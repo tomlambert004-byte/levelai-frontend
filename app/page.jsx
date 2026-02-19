@@ -1465,6 +1465,237 @@ function CalendarView({ patients, results, triageMap, onSelectDay, currentDayLoc
   );
 }
 
+// ── Week Ahead ────────────────────────────────────────────────────────────────
+function WeekAhead({ patients, agentLog, triageMap, results, onApprove, onDismiss, showToast, onSelectPatient, isMounted }) {
+  const today = isMounted ? new Date() : new Date();
+  const todayStr = today.toISOString().split("T")[0];
+
+  // Build the next 7 weekdays
+  const weekDays = getNextWeekdays(today, 7);
+
+  // All upcoming patients (today + this week) sorted by appointment date
+  const weekPatients = patients.filter(p => {
+    return p.appointmentDate && p.appointmentDate >= todayStr;
+  }).sort((a, b) => (a.appointmentDate + (a.appointmentTime||"")) < (b.appointmentDate + (b.appointmentTime||"")) ? -1 : 1);
+
+  // Issues = patients with a triage entry
+  const issuePatients = weekPatients.filter(p => {
+    const t = triageMap[p.id];
+    return t && (t.block.length > 0 || t.notify.length > 0);
+  });
+
+  const clearPatients = weekPatients.filter(p => {
+    const t = triageMap[p.id];
+    return !t || (t.block.length === 0 && t.notify.length === 0);
+  });
+
+  // Pending action queue entries
+  const pendingActions = agentLog.filter(e => e.awaitingApproval);
+
+  const fmtDate = (dateStr) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr + "T12:00:00");
+    const isToday = dateStr === todayStr;
+    const label = isToday ? "Today" : d.toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric" });
+    return label;
+  };
+
+  const criticalCount = issuePatients.filter(p => triageMap[p.id]?.block.length > 0).length;
+  const warnCount = issuePatients.filter(p => triageMap[p.id]?.block.length === 0 && triageMap[p.id]?.notify.length > 0).length;
+
+  return (
+    <div style={{ padding:24, height:"100%", display:"flex", flexDirection:"column", overflow:"hidden" }}>
+
+      {/* Header */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20, flexShrink:0 }}>
+        <div>
+          <div style={{ color:T.text, fontSize:22, fontWeight:900 }}>&#x1F4C5; Week Ahead</div>
+          <div style={{ color:T.textSoft, fontSize:13, marginTop:2 }}>Upcoming patient issues that need to be addressed before appointments.</div>
+        </div>
+        <div style={{ display:"flex", gap:10 }}>
+          {criticalCount > 0 && (
+            <div style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", borderRadius:20, background:T.redLight, border:"1px solid " + T.redBorder, color:T.red, fontSize:12, fontWeight:800 }}>
+              <span style={{ width:8, height:8, borderRadius:"50%", background:T.red }} />
+              {criticalCount} Critical
+            </div>
+          )}
+          {warnCount > 0 && (
+            <div style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", borderRadius:20, background:T.amberLight, border:"1px solid " + T.amberBorder, color:T.amberDark, fontSize:12, fontWeight:800 }}>
+              <span style={{ width:8, height:8, borderRadius:"50%", background:T.amber }} />
+              {warnCount} Heads-up
+            </div>
+          )}
+          <div style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", borderRadius:20, background:T.limeLight, border:"1px solid " + T.limeBorder, color:T.limeDark, fontSize:12, fontWeight:800 }}>
+            {clearPatients.length} Clear
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display:"flex", gap:20, flex:1, minHeight:0, overflow:"hidden" }}>
+
+        {/* Left: patient issue list */}
+        <div style={{ flex:1, display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden" }}>
+          <div style={{ overflowY:"auto", flex:1, minHeight:0, display:"flex", flexDirection:"column", gap:10, paddingRight:6 }}>
+
+            {weekPatients.length === 0 && (
+              <div style={{ textAlign:"center", color:T.textSoft, fontSize:14, marginTop:60 }}>No upcoming patients this week.</div>
+            )}
+
+            {issuePatients.length > 0 && (
+              <>
+                <div style={{ fontSize:11, fontWeight:900, color:T.textSoft, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4, flexShrink:0 }}>Needs Attention</div>
+                {issuePatients.map(p => {
+                  const t = triageMap[p.id];
+                  const isCritical = t.block.length > 0;
+                  const pendingEntry = agentLog.find(e => e.patientId === p.id && e.awaitingApproval);
+
+                  return (
+                    <div key={p.id} style={{ background:T.bgCard, border:"1.5px solid " + (isCritical ? T.redBorder : T.amberBorder), borderRadius:14, overflow:"hidden", flexShrink:0, boxShadow:"0 2px 8px rgba(0,0,0,0.04)" }}>
+                      {/* Patient header */}
+                      <div style={{ background: isCritical ? T.redLight : T.amberLight, padding:"12px 16px", borderBottom:"1px solid " + (isCritical ? T.redBorder : T.amberBorder), display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <div>
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            <span style={{ fontSize:15, fontWeight:900, color:T.text }}>{p.name}</span>
+                            <Badge
+                              label={isCritical ? "Critical" : "Heads-up"}
+                              color={isCritical ? T.red : T.amberDark}
+                              bg={isCritical ? T.redLight : T.amberLight}
+                              border={isCritical ? T.redBorder : T.amberBorder}
+                            />
+                          </div>
+                          <div style={{ fontSize:11, color:T.textMid, marginTop:4 }}>
+                            {fmtDate(p.appointmentDate)}{p.appointmentTime ? " · " + p.appointmentTime : ""} · {p.procedure || "Procedure TBD"}
+                          </div>
+                        </div>
+                        <button onClick={() => onSelectPatient(p)} style={{ background:"transparent", border:"1px solid " + (isCritical ? T.redBorder : T.amberBorder), borderRadius:8, padding:"6px 12px", cursor:"pointer", fontSize:11, fontWeight:700, color:T.textMid }}>
+                          View Chart
+                        </button>
+                      </div>
+
+                      {/* Issues */}
+                      <div style={{ padding:"12px 16px 0 16px" }}>
+                        {(isCritical ? t.block : t.notify).map((reason, i) => (
+                          <div key={i} style={{ display:"flex", gap:8, marginBottom:8 }}>
+                            <span style={{ color: isCritical ? T.red : T.amberDark, fontSize:14, flexShrink:0 }}>•</span>
+                            <span style={{ color:T.textMid, fontSize:12, fontWeight:600, lineHeight:"1.4" }}>{reason}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* AI draft + action buttons */}
+                      {pendingEntry && (
+                        <div style={{ padding:"0 16px 16px 16px" }}>
+                          <div style={{ background:T.bg, border:"1px solid " + T.border, borderRadius:8, padding:"10px 12px", margin:"8px 0 12px 0" }}>
+                            <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>&#x1F916; AI Draft Text</div>
+                            <div style={{ color:T.textMid, fontSize:12, lineHeight:"1.5" }}>&ldquo;{pendingEntry.draftMessage}&rdquo;</div>
+                          </div>
+                          <div style={{ display:"flex", gap:8 }}>
+                            <button
+                              onClick={() => { onApprove(pendingEntry); showToast("Message sent to " + p.name + "!"); }}
+                              style={{ flex:1, padding:"10px 14px", borderRadius:8, border:"none", background:T.indigoDark, color:"#fff", fontWeight:800, cursor:"pointer", fontSize:12 }}>
+                              Approve Draft + Send
+                            </button>
+                            <button
+                              onClick={() => { onDismiss(pendingEntry); showToast("Marked as handled."); }}
+                              style={{ padding:"10px 16px", borderRadius:8, border:"1px solid " + T.borderStrong, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:12, whiteSpace:"nowrap" }}>
+                              I&apos;ll Handle It
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {!pendingEntry && (
+                        <div style={{ padding:"0 16px 14px 16px" }}>
+                          <div style={{ color:T.textSoft, fontSize:11, fontWeight:700, fontStyle:"italic" }}>
+                            {agentLog.find(e => e.patientId === p.id && e.action === ACTION.APPROVED)
+                              ? "✓ Message sent"
+                              : agentLog.find(e => e.patientId === p.id && e.action === ACTION.DISMISSED)
+                              ? "✓ Handled manually"
+                              : "Verification in progress…"}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
+            {clearPatients.length > 0 && (
+              <>
+                <div style={{ fontSize:11, fontWeight:900, color:T.textSoft, textTransform:"uppercase", letterSpacing:"0.08em", marginTop: issuePatients.length > 0 ? 12 : 0, marginBottom:4, flexShrink:0 }}>All Clear</div>
+                {clearPatients.map(p => (
+                  <div key={p.id} onClick={() => onSelectPatient(p)}
+                    style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:12, padding:"12px 16px", display:"flex", alignItems:"center", gap:12, cursor:"pointer", transition:"0.15s", flexShrink:0 }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = T.limeBorder}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = T.border}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                        <span style={{ fontSize:13, fontWeight:800, color:T.text }}>{p.name}</span>
+                        <Badge label="Clear" color={T.limeDark} bg={T.limeLight} border={T.limeBorder} />
+                      </div>
+                      <div style={{ fontSize:11, color:T.textSoft, marginTop:3 }}>
+                        {fmtDate(p.appointmentDate)}{p.appointmentTime ? " · " + p.appointmentTime : ""} · {p.procedure || "Procedure TBD"}
+                      </div>
+                    </div>
+                    <div style={{ color:T.textSoft, fontSize:11, fontWeight:700 }}>View &rarr;</div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Action queue panel (pending only) */}
+        {pendingActions.length > 0 && (
+          <div style={{ width:400, flexShrink:0, display:"flex", flexDirection:"column", background:T.bgCard, border:"1px solid " + T.border, borderRadius:12, overflow:"hidden" }}>
+            <div style={{ padding:"16px 20px", borderBottom:"1px solid " + T.border, background:T.bg, flexShrink:0 }}>
+              <div style={{ fontSize:15, fontWeight:900, color:T.text }}>Action Queue</div>
+              <div style={{ fontSize:11, color:T.textSoft, marginTop:2 }}>{pendingActions.length} pending · Review AI-drafted messages below</div>
+            </div>
+            <div style={{ flex:1, overflowY:"auto", minHeight:0, padding:"16px", display:"flex", flexDirection:"column", gap:14 }}>
+              {pendingActions.map(entry => {
+                const isReschedule = entry.action === ACTION.RESCHEDULE;
+                return (
+                  <div key={entry.id} style={{ border:"1.5px solid " + (isReschedule ? T.redBorder : T.amberBorder), borderRadius:12, overflow:"hidden", flexShrink:0 }}>
+                    <div style={{ background: isReschedule ? T.redLight : T.amberLight, padding:"10px 14px", borderBottom:"1px solid " + (isReschedule ? T.redBorder : T.amberBorder) }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                        <span style={{ fontSize:13, fontWeight:900, color:T.text }}>{entry.patient}</span>
+                        <span style={{ fontSize:11, fontWeight:800, color: isReschedule ? T.red : T.amberDark }}>{isReschedule ? "Reschedule" : "Outreach"}</span>
+                      </div>
+                      {entry.appointmentDate && (
+                        <div style={{ fontSize:11, color:T.textMid, marginTop:2 }}>{fmtDate(entry.appointmentDate)} · {entry.procedure}</div>
+                      )}
+                    </div>
+                    <div style={{ padding:"12px 14px" }}>
+                      <div style={{ background:T.bg, border:"1px solid " + T.border, borderRadius:8, padding:"10px 12px", marginBottom:10 }}>
+                        <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>AI SMS Draft</div>
+                        <div style={{ color:T.textMid, fontSize:12, lineHeight:"1.5" }}>&ldquo;{entry.draftMessage}&rdquo;</div>
+                      </div>
+                      <div style={{ display:"flex", gap:8 }}>
+                        <button
+                          onClick={() => { onApprove(entry); showToast("Message sent!"); }}
+                          style={{ flex:1, padding:"10px 10px", borderRadius:8, border:"none", background:T.indigoDark, color:"#fff", fontWeight:800, cursor:"pointer", fontSize:12 }}>
+                          Approve Draft + Send
+                        </button>
+                        <button
+                          onClick={() => { onDismiss(entry); showToast("Removed from queue."); }}
+                          style={{ padding:"10px 12px", borderRadius:8, border:"1px solid " + T.borderStrong, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:12, whiteSpace:"nowrap" }}>
+                          I&apos;ll Handle It
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── AI Workflow ───────────────────────────────────────────────────────────────
 function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast }) {
   const [showAttentionPanel, setShowAttentionPanel] = useState(true);
@@ -2209,7 +2440,7 @@ export default function LevelAI() {
 
   // ── Core data state ──────────────────────────────────────────────────────────
   const [isMounted, setIsMounted]         = useState(false);
-  const [tab, setTab]                     = useState("calendar");
+  const [tab, setTab]                     = useState("week");
 
   // patients: the flat list for today's Kanban + DayCardPanel.
   // CalendarView now only needs per-day summary counts (calendarSummary),
@@ -2540,8 +2771,8 @@ export default function LevelAI() {
         <div style={{ display:"flex", gap:4 }}>
           {[
             { id:"schedule",  label:"Daily Schedule" },
-            { id:"calendar",  label:"Office Calendar" },
-            { id:"agent",     label:"AI Workflow", badge: agentLog.filter(e=>e.awaitingApproval).length },
+            { id:"week",      label:"Week Ahead", badge: agentLog.filter(e=>e.awaitingApproval).length },
+            { id:"agent",     label:"AI Workflow" },
             { id:"analytics", label:"Analytics" },
             { id:"settings",  label:"Settings" },
           ].map(tItem => (
@@ -2615,65 +2846,19 @@ export default function LevelAI() {
 
         {tab === "settings" && <Settings showToast={showToast} />}
 
-        {/* ── Calendar tab ─────────────────────────────────────────────── */}
-        {tab === "calendar" && (
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 380px", height:"100%", overflow:"hidden" }}>
-
-            {/*
-              CalendarView now accepts `calendarSummary` (a date→{count,hasAlert,...} map)
-              instead of the full patient array. It calls `onMonthChange` when the user
-              navigates to a different month so we can fetch that month's summaries.
-              The existing `patients` + `triageMap` props remain as fallback for
-              today's already-loaded data to avoid a double flash.
-            */}
-            <CalendarView
-              patients={patients}
-              calendarSummary={calendarSummary}
-              calendarLoading={calendarLoading}
-              results={results}
-              triageMap={triageMap}
-              onSelectDay={handleSelectDay}
-              onMonthChange={(yr, mo) => {
-                const monthStr = `${yr}-${String(mo+1).padStart(2,"0")}`;
-                loadCalendar(monthStr);
-              }}
-              currentDayLocal={isMounted ? new Date() : null}
-            />
-
-            <div style={{ borderLeft:"1px solid " + T.border, background:T.bgCard, height:"100%", overflow:"hidden", display:"flex", flexDirection:"column" }}>
-              {selectedDayDate ? (
-                dayPanelLoading || selectedDayPatients === null ? (
-                  // DayCardPanel skeleton while fetching
-                  <div style={{ padding:20, display:"flex", flexDirection:"column", gap:14 }}>
-                    <div style={{ display:"flex", justifyContent:"space-between" }}>
-                      <Skeleton w={120} h={18} />
-                      <Skeleton w={24} h={24} r={6} />
-                    </div>
-                    {[0,1,2,3,4].map(i => (
-                      <div key={i} style={{ background:T.bg, borderRadius:10, padding:"12px 14px", display:"flex", flexDirection:"column", gap:8 }}>
-                        <Skeleton w="60%" h={13} />
-                        <Skeleton w="40%" h={10} />
-                        <Skeleton w="80%" h={10} />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <DayCardPanel
-                    date={selectedDayDate}
-                    patientsOnDay={selectedDayPatients}
-                    results={results}
-                    triageMap={triageMap}
-                    onClose={() => { setSelectedDayDate(null); setSelectedDayPatients(null); }}
-                    onAddPatientClick={handleAddPatientClick}
-                    onPatientClick={(p) => { setSelected(p); setSchedulePanel("benefits"); setTab("schedule"); }}
-                    onRemovePatient={handleRemovePatient}
-                  />
-                )
-              ) : (
-                <CalendarMonthSummaryPanel patients={patients} showToast={showToast} />
-              )}
-            </div>
-          </div>
+        {/* ── Week Ahead tab ────────────────────────────────────────────── */}
+        {tab === "week" && (
+          <WeekAhead
+            patients={patients}
+            agentLog={agentLog}
+            triageMap={triageMap}
+            results={results}
+            onApprove={handleApprove}
+            onDismiss={handleDismiss}
+            showToast={showToast}
+            onSelectPatient={p => { setSelected(p); setTab("schedule"); }}
+            isMounted={isMounted}
+          />
         )}
 
         {/* ── Daily Schedule tab ───────────────────────────────────────── */}
