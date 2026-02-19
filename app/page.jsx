@@ -2472,6 +2472,10 @@ function ToastBar({ msg }) {
 export default function LevelAI() {
   const { isSignedIn, isLoaded } = useAuth();
   const [toastMsg, setToastMsg] = useState("");
+  const showToast = useCallback((msg) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(""), 3500);
+  }, []);
 
   // ── Core data state ──────────────────────────────────────────────────────────
   const [isMounted, setIsMounted]         = useState(false);
