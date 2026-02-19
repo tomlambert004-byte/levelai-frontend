@@ -1594,325 +1594,145 @@ function CalendarView({ patients, results, triageMap, onSelectDay, currentDayLoc
 }
 
 // ── Week Ahead ────────────────────────────────────────────────────────────────
-function WeekAhead({ patients, agentLog, triageMap, results, onApprove, onDismiss, showToast, onSelectPatient, onVerify, isMounted }) {
-  const today = isMounted ? new Date() : new Date();
+// ── Clean Week Ahead — 3 Category Boxes + Modal ─────────────────────────────────
+function WeekAhead({ patients, results, triageMap, agentLog, showToast, onSelectPatient, onVerify }) {
+  const [modalCategory, setModalCategory] = useState(null);
+
+  const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
-  const [expandedPatient, setExpandedPatient] = useState(null);
 
-  // Build the next 7 weekdays
-  const weekDays = getNextWeekdays(today, 7);
+  const allUpcoming = patients.filter(p => p.appointmentDate >= todayStr);
 
-  // All upcoming patients (today + this week) sorted by appointment date
-  const weekPatients = patients.filter(p => {
-    return p.appointmentDate && p.appointmentDate >= todayStr;
-  }).sort((a, b) => (a.appointmentDate + (a.appointmentTime||"")) < (b.appointmentDate + (b.appointmentTime||"")) ? -1 : 1);
-
-  // Issues = patients with a triage entry
-  const issuePatients = weekPatients.filter(p => {
+  const critical = allUpcoming.filter(p => {
     const t = triageMap[p.id];
-    return t && (t.block.length > 0 || t.notify.length > 0);
+    return t && t.block.length > 0;
   });
 
-  const clearPatients = weekPatients.filter(p => {
+  const headsUp = allUpcoming.filter(p => {
+    const t = triageMap[p.id];
+    return t && t.block.length === 0 && t.notify.length > 0;
+  });
+
+  const clear = allUpcoming.filter(p => {
     const t = triageMap[p.id];
     return !t || (t.block.length === 0 && t.notify.length === 0);
   });
 
-  // Pending action queue entries
-  const pendingActions = agentLog.filter(e => e.awaitingApproval);
+  const openModal = (cat) => setModalCategory(cat);
+  const closeModal = () => setModalCategory(null);
 
-  const fmtDate = (dateStr) => {
-    if (!dateStr) return "";
-    const d = new Date(dateStr + "T12:00:00");
-    const isToday = dateStr === todayStr;
-    const label = isToday ? "Today" : d.toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric" });
-    return label;
+  const categoryPatients = {
+    critical,
+    headsUp,
+    clear,
   };
 
-  const criticalCount = issuePatients.filter(p => triageMap[p.id]?.block.length > 0).length;
-  const warnCount = issuePatients.filter(p => triageMap[p.id]?.block.length === 0 && triageMap[p.id]?.notify.length > 0).length;
+  const categoryConfig = {
+    critical: { label: "Critical", color: T.red, bg: T.redLight, border: T.redBorder, count: critical.length },
+    headsUp: { label: "Heads Up", color: T.amberDark, bg: T.amberLight, border: T.amberBorder, count: headsUp.length },
+    clear: { label: "Clear", color: T.limeDark, bg: T.limeLight, border: T.limeBorder, count: clear.length },
+  };
 
   return (
-    <div style={{ padding:24, height:"100%", display:"flex", flexDirection:"column", overflow:"hidden" }}>
-
-      {/* Header */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:20, flexShrink:0 }}>
-        <div>
-          <div style={{ color:T.text, fontSize:22, fontWeight:900 }}>&#x1F4C5; Week Ahead</div>
-          <div style={{ color:T.textSoft, fontSize:13, marginTop:2 }}>Upcoming patient issues that need to be addressed before appointments.</div>
-        </div>
-        <div style={{ display:"flex", gap:10 }}>
-          {criticalCount > 0 && (
-            <div style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", borderRadius:20, background:T.redLight, border:"1px solid " + T.redBorder, color:T.red, fontSize:12, fontWeight:800 }}>
-              <span style={{ width:8, height:8, borderRadius:"50%", background:T.red }} />
-              {criticalCount} Critical
-            </div>
-          )}
-          {warnCount > 0 && (
-            <div style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", borderRadius:20, background:T.amberLight, border:"1px solid " + T.amberBorder, color:T.amberDark, fontSize:12, fontWeight:800 }}>
-              <span style={{ width:8, height:8, borderRadius:"50%", background:T.amber }} />
-              {warnCount} Heads-up
-            </div>
-          )}
-          <div style={{ display:"flex", alignItems:"center", gap:6, padding:"8px 14px", borderRadius:20, background:T.limeLight, border:"1px solid " + T.limeBorder, color:T.limeDark, fontSize:12, fontWeight:800 }}>
-            {clearPatients.length} Clear
-          </div>
+    <div style={{ padding: 24, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 22, fontWeight: 900 }}>Week Ahead</div>
+        <div style={{ fontSize: 13, color: T.textSoft }}>
+          {allUpcoming.length} patients • Issues that need attention
         </div>
       </div>
 
-      <div style={{ display:"flex", gap:20, flex:1, minHeight:0, overflow:"hidden" }}>
+      {/* 3 Dynamic Category Boxes */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, flex: 1, minHeight: 0 }}>
+        {["critical", "headsUp", "clear"].map(cat => {
+          const cfg = categoryConfig[cat];
+          const patientsInCat = categoryPatients[cat];
 
-        {/* Left: patient issue list */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", minHeight:0, overflow:"hidden" }}>
-          <div style={{ overflowY:"auto", flex:1, minHeight:0, display:"flex", flexDirection:"column", gap:10, paddingRight:6 }}>
+          return (
+            <div
+              key={cat}
+              onClick={() => openModal(cat)}
+              style={{
+                background: cfg.bg,
+                border: `2px solid ${cfg.border}`,
+                borderRadius: 16,
+                padding: 24,
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                alignItems: "center",
+                transition: "all 0.2s",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 12px 24px rgba(0,0,0,0.08)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.04)"; }}
+            >
+              <div style={{ fontSize: 48, fontWeight: 900, color: cfg.color, marginBottom: 8 }}>
+                {cfg.count}
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: cfg.color }}>
+                {cfg.label}
+              </div>
+              <div style={{ fontSize: 12, color: T.textSoft, marginTop: 8 }}>
+                {patientsInCat.length} patient{patientsInCat.length !== 1 ? "s" : ""}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-            {weekPatients.length === 0 && (
-              <div style={{ textAlign:"center", color:T.textSoft, fontSize:14, marginTop:60 }}>No upcoming patients this week.</div>
-            )}
+      {/* Modal */}
+      {modalCategory && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={closeModal}>
+          <div style={{ background: T.bgCard, width: "90%", maxWidth: 620, borderRadius: 16, overflow: "hidden", maxHeight: "88vh", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid " + T.border, display: "flex", justifyContent: "space-between", alignItems: "center", background: categoryConfig[modalCategory].bg }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: categoryConfig[modalCategory].color }}>
+                {categoryConfig[modalCategory].label} Patients
+              </div>
+              <button onClick={closeModal} style={{ fontSize: 24, color: T.textSoft, background: "none", border: "none", cursor: "pointer" }}>✕</button>
+            </div>
 
-            {issuePatients.length > 0 && (
-              <>
-                <div style={{ fontSize:11, fontWeight:900, color:T.textSoft, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4, flexShrink:0 }}>Needs Attention</div>
-                {issuePatients.map(p => {
+            <div style={{ flex: 1, overflowY: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 12 }}>
+              {categoryPatients[modalCategory].length === 0 ? (
+                <div style={{ textAlign: "center", color: T.textSoft, padding: 40 }}>No patients in this category.</div>
+              ) : (
+                categoryPatients[modalCategory].map(p => {
                   const t = triageMap[p.id];
-                  const isCritical = t.block.length > 0;
-                  const pendingEntry = agentLog.find(e => e.patientId === p.id && e.awaitingApproval);
-
+                  const reasons = t ? (t.block.length > 0 ? t.block : t.notify) : [];
                   return (
-                    <div key={p.id} style={{ background:T.bgCard, border:"1.5px solid " + (isCritical ? T.redBorder : T.amberBorder), borderRadius:14, overflow:"hidden", flexShrink:0, boxShadow:"0 2px 8px rgba(0,0,0,0.04)" }}>
-                      {/* Patient header */}
-                      <div style={{ background: isCritical ? T.redLight : T.amberLight, padding:"12px 16px", borderBottom:"1px solid " + (isCritical ? T.redBorder : T.amberBorder), display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <div key={p.id} style={{ border: "1px solid " + T.border, borderRadius: 12, padding: 16, cursor: "pointer", background: T.bg }} onClick={() => { onSelectPatient(p); closeModal(); }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
-                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                            <span style={{ fontSize:15, fontWeight:900, color:T.text }}>{p.name}</span>
-                            <Badge
-                              label={isCritical ? "Critical" : "Heads-up"}
-                              color={isCritical ? T.red : T.amberDark}
-                              bg={isCritical ? T.redLight : T.amberLight}
-                              border={isCritical ? T.redBorder : T.amberBorder}
-                            />
-                          </div>
-                          <div style={{ fontSize:11, color:T.textMid, marginTop:4 }}>
-                            {fmtDate(p.appointmentDate)}{p.appointmentTime ? " · " + p.appointmentTime : ""} · {p.procedure || "Procedure TBD"}
+                          <div style={{ fontWeight: 800, fontSize: 16 }}>{p.name}</div>
+                          <div style={{ fontSize: 12, color: T.textMid, marginTop: 2 }}>
+                            {p.appointmentDate} · {p.appointmentTime} · {p.procedure}
                           </div>
                         </div>
-                        <button onClick={() => setExpandedPatient(expandedPatient?.id === p.id ? null : p)} style={{ background:"transparent", border:"1px solid " + (isCritical ? T.redBorder : T.amberBorder), borderRadius:8, padding:"6px 12px", cursor:"pointer", fontSize:11, fontWeight:700, color:T.textMid }}>
-                          {expandedPatient?.id === p.id ? "Close ✕" : "View Benefits"}
-                        </button>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 11, color: T.textSoft }}>{p.insurance}</div>
+                        </div>
                       </div>
 
-                      {/* Issues */}
-                      <div style={{ padding:"12px 16px 0 16px" }}>
-                        {(isCritical ? t.block : t.notify).map((reason, i) => (
-                          <div key={i} style={{ display:"flex", gap:8, marginBottom:8 }}>
-                            <span style={{ color: isCritical ? T.red : T.amberDark, fontSize:14, flexShrink:0 }}>•</span>
-                            <span style={{ color:T.textMid, fontSize:12, fontWeight:600, lineHeight:"1.4" }}>{reason}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* AI draft + action buttons */}
-                      {pendingEntry && (
-                        <div style={{ padding:"0 16px 16px 16px" }}>
-                          <div style={{ background:T.bg, border:"1px solid " + T.border, borderRadius:8, padding:"10px 12px", margin:"8px 0 12px 0" }}>
-                            <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>&#x1F916; AI Draft Text</div>
-                            <div style={{ color:T.textMid, fontSize:12, lineHeight:"1.5" }}>&ldquo;{pendingEntry.draftMessage}&rdquo;</div>
-                          </div>
-                          <div style={{ display:"flex", gap:8 }}>
-                            <button
-                              onClick={() => { onApprove(pendingEntry); showToast("Message sent to " + p.name + "!"); }}
-                              style={{ flex:1, padding:"10px 14px", borderRadius:8, border:"none", background:T.indigoDark, color:"#fff", fontWeight:800, cursor:"pointer", fontSize:12 }}>
-                              Approve Draft + Send
-                            </button>
-                            <button
-                              onClick={() => { onDismiss(pendingEntry); showToast("Marked as handled."); }}
-                              style={{ padding:"10px 16px", borderRadius:8, border:"1px solid " + T.borderStrong, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:12, whiteSpace:"nowrap" }}>
-                              I&apos;ll Handle It
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {!pendingEntry && (
-                        <div style={{ padding:"0 16px 14px 16px" }}>
-                          <div style={{ color:T.textSoft, fontSize:11, fontWeight:700, fontStyle:"italic" }}>
-                            {agentLog.find(e => e.patientId === p.id && e.action === ACTION.APPROVED)
-                              ? "✓ Message sent"
-                              : agentLog.find(e => e.patientId === p.id && e.action === ACTION.DISMISSED)
-                              ? "✓ Handled manually"
-                              : "Verification in progress…"}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Inline expanded benefit panel */}
-                      {expandedPatient?.id === p.id && (() => {
-                        const r = results[p.id];
-                        if (!r) return (
-                          <div style={{ padding:"12px 16px 16px", borderTop:"1px solid " + T.border }}>
-                            <div style={{ color:T.textSoft, fontSize:12 }}>No verification data yet. Run verification from the Schedule tab.</div>
-                          </div>
-                        );
-                        const dedMet = (r.individual_deductible_met_cents||0) >= (r.individual_deductible_cents||1);
-                        return (
-                          <div style={{ padding:"14px 16px 16px", borderTop:"1px solid " + T.border, background:T.bg }}>
-                            {r.ai_summary && (
-                              <div style={{ background:"#1e2a1e", border:"1px solid " + T.limeBorder, borderRadius:8, padding:"10px 12px", marginBottom:12 }}>
-                                <div style={{ color:T.lime, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:5 }}>&#x1F916; AI Summary</div>
-                                <div style={{ color:"#c8f0c8", fontSize:11, lineHeight:"1.6" }}>{r.ai_summary}</div>
-                              </div>
-                            )}
-                            {r.estimated_patient_responsibility_cents != null && (
-                              <div style={{ background:T.amberLight, border:"1px solid " + T.amberBorder, borderRadius:8, padding:"8px 12px", marginBottom:12, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                                <span style={{ color:T.amberDark, fontSize:11, fontWeight:700 }}>Est. Patient Responsibility</span>
-                                <span style={{ color:T.amberDark, fontSize:16, fontWeight:900 }}>{dollars(r.estimated_patient_responsibility_cents)}</span>
-                              </div>
-                            )}
-                            <div style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:8, overflow:"hidden", marginBottom:8 }}>
-                              {[
-                                { label:"Payer", value: r.payer_name },
-                                { label:"Annual Max", value: dollars(r.annual_maximum_cents) },
-                                { label:"Remaining", value: dollars(r.annual_remaining_cents), warn:(r.annual_remaining_cents||0)<30000 },
-                                { label:"Deductible", value: dollars(r.individual_deductible_cents) },
-                                { label:"Deductible Met", value: dedMet ? "Yes ✓" : "No — $" + (((r.individual_deductible_cents||0)-(r.individual_deductible_met_cents||0))/100).toFixed(0) + " gap", warn:!dedMet },
-                                r.copay_pct ? { label:"Insurance Pays", value: r.copay_pct + "%" } : null,
-                                r.preventive ? { label:"Preventive", value: r.preventive.coverage_pct + "%" } : null,
-                                r.basic ? { label:"Basic", value: r.basic.coverage_pct + "%" } : null,
-                                r.restorative ? { label:"Major/Restorative", value: r.restorative.coverage_pct + "%" } : null,
-                                r.restorative?.crown_waiting_period_months > 0 ? { label:"Crown Waiting Period", value: r.restorative.crown_waiting_period_months + " months", warn:true } : null,
-                                r.restorative?.composite_posterior_downgrade ? { label:"Composite Downgrade", value:"Yes — amalgam rate", warn:true } : null,
-                                r.ortho?.covered ? { label:"Ortho Lifetime Max", value: dollars(r.ortho.lifetime_maximum_cents) } : null,
-                              ].filter(Boolean).map((row,i,arr) => (
-                                <div key={row.label} style={{ display:"flex", justifyContent:"space-between", padding:"7px 12px", borderBottom:i<arr.length-1?"1px solid "+T.border:"none" }}>
-                                  <span style={{ color:T.textMid, fontSize:11, fontWeight:600 }}>{row.label}</span>
-                                  <span style={{ color:row.warn?T.amber:T.text, fontSize:12, fontWeight:700 }}>{row.value}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  );
-                })}
-              </>
-            )}
-
-            {clearPatients.length > 0 && (
-              <>
-                <div style={{ fontSize:11, fontWeight:900, color:T.textSoft, textTransform:"uppercase", letterSpacing:"0.08em", marginTop: issuePatients.length > 0 ? 12 : 0, marginBottom:4, flexShrink:0 }}>All Clear</div>
-                {clearPatients.map(p => {
-                  const isExpanded = expandedPatient?.id === p.id;
-                  const r = results[p.id];
-                  return (
-                    <div key={p.id}
-                      style={{ background:T.bgCard, border:"1px solid " + (isExpanded ? T.limeBorder : T.border), borderRadius:12, overflow:"hidden", flexShrink:0, transition:"0.15s" }}>
-                      <div onClick={() => setExpandedPatient(isExpanded ? null : p)}
-                        style={{ padding:"12px 16px", display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}
-                        onMouseEnter={e => e.currentTarget.parentElement.style.borderColor = T.limeBorder}
-                        onMouseLeave={e => e.currentTarget.parentElement.style.borderColor = isExpanded ? T.limeBorder : T.border}>
-                        <div style={{ flex:1 }}>
-                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                            <span style={{ fontSize:13, fontWeight:800, color:T.text }}>{p.name}</span>
-                            <Badge label="Clear" color={T.limeDark} bg={T.limeLight} border={T.limeBorder} />
-                          </div>
-                          <div style={{ fontSize:11, color:T.textSoft, marginTop:3 }}>
-                            {fmtDate(p.appointmentDate)}{p.appointmentTime ? " · " + p.appointmentTime : ""} · {p.procedure || "Procedure TBD"}
-                          </div>
-                        </div>
-                        <div style={{ color:T.textSoft, fontSize:11, fontWeight:700 }}>{isExpanded ? "Close ✕" : "View →"}</div>
-                      </div>
-                      {isExpanded && r && (
-                        <div style={{ padding:"12px 16px 14px", borderTop:"1px solid " + T.border, background:T.bg }}>
-                          {r.ai_summary && (
-                            <div style={{ background:"#1e2a1e", border:"1px solid " + T.limeBorder, borderRadius:8, padding:"10px 12px", marginBottom:10 }}>
-                              <div style={{ color:T.lime, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:5 }}>&#x1F916; AI Summary</div>
-                              <div style={{ color:"#c8f0c8", fontSize:11, lineHeight:"1.6" }}>{r.ai_summary}</div>
-                            </div>
-                          )}
-                          {r.estimated_patient_responsibility_cents != null && (
-                            <div style={{ background:T.amberLight, border:"1px solid " + T.amberBorder, borderRadius:8, padding:"8px 12px", marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                              <span style={{ color:T.amberDark, fontSize:11, fontWeight:700 }}>Est. Patient Responsibility</span>
-                              <span style={{ color:T.amberDark, fontSize:16, fontWeight:900 }}>{dollars(r.estimated_patient_responsibility_cents)}</span>
-                            </div>
-                          )}
-                          <div style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:8, overflow:"hidden" }}>
-                            {[
-                              { label:"Payer", value: r.payer_name },
-                              { label:"Annual Max", value: dollars(r.annual_maximum_cents) },
-                              { label:"Remaining", value: dollars(r.annual_remaining_cents) },
-                              { label:"Deductible Met", value:(r.individual_deductible_met_cents||0)>=(r.individual_deductible_cents||1)?"Yes ✓":"No" },
-                              r.copay_pct ? { label:"Insurance Pays", value: r.copay_pct + "%" } : null,
-                              r.preventive ? { label:"Preventive", value: r.preventive.coverage_pct + "%" } : null,
-                              r.basic ? { label:"Basic", value: r.basic.coverage_pct + "%" } : null,
-                              r.restorative ? { label:"Major/Restorative", value: r.restorative.coverage_pct + "%" } : null,
-                            ].filter(Boolean).map((row,i,arr) => (
-                              <div key={row.label} style={{ display:"flex", justifyContent:"space-between", padding:"7px 12px", borderBottom:i<arr.length-1?"1px solid "+T.border:"none" }}>
-                                <span style={{ color:T.textMid, fontSize:11, fontWeight:600 }}>{row.label}</span>
-                                <span style={{ color:T.text, fontSize:12, fontWeight:700 }}>{row.value}</span>
-                              </div>
-                            ))}
-                          </div>
+                      {reasons.length > 0 && (
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: T.textSoft, marginBottom: 6 }}>WHY THEY ARE HERE</div>
+                          {reasons.map((r, i) => (
+                            <div key={i} style={{ fontSize: 12, color: T.textMid, padding: "4px 0" }}>• {r}</div>
+                          ))}
                         </div>
                       )}
                     </div>
                   );
-                })}
-              </>
-            )}
+                })
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Right: Action queue panel (pending only) */}
-        {pendingActions.length > 0 && (
-          <div style={{ width:400, flexShrink:0, display:"flex", flexDirection:"column", background:T.bgCard, border:"1px solid " + T.border, borderRadius:12, overflow:"hidden" }}>
-            <div style={{ padding:"16px 20px", borderBottom:"1px solid " + T.border, background:T.bg, flexShrink:0 }}>
-              <div style={{ fontSize:15, fontWeight:900, color:T.text }}>Action Queue</div>
-              <div style={{ fontSize:11, color:T.textSoft, marginTop:2 }}>{pendingActions.length} pending · Review AI-drafted messages below</div>
-            </div>
-            <div style={{ flex:1, overflowY:"auto", minHeight:0, padding:"16px", display:"flex", flexDirection:"column", gap:14 }}>
-              {pendingActions.map(entry => {
-                const isReschedule = entry.action === ACTION.RESCHEDULE;
-                return (
-                  <div key={entry.id} style={{ border:"1.5px solid " + (isReschedule ? T.redBorder : T.amberBorder), borderRadius:12, overflow:"hidden", flexShrink:0 }}>
-                    <div style={{ background: isReschedule ? T.redLight : T.amberLight, padding:"10px 14px", borderBottom:"1px solid " + (isReschedule ? T.redBorder : T.amberBorder) }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                        <span style={{ fontSize:13, fontWeight:900, color:T.text }}>{entry.patient}</span>
-                        <span style={{ fontSize:11, fontWeight:800, color: isReschedule ? T.red : T.amberDark }}>{isReschedule ? "Reschedule" : "Outreach"}</span>
-                      </div>
-                      {entry.appointmentDate && (
-                        <div style={{ fontSize:11, color:T.textMid, marginTop:2 }}>{fmtDate(entry.appointmentDate)} · {entry.procedure}</div>
-                      )}
-                    </div>
-                    <div style={{ padding:"12px 14px" }}>
-                      <div style={{ background:T.bg, border:"1px solid " + T.border, borderRadius:8, padding:"10px 12px", marginBottom:10 }}>
-                        <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:5 }}>AI SMS Draft</div>
-                        <div style={{ color:T.textMid, fontSize:12, lineHeight:"1.5" }}>&ldquo;{entry.draftMessage}&rdquo;</div>
-                      </div>
-                      <div style={{ display:"flex", gap:8 }}>
-                        <button
-                          onClick={() => { onApprove(entry); showToast("Message sent!"); }}
-                          style={{ flex:1, padding:"10px 10px", borderRadius:8, border:"none", background:T.indigoDark, color:"#fff", fontWeight:800, cursor:"pointer", fontSize:12 }}>
-                          Approve Draft + Send
-                        </button>
-                        <button
-                          onClick={() => { onDismiss(entry); showToast("Removed from queue."); }}
-                          style={{ padding:"10px 12px", borderRadius:8, border:"1px solid " + T.borderStrong, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:12, whiteSpace:"nowrap" }}>
-                          I&apos;ll Handle It
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
-
 // ── AI Workflow ───────────────────────────────────────────────────────────────
 function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast }) {
   const [showAttentionPanel, setShowAttentionPanel] = useState(true);
