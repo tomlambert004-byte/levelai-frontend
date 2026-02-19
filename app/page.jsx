@@ -1,6 +1,6 @@
 "use client";
 export const dynamic = "force-dynamic";
-import { SignedIn, SignedOut, useAuth, SignIn } from "@clerk/nextjs";
+import { SignedIn, SignedOut, useAuth, SignIn, useClerk } from "@clerk/nextjs";
 import { useState, useCallback, useEffect, useRef } from "react";
 // ... your other imports (T, dollars, etc.) ...
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
@@ -2471,11 +2471,38 @@ function ToastBar({ msg }) {
 }
 export default function LevelAI() {
   const { isSignedIn, isLoaded } = useAuth();
+  const { signOut } = useClerk();
   const [toastMsg, setToastMsg] = useState("");
   const showToast = useCallback((msg) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), 3500);
   }, []);
+
+  // ── Idle timer (20 min) ───────────────────────────────────────────────────────
+  const IDLE_MS = 20 * 60 * 1000;
+  const WARN_MS = 19 * 60 * 1000; // warn at 19 min, auto-logout at 20
+  const [idleWarning, setIdleWarning] = useState(false);
+  const idleWarnTimer  = useRef(null);
+  const idleLogoutTimer = useRef(null);
+  const resetIdle = useCallback(() => {
+    setIdleWarning(false);
+    clearTimeout(idleWarnTimer.current);
+    clearTimeout(idleLogoutTimer.current);
+    if (!isSignedIn) return;
+    idleWarnTimer.current  = setTimeout(() => setIdleWarning(true), WARN_MS);
+    idleLogoutTimer.current = setTimeout(() => signOut(), IDLE_MS);
+  }, [isSignedIn, signOut]);
+  useEffect(() => {
+    if (!isSignedIn) return;
+    const events = ["mousemove","keydown","mousedown","touchstart","scroll"];
+    events.forEach(e => window.addEventListener(e, resetIdle));
+    resetIdle();
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetIdle));
+      clearTimeout(idleWarnTimer.current);
+      clearTimeout(idleLogoutTimer.current);
+    };
+  }, [isSignedIn, resetIdle]);
 
   // ── Core data state ──────────────────────────────────────────────────────────
   const [isMounted, setIsMounted]         = useState(false);
@@ -2859,6 +2886,13 @@ export default function LevelAI() {
           <div style={{ color:T.textSoft, fontSize:11 }}>
             {isMounted ? new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}) : ""}
           </div>
+          <button
+            onClick={() => signOut()}
+            style={{ marginLeft:4, padding:"4px 12px", borderRadius:20, border:"1px solid " + T.border,
+              background:T.bgCard, color:T.textMid, fontSize:11, fontWeight:700, cursor:"pointer",
+              display:"flex", alignItems:"center", gap:5 }}>
+            <span>🚪</span> Log out
+          </button>
           {dailyLoading ? <NavCountSkeleton /> : (
             <>
               {[
@@ -3058,6 +3092,39 @@ export default function LevelAI() {
       )}
 
       {toastMsg && <ToastBar msg={toastMsg} />}
+
+      {/* ── Idle warning modal ───────────────────────────────────────────── */}
+      {idleWarning && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:9999,
+          display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
+          <div style={{ background:T.bgCard, borderRadius:18, padding:"40px 44px", maxWidth:400, width:"90%",
+            boxShadow:"0 20px 60px rgba(0,0,0,0.25)", textAlign:"center", border:"1px solid " + T.border }}>
+            <div style={{ fontSize:52, marginBottom:12 }}>🥱</div>
+            <div style={{ fontSize:22, fontWeight:900, color:T.text, marginBottom:8 }}>
+              Psst… you still there?
+            </div>
+            <div style={{ fontSize:14, color:T.textSoft, lineHeight:1.6, marginBottom:28 }}>
+              We&apos;ve noticed some suspicious levels of<br />
+              <em>not clicking things</em>. For security, we&apos;ll<br />
+              log you out in about a minute. No pressure. 👀
+            </div>
+            <div style={{ display:"flex", gap:10, justifyContent:"center" }}>
+              <button
+                onClick={resetIdle}
+                style={{ background:T.lime, color:"#fff", border:"none", borderRadius:10,
+                  padding:"12px 28px", fontWeight:900, fontSize:15, cursor:"pointer" }}>
+                Yes, I&apos;m here! 🙋
+              </button>
+              <button
+                onClick={() => signOut()}
+                style={{ background:T.bgCard, color:T.textMid, border:"1px solid " + T.border,
+                  borderRadius:10, padding:"12px 20px", fontWeight:700, fontSize:14, cursor:"pointer" }}>
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
