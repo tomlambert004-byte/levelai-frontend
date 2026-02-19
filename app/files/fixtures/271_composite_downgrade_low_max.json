@@ -1,0 +1,71 @@
+{
+  "_fixture_id": "271_composite_downgrade_low_max",
+  "_description": "Carlos Reyes — Cigna Dental, active but annual max nearly exhausted + posterior composite downgraded",
+  "_patient_id": "p2",
+  "meta": {
+    "transaction_set_id": "271",
+    "interchange_date": "2026-02-18",
+    "payer_id": "CIGNA"
+  },
+  "subscriber": {
+    "member_id": "CIG98765432",
+    "first_name": "Carlos",
+    "last_name": "Reyes",
+    "date_of_birth": "1991-11-03",
+    "group_number": "GRP-098765",
+    "plan_name": "Cigna Dental 1000"
+  },
+  "payer": {
+    "name": "Cigna Dental",
+    "payer_id": "CIGNA"
+  },
+  "coverage": {
+    "plan_status": "active",
+    "plan_begin_date": "2026-01-01",
+    "plan_end_date": "2026-12-31",
+    "insurance_type": "PPO",
+    "in_network": true
+  },
+  "benefits": {
+    "calendar_year_maximum": {
+      "amount_cents": 100000,
+      "used_cents": 78000,
+      "remaining_cents": 22000,
+      "period": "calendar_year"
+    },
+    "deductible": {
+      "individual_cents": 5000,
+      "met_cents": 5000,
+      "applies_to": ["basic", "major"],
+      "waived_for": ["preventive"]
+    },
+    "preventive": {
+      "coverage_pct": 100,
+      "deductible_applies": false,
+      "frequency": {
+        "cleanings": {
+          "times_per_period": 2,
+          "used_this_period": 1,
+          "period": "calendar_year",
+          "next_eligible_date": null
+        }
+      }
+    },
+    "basic_restorative": {
+      "coverage_pct": 80,
+      "deductible_applies": true,
+      "composite_posterior_downgrade": true,
+      "composite_posterior_downgrade_note": "Posterior composites (teeth 1–5, 12–16, 17–21, 28–32) reimbursed at amalgam rate. Patient responsible for cost difference.",
+      "services": ["D2140", "D2150", "D2160", "D2161", "D2330", "D2331", "D2332", "D2335"]
+    },
+    "major_restorative": {
+      "coverage_pct": 50,
+      "deductible_applies": true,
+      "waiting_period_months": 0,
+      "services": ["D2750", "D2751", "D2752", "D2790", "D2710", "D2720", "D2721", "D2722"]
+    },
+    "missing_tooth_clause": {
+      "applies": false
+    }
+  }
+}

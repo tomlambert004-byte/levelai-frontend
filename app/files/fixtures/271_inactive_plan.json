@@ -1,0 +1,46 @@
+{
+  "_fixture_id": "271_inactive_plan",
+  "_description": "Diane Okafor — MetLife, plan termed, annual max exhausted",
+  "_patient_id": "p3",
+  "meta": {
+    "transaction_set_id": "271",
+    "interchange_date": "2026-02-18",
+    "payer_id": "METLIFE"
+  },
+  "subscriber": {
+    "member_id": "MET44412222",
+    "first_name": "Diane",
+    "last_name": "Okafor",
+    "date_of_birth": "1965-07-18",
+    "group_number": "GRP-044412",
+    "plan_name": "MetLife PDP Plus"
+  },
+  "payer": {
+    "name": "MetLife Dental",
+    "payer_id": "METLIFE"
+  },
+  "coverage": {
+    "plan_status": "inactive",
+    "termination_reason": "employment_terminated",
+    "plan_begin_date": "2023-01-01",
+    "plan_end_date": "2026-01-31",
+    "insurance_type": "PPO",
+    "in_network": false
+  },
+  "benefits": {
+    "calendar_year_maximum": {
+      "amount_cents": 150000,
+      "used_cents": 150000,
+      "remaining_cents": 0,
+      "period": "calendar_year"
+    },
+    "deductible": {
+      "individual_cents": 5000,
+      "met_cents": 5000
+    },
+    "plan_termination_notice": "Coverage ended 2026-01-31. Patient may be eligible for COBRA continuation. Contact HR or carrier directly.",
+    "missing_tooth_clause": {
+      "applies": false
+    }
+  }
+}

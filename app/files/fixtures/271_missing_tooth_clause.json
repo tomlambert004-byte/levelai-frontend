@@ -1,0 +1,89 @@
+{
+  "_fixture_id": "271_missing_tooth_clause",
+  "_description": "James Whitfield — Aetna DMO, active plan, MTC applies to tooth #14, implant consult flagged",
+  "_patient_id": "p4",
+  "meta": {
+    "transaction_set_id": "271",
+    "interchange_date": "2026-02-18",
+    "payer_id": "AETNA_DMO"
+  },
+  "subscriber": {
+    "member_id": "AET77700011",
+    "first_name": "James",
+    "last_name": "Whitfield",
+    "date_of_birth": "2002-01-30",
+    "group_number": "GRP-077700",
+    "plan_name": "Aetna DMO Essential"
+  },
+  "payer": {
+    "name": "Aetna DMO",
+    "payer_id": "AETNA_DMO"
+  },
+  "coverage": {
+    "plan_status": "active",
+    "plan_begin_date": "2025-06-01",
+    "plan_end_date": "2026-05-31",
+    "insurance_type": "DMO",
+    "in_network": true
+  },
+  "benefits": {
+    "calendar_year_maximum": {
+      "amount_cents": 200000,
+      "used_cents": 100000,
+      "remaining_cents": 100000,
+      "period": "calendar_year"
+    },
+    "deductible": {
+      "individual_cents": 5000,
+      "met_cents": 0,
+      "family_cents": 15000,
+      "family_met_cents": 0,
+      "applies_to": ["basic", "major"],
+      "waived_for": ["preventive"]
+    },
+    "preventive": {
+      "coverage_pct": 100,
+      "deductible_applies": false,
+      "frequency": {
+        "cleanings": {
+          "times_per_period": 2,
+          "used_this_period": 0,
+          "period": "calendar_year",
+          "next_eligible_date": null
+        }
+      }
+    },
+    "basic_restorative": {
+      "coverage_pct": 80,
+      "deductible_applies": true
+    },
+    "major_restorative": {
+      "coverage_pct": 50,
+      "deductible_applies": true,
+      "waiting_period_months": 12
+    },
+    "implants": {
+      "covered": true,
+      "coverage_pct": 50,
+      "deductible_applies": true,
+      "pre_auth_required": true,
+      "services": ["D6010", "D6040", "D6050", "D6056", "D6057"]
+    },
+    "missing_tooth_clause": {
+      "applies": true,
+      "affected_teeth": ["#14"],
+      "clause_effective_date": "2025-06-01",
+      "coverage_begin_date": "2025-06-01",
+      "extraction_date_on_file": "2024-03-10",
+      "excluded_services": [
+        "D6010 — Implant body placement",
+        "D6056 — Implant supported crown (titanium)",
+        "D6057 — Implant supported crown (porcelain fused to titanium)",
+        "D6240 — Pontic, porcelain fused to precious metal",
+        "D6750 — Crown, porcelain fused to high noble metal"
+      ],
+      "exception_pathway": "Submit pre-authorization with dated extraction records and clinical notes. Carrier review takes 5–7 business days. Appeal available if denied.",
+      "notes": "Tooth #14 was extracted prior to coverage effective date. MTC applies to all prosthetic replacements for this tooth under current plan."
+    }
+  }
+}

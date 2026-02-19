@@ -1,0 +1,95 @@
+{
+  "_fixture_id": "271_frequency_limit",
+  "_description": "Derek Fontaine — Delta Dental PPO, active plan, 2/2 cleanings used, not eligible until Aug",
+  "_patient_id": "p6",
+  "meta": {
+    "transaction_set_id": "271",
+    "interchange_date": "2026-02-18",
+    "payer_id": "DELTA_PPO"
+  },
+  "subscriber": {
+    "member_id": "DD00998877",
+    "first_name": "Derek",
+    "last_name": "Fontaine",
+    "date_of_birth": "1970-03-28",
+    "group_number": "GRP-009988",
+    "plan_name": "Delta Dental PPO Plus Premier"
+  },
+  "payer": {
+    "name": "Delta Dental PPO",
+    "payer_id": "DELTA_PPO"
+  },
+  "coverage": {
+    "plan_status": "active",
+    "plan_begin_date": "2025-01-01",
+    "plan_end_date": "2026-12-31",
+    "insurance_type": "PPO",
+    "in_network": true
+  },
+  "benefits": {
+    "calendar_year_maximum": {
+      "amount_cents": 200000,
+      "used_cents": 112000,
+      "remaining_cents": 88000,
+      "period": "calendar_year"
+    },
+    "deductible": {
+      "individual_cents": 5000,
+      "met_cents": 5000,
+      "family_cents": 15000,
+      "family_met_cents": 15000,
+      "applies_to": ["basic", "major"],
+      "waived_for": ["preventive"]
+    },
+    "preventive": {
+      "coverage_pct": 100,
+      "deductible_applies": false,
+      "copay_cents": null,
+      "frequency": {
+        "cleanings": {
+          "times_per_period": 2,
+          "used_this_period": 2,
+          "period": "calendar_year",
+          "last_service_date": "2026-02-01",
+          "next_eligible_date": "2027-01-01"
+        },
+        "exams": {
+          "times_per_period": 2,
+          "used_this_period": 2,
+          "period": "calendar_year",
+          "next_eligible_date": "2027-01-01"
+        },
+        "bitewing_xrays": {
+          "times_per_period": 1,
+          "used_this_period": 1,
+          "period": "calendar_year",
+          "next_eligible_date": "2027-01-01"
+        }
+      }
+    },
+    "basic_restorative": {
+      "coverage_pct": 80,
+      "deductible_applies": true,
+      "composite_posterior_downgrade": false
+    },
+    "major_restorative": {
+      "coverage_pct": 50,
+      "deductible_applies": true,
+      "waiting_period_months": 0
+    },
+    "periodontics": {
+      "coverage_pct": 80,
+      "deductible_applies": true,
+      "frequency": {
+        "srp_per_quadrant": {
+          "times_per_period": 1,
+          "used_this_period": 0,
+          "period": "24_months"
+        }
+      }
+    },
+    "missing_tooth_clause": {
+      "applies": false
+    }
+  }
+}

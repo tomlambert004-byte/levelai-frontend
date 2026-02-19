@@ -1,0 +1,119 @@
+{
+  "_fixture_id": "271_active_clean",
+  "_description": "Margaret Holloway — Delta Dental PPO, active plan, deductible met, 1 of 2 cleanings used",
+  "_patient_id": "p1",
+  "meta": {
+    "transaction_set_id": "271",
+    "interchange_date": "2026-02-18",
+    "interchange_time": "0900",
+    "payer_id": "DELTA_PPO"
+  },
+  "subscriber": {
+    "member_id": "DD00112233",
+    "first_name": "Margaret",
+    "last_name": "Holloway",
+    "date_of_birth": "1978-04-22",
+    "group_number": "GRP-001122",
+    "plan_name": "Delta Dental PPO Plus Premier"
+  },
+  "payer": {
+    "name": "Delta Dental PPO",
+    "payer_id": "DELTA_PPO",
+    "phone": "800-765-5200"
+  },
+  "coverage": {
+    "plan_status": "active",
+    "plan_begin_date": "2024-01-01",
+    "plan_end_date": "2026-12-31",
+    "insurance_type": "PPO",
+    "in_network": true
+  },
+  "benefits": {
+    "calendar_year_maximum": {
+      "amount_cents": 200000,
+      "used_cents": 55000,
+      "remaining_cents": 145000,
+      "period": "calendar_year"
+    },
+    "deductible": {
+      "individual_cents": 5000,
+      "met_cents": 5000,
+      "family_cents": 15000,
+      "family_met_cents": 10000,
+      "applies_to": ["basic", "major"],
+      "waived_for": ["preventive"]
+    },
+    "preventive": {
+      "coverage_pct": 100,
+      "deductible_applies": false,
+      "copay_cents": null,
+      "services": ["D1110", "D1120", "D0120", "D0150", "D0210", "D0220", "D0272", "D1351"],
+      "frequency": {
+        "cleanings": {
+          "times_per_period": 2,
+          "used_this_period": 1,
+          "period": "calendar_year",
+          "last_service_date": "2026-08-15",
+          "next_eligible_date": null
+        },
+        "exams": {
+          "times_per_period": 2,
+          "used_this_period": 0,
+          "period": "calendar_year"
+        },
+        "bitewing_xrays": {
+          "times_per_period": 1,
+          "used_this_period": 0,
+          "period": "calendar_year",
+          "next_eligible_date": null
+        },
+        "panoramic": {
+          "times_per_period": 1,
+          "used_this_period": 0,
+          "period": "36_months",
+          "next_eligible_date": null
+        }
+      }
+    },
+    "basic_restorative": {
+      "coverage_pct": 80,
+      "deductible_applies": true,
+      "copay_cents": null,
+      "composite_posterior_downgrade": false,
+      "services": ["D2140", "D2150", "D2160", "D2161", "D2330", "D2331", "D2332", "D2335"]
+    },
+    "major_restorative": {
+      "coverage_pct": 50,
+      "deductible_applies": true,
+      "copay_cents": null,
+      "waiting_period_months": 0,
+      "services": ["D2710", "D2712", "D2720", "D2721", "D2722", "D2740", "D2750", "D2751", "D2752", "D2780", "D2781", "D2782", "D2783", "D2790"]
+    },
+    "endodontics": {
+      "coverage_pct": 80,
+      "deductible_applies": true,
+      "services": ["D3310", "D3320", "D3330"]
+    },
+    "periodontics": {
+      "coverage_pct": 80,
+      "deductible_applies": true,
+      "services": ["D4341", "D4342", "D4910"]
+    },
+    "oral_surgery": {
+      "coverage_pct": 80,
+      "deductible_applies": true,
+      "services": ["D7140", "D7210"]
+    },
+    "implants": {
+      "covered": false,
+      "coverage_pct": 0,
+      "notes": "Implants not covered under this plan"
+    },
+    "orthodontics": {
+      "covered": false
+    },
+    "missing_tooth_clause": {
+      "applies": false
+    }
+  }
+}
