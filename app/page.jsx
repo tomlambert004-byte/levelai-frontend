@@ -1,5 +1,5 @@
 "use client";
-import { SignedIn, SignedOut } from "@clerk/nextjs";
+import { SignedIn, SignedOut, useAuth } from "@clerk/nextjs";
 import { useState, useCallback, useEffect, useRef } from "react";
 // ... your other imports (T, dollars, etc.) ...
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
@@ -2528,45 +2528,8 @@ function ToastBar({ msg }) {
   );
 }
 export default function LevelAI() {
+  const { isSignedIn } = useAuth();
   const [toastMsg, setToastMsg] = useState("");
-
-  const showToast = useCallback((msg) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(""), 3500);
-  }, []);
-
-  return (
-    <div style={{ height: "100vh", background: T.bg, fontFamily: "'Nunito', sans-serif", overflow: "hidden" }}>
-      
-      <SignedOut>
-        <AuthFlow onComplete={() => {}} showToast={showToast} />
-      </SignedOut>
-
-      <SignedIn>
-        <div style={{ 
-          height: "100vh", 
-          display: "flex", 
-          alignItems: "center", 
-          justifyContent: "center", 
-          background: "#0f172a", 
-          color: "#22c55e", 
-          fontSize: 48, 
-          fontWeight: 900,
-          textAlign: "center",
-          padding: 40 
-        }}>
-          ✅ Signed In Successfully!<br />
-          <span style={{ fontSize: 24, marginTop: 30, display: "block", opacity: 0.9 }}>
-            Your Week Ahead dashboard is loading here
-          </span>
-        </div>
-      </SignedIn>
-
-      {toastMsg && <ToastBar msg={toastMsg} />}
-    </div>
-  );
-  // ── Auth gate ───────────────────────────────────────────────────────────────
-  const [authState, setAuthState] = useState("auth");
 
   // ── Core data state ──────────────────────────────────────────────────────────
   const [isMounted, setIsMounted]         = useState(false);
@@ -2877,11 +2840,10 @@ export default function LevelAI() {
   );
 
   // ── Auth gate ─────────────────────────────────────────────────────────────────
-  // ── Auth gate ─────────────────────────────────────────────────────────────────
-  if (authState === "auth") {
+  if (!isSignedIn) {
     return (
       <div style={{ position: "relative", height: "100vh", overflow: "hidden" }}>
-        <AuthFlow onComplete={() => setAuthState("dashboard")} showToast={showToast} />
+        <AuthFlow onComplete={() => {}} showToast={showToast} />
         {toastMsg && <ToastBar msg={toastMsg} />}
       </div>
     );
