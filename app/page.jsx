@@ -1,6 +1,8 @@
 "use client";
+import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { SignIn, SignUp } from "@clerk/nextjs";
+// ... your other imports (T, dollars, etc.) ...
+import { SignInButton, SignUpButton } from "@clerk/nextjs";
 // Theme
 const T = {
   bg:"#F5F5F0", bgCard:"#FFFFFF", border:"#E2E2DC", borderStrong:"#C8C8C0",
@@ -464,88 +466,70 @@ function AuthFlow({ onComplete, showToast }) {
         <div style={{ width: "100%", maxWidth: 460 }}>
 
           {/* ───────── LOGIN ───────── */}
-         {step === "login" && (
+    {step === "login" && (
   <div style={{ animation: "fadeIn 0.4s ease-out" }}>
     <div style={{ fontSize: 30, fontWeight: 900, color: T.text, marginBottom: 6 }}>Welcome back</div>
     <div style={{ fontSize: 14, color: T.textSoft, marginBottom: 32, lineHeight: 1.5 }}>
       Sign in to your Level AI practice dashboard.
     </div>
 
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Embedded Clerk Sign In */}
-      <div style={{ border: "1px solid " + T.border, borderRadius: 12, overflow: "hidden", background: T.bgCard, padding: "20px" }}>
-        <SignIn
-          appearance={{
-            elements: {
-              rootBox: { width: "100%" },
-              card: { boxShadow: "none", border: "none", background: "transparent" },
-              headerTitle: { fontSize: "24px", color: T.text },
-              headerSubtitle: { color: T.textSoft },
-              formButtonPrimary: { background: T.indigoDark, color: "white", borderRadius: 10, padding: "14px", fontWeight: 800 },
-              input: { border: "1px solid " + T.border, borderRadius: 10, padding: "13px" },
-              formFieldInput: { color: T.text },
-              dividerLine: { background: T.border },
-              socialButtonsBlockButton: { borderRadius: 10 },
-            },
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+      <SignInButton mode="modal">
+        <button 
+          style={{ 
+            width: "100%", 
+            padding: "16px", 
+            background: T.indigoDark, 
+            color: "white", 
+            borderRadius: 12, 
+            border: "none", 
+            fontSize: 17, 
+            fontWeight: 800, 
+            cursor: "pointer" 
           }}
-          afterSignInUrl="/dashboard"  // redirect to your dashboard
-          forceRedirectUrl="/dashboard"
-        />
-      </div>
-{step === "signup" && (
-  <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-    <div style={{ fontSize: 30, fontWeight: 900, color: T.text, marginBottom: 6 }}>Create Your Practice</div>
-    <div style={{ fontSize: 14, color: T.textSoft, marginBottom: 32, lineHeight: 1.5 }}>
-      Get started with Level AI — secure onboarding in minutes.
-    </div>
+        >
+          Sign In
+        </button>
+      </SignInButton>
 
-    <div style={{ border: "1px solid " + T.border, borderRadius: 12, overflow: "hidden", background: T.bgCard, padding: "20px" }}>
-      <SignUp
-        appearance={{
-          elements: {
-            rootBox: { width: "100%" },
-            card: { boxShadow: "none", border: "none", background: "transparent" },
-            headerTitle: { fontSize: "24px", color: T.text },
-            headerSubtitle: { color: T.textSoft },
-            formButtonPrimary: { background: T.indigoDark, color: "white", borderRadius: 10, padding: "14px", fontWeight: 800 },
-            input: { border: "1px solid " + T.border, borderRadius: 10, padding: "13px" },
-            formFieldInput: { color: T.text },
-          },
-        }}
-        afterSignUpUrl="/onboarding"  // redirect to your custom onboarding
-        forceRedirectUrl="/onboarding"
-      />
-    </div>
+      <SignUpButton mode="modal">
+        <button 
+          style={{ 
+            width: "100%", 
+            padding: "16px", 
+            background: "transparent", 
+            color: T.indigoDark, 
+            border: "2px solid " + T.indigoDark, 
+            borderRadius: 12, 
+            fontSize: 17, 
+            fontWeight: 800, 
+            cursor: "pointer" 
+          }}
+        >
+          New Practice — Create Account
+        </button>
+      </SignUpButton>
 
-    <button
-      onClick={() => setStep("login")}
-      style={{ marginTop: 24, color: T.textSoft, fontSize: 13, textDecoration: "underline", background: "none", border: "none", cursor: "pointer" }}
-    >
-      ← Already have an account? Sign in
-    </button>
-  </div>
-)}
-      {/* New Practice / Sign Up Button */}
-      <button
-        onClick={() => setStep("signup")}  // or directly open SignUp modal
-        style={{
-          width: "100%",
-          padding: "16px",
-          background: "transparent",
-          color: T.indigoDark,
-          border: "2px solid " + T.indigoDark,
-          borderRadius: 12,
-          fontSize: 17,
-          fontWeight: 800,
-          cursor: "pointer",
+      {/* Sign Out button for testing */}
+      <button 
+        onClick={() => window.Clerk.signOut()}
+        style={{ 
+          marginTop: 20, 
+          color: T.textSoft, 
+          fontSize: 13, 
+          textDecoration: "underline", 
+          background: "none", 
+          border: "none", 
+          cursor: "pointer" 
         }}
       >
-        New Practice — Create Account
+        Sign Out (for testing)
       </button>
+
     </div>
   </div>
 )}
-
           {/* ───────── MFA ───────── */}
           {step === "mfa" && (
             <div style={{ animation: "fadeIn 0.4s ease-out" }}>
@@ -2531,17 +2515,58 @@ function Settings({ showToast }) {
 //   ✓  Skeleton loaders on every data-dependent surface
 //   ✓  Error/retry UI on the schedule kanban
 // ─────────────────────────────────────────────────────────────────────────────
-
+// Shared toast bar — used in both auth and dashboard contexts
+function ToastBar({ msg }) {
+  return (
+    <div style={{ position:"absolute", bottom:40, right:40, background:T.text, color:"white",
+      padding:"16px 24px", borderRadius:8, fontWeight:800, fontSize:13,
+      boxShadow:"0 8px 24px rgba(0,0,0,0.15)", zIndex:9999,
+      display:"flex", alignItems:"center", gap:12, animation:"slideIn 0.3s ease-out" }}>
+      <span style={{ color:T.limeDark, background:T.limeLight, borderRadius:"50%", width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>✓</span>
+      {msg}
+    </div>
+  );
+}
 export default function LevelAI() {
-  // ── Auth gate ───────────────────────────────────────────────────────────────
-  const [authState, setAuthState] = useState("auth");
-
-  // ── Toast ────────────────────────────────────────────────────────────────────
   const [toastMsg, setToastMsg] = useState("");
+
   const showToast = useCallback((msg) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), 3500);
   }, []);
+
+  return (
+    <div style={{ height: "100vh", background: T.bg, fontFamily: "'Nunito', sans-serif", overflow: "hidden" }}>
+      
+      <SignedOut>
+        <AuthFlow onComplete={() => {}} showToast={showToast} />
+      </SignedOut>
+
+      <SignedIn>
+        <div style={{ 
+          height: "100vh", 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center", 
+          background: "#0f172a", 
+          color: "#22c55e", 
+          fontSize: 48, 
+          fontWeight: 900,
+          textAlign: "center",
+          padding: 40 
+        }}>
+          ✅ Signed In Successfully!<br />
+          <span style={{ fontSize: 24, marginTop: 30, display: "block", opacity: 0.9 }}>
+            Your Week Ahead dashboard is loading here
+          </span>
+        </div>
+      </SignedIn>
+
+      {toastMsg && <ToastBar msg={toastMsg} />}
+    </div>
+  );
+  // ── Auth gate ───────────────────────────────────────────────────────────────
+  const [authState, setAuthState] = useState("auth");
 
   // ── Core data state ──────────────────────────────────────────────────────────
   const [isMounted, setIsMounted]         = useState(false);
@@ -3118,19 +3143,6 @@ export default function LevelAI() {
       )}
 
       {toastMsg && <ToastBar msg={toastMsg} />}
-    </div>
-  );
-}
-
-// Shared toast bar — used in both auth and dashboard contexts
-function ToastBar({ msg }) {
-  return (
-    <div style={{ position:"absolute", bottom:40, right:40, background:T.text, color:"white",
-      padding:"16px 24px", borderRadius:8, fontWeight:800, fontSize:13,
-      boxShadow:"0 8px 24px rgba(0,0,0,0.15)", zIndex:9999,
-      display:"flex", alignItems:"center", gap:12, animation:"slideIn 0.3s ease-out" }}>
-      <span style={{ color:T.limeDark, background:T.limeLight, borderRadius:"50%", width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>✓</span>
-      {msg}
     </div>
   );
 }
