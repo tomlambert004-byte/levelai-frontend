@@ -1103,6 +1103,69 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
                 </div>
               </>
             )}
+
+            {/* Download Benefit PDF */}
+            <div style={{ marginTop:20, paddingTop:16, borderTop:"1px solid " + T.border }}>
+              <button
+                onClick={() => {
+                  const lines = [];
+                  lines.push(`BENEFIT VERIFICATION REPORT`);
+                  lines.push(`Generated: ${new Date().toLocaleString()}`);
+                  lines.push(`${"─".repeat(48)}`);
+                  lines.push(`Patient:      ${patient.name}`);
+                  lines.push(`DOB:          ${patient.dob}`);
+                  lines.push(`Member ID:    ${patient.memberId}`);
+                  lines.push(`Insurance:    ${result.payer_name}`);
+                  lines.push(`Appointment:  ${patient.appointmentDate} ${patient.appointmentTime}`);
+                  lines.push(`Procedure:    ${patient.procedure}`);
+                  lines.push(`Fee:          $${(patient.fee/100).toLocaleString()}`);
+                  lines.push(``);
+                  lines.push(`PLAN STATUS`);
+                  lines.push(`${"─".repeat(48)}`);
+                  lines.push(`Status:             ${result.plan_status === "terminated" ? "INACTIVE / TERMINATED" : "Active"}`);
+                  lines.push(`Annual Maximum:     $${(result.annual_maximum_cents/100).toLocaleString()}`);
+                  lines.push(`Remaining:          $${(result.annual_remaining_cents/100).toLocaleString()}`);
+                  lines.push(`Deductible:         $${(result.individual_deductible_cents/100).toLocaleString()}`);
+                  const dedMet = (result.individual_deductible_met_cents||0) >= (result.individual_deductible_cents||1);
+                  lines.push(`Deductible Met:     ${dedMet ? "Yes" : "No — $" + (((result.individual_deductible_cents||0)-(result.individual_deductible_met_cents||0))/100).toFixed(0) + " gap"}`);
+                  if (result.copay_pct) lines.push(`Insurance Pays:     ${result.copay_pct}%`);
+                  lines.push(``);
+                  if (result.preventive) { lines.push(`COVERAGE BREAKDOWN`); lines.push(`${"─".repeat(48)}`); }
+                  if (result.preventive) lines.push(`Preventive:         ${result.preventive.coverage_pct}%`);
+                  if (result.basic) lines.push(`Basic:              ${result.basic.coverage_pct}%`);
+                  if (result.restorative) lines.push(`Major/Restorative:  ${result.restorative.coverage_pct}%`);
+                  if (result.restorative?.crown_waiting_period_months > 0) lines.push(`Crown Wait Period:  ${result.restorative.crown_waiting_period_months} months`);
+                  if (result.restorative?.composite_posterior_downgrade) lines.push(`Composite Downgrade: Yes — amalgam rate`);
+                  if (result.ortho?.covered) {
+                    lines.push(`Orthodontics:       Covered`);
+                    lines.push(`Ortho Lifetime Max: $${(result.ortho.lifetime_maximum_cents/100).toLocaleString()}`);
+                    lines.push(`Ortho Used:         $${(result.ortho.used_cents/100).toLocaleString()}`);
+                  }
+                  if (result.missing_tooth_clause?.applies) lines.push(`Missing Tooth Clause: Applies to ${(result.missing_tooth_clause.affected_teeth||[]).join(", ")}`);
+                  lines.push(``);
+                  if (result.estimated_patient_responsibility_cents != null) {
+                    lines.push(`EST. PATIENT RESPONSIBILITY`);
+                    lines.push(`${"─".repeat(48)}`);
+                    lines.push(`$${(result.estimated_patient_responsibility_cents/100).toLocaleString()}`);
+                    lines.push(``);
+                  }
+                  if (result.ai_summary) {
+                    lines.push(`AI SUMMARY`);
+                    lines.push(`${"─".repeat(48)}`);
+                    lines.push(result.ai_summary);
+                    lines.push(``);
+                  }
+                  lines.push(`Source: ${result._source || "verified"} · Level AI Demo Sandbox`);
+                  const content = lines.join("\n");
+                  const win = window.open("", "_blank");
+                  win.document.write(`<html><head><title>Benefit Report — ${patient.name}</title><style>body{font-family:monospace;white-space:pre;padding:32px;font-size:13px;line-height:1.6;color:#111;}@media print{body{padding:16px}}</style></head><body>${content.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</body></html>`);
+                  win.document.close();
+                  win.print();
+                }}
+                style={{ width:"100%", padding:"11px 16px", borderRadius:8, border:"1px solid " + T.border, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:12, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                ⬇ Download Benefit Report PDF
+              </button>
+            </div>
           </>
         )}
       </div>
@@ -2750,6 +2813,18 @@ export default function LevelAI() {
     setPhase(patient.id, { phase: "complete", phases: runPhases });
 
     const triage = triagePatient(patient, finalResult);
+    const issueCount = (triage.block?.length || 0) + (triage.notify?.length || 0);
+    if (trigger === "manual") {
+      if (finalResult.plan_status === "terminated") {
+        showToast(`⚠️ ${patient.name} — Coverage terminated. Patient is self-pay.`);
+      } else if (triage.block?.length > 0) {
+        showToast(`🔴 ${patient.name} — ${triage.block[0]}`);
+      } else if (triage.notify?.length > 0) {
+        showToast(`🟡 ${patient.name} — ${triage.notify[0]}`);
+      } else {
+        showToast(`✅ ${patient.name} verified — All clear.`);
+      }
+    }
     const isFuture = patient.hoursUntil > 24;
     const newEntries = [buildVerifyEntry(patient, finalResult, trigger, runPhases)];
     if (triage.block.length > 0 && isFuture) newEntries.push(buildRescheduleEntry(patient, triage, trigger));
@@ -3011,7 +3086,7 @@ export default function LevelAI() {
             onDismiss={handleDismiss}
             showToast={showToast}
             onSelectPatient={p => { setSelected(p); setTab("schedule"); }}
-            onVerify={handleVerify}
+            onVerify={verify}
             isMounted={isMounted}
           />
         )}
@@ -3040,7 +3115,7 @@ export default function LevelAI() {
                   <button
                     disabled={dailyLoading}
                     onClick={() => {
-                      if (!dailyLoading) patients.forEach(p => { if (!results[p.id] && !isLoading(p.id)) verify(p, "manual"); });
+                      if (!dailyLoading) patients.forEach((p, i) => { if (!isLoading(p.id)) setTimeout(() => verify(p, "manual"), i * 300); });
                     }}
                     style={{ background: dailyLoading ? T.borderStrong : T.lime, color:"#fff", border:"none", padding:"8px 18px", borderRadius:8, fontWeight:800, cursor: dailyLoading ? "not-allowed" : "pointer", fontSize:12, transition:"0.2s" }}>
                     {dailyLoading ? "Loading…" : "Verify All"}
