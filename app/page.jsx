@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 import { SignedIn, SignedOut, useAuth, SignIn } from "@clerk/nextjs";
 import { useState, useCallback, useEffect, useRef } from "react";
 // ... your other imports (T, dollars, etc.) ...
