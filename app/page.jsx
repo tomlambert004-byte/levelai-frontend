@@ -1,6 +1,6 @@
 "use client";
 import { useState, useCallback, useEffect, useRef } from "react";
-
+import { SignIn, SignUp } from "@clerk/nextjs";
 // Theme
 const T = {
   bg:"#F5F5F0", bgCard:"#FFFFFF", border:"#E2E2DC", borderStrong:"#C8C8C0",
@@ -464,19 +464,87 @@ function AuthFlow({ onComplete, showToast }) {
         <div style={{ width: "100%", maxWidth: 460 }}>
 
           {/* ───────── LOGIN ───────── */}
-          {step === "login" && (
-            <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-              <div style={{ fontSize: 30, fontWeight: 900, color: T.text, marginBottom: 6 }}>Welcome back</div>
-              <div style={{ fontSize: 14, color: T.textSoft, marginBottom: 32, lineHeight: 1.5 }}>
-                Sign in to your Level AI practice dashboard.
-              </div>
-              <form onSubmit={handleLoginSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-                <OInput label="Work Email" type="email" placeholder="dr.smith@practice.com" value={email} onChange={e=>setEmail(e.target.value)} required />
-                <OInput label="Password" type="password" placeholder="••••••••" value={password} onChange={e=>setPassword(e.target.value)} required />
-                <NextBtn type="submit" label="Sign In →" />
-              </form>
-            </div>
-          )}
+         {step === "login" && (
+  <div style={{ animation: "fadeIn 0.4s ease-out" }}>
+    <div style={{ fontSize: 30, fontWeight: 900, color: T.text, marginBottom: 6 }}>Welcome back</div>
+    <div style={{ fontSize: 14, color: T.textSoft, marginBottom: 32, lineHeight: 1.5 }}>
+      Sign in to your Level AI practice dashboard.
+    </div>
+
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Embedded Clerk Sign In */}
+      <div style={{ border: "1px solid " + T.border, borderRadius: 12, overflow: "hidden", background: T.bgCard, padding: "20px" }}>
+        <SignIn
+          appearance={{
+            elements: {
+              rootBox: { width: "100%" },
+              card: { boxShadow: "none", border: "none", background: "transparent" },
+              headerTitle: { fontSize: "24px", color: T.text },
+              headerSubtitle: { color: T.textSoft },
+              formButtonPrimary: { background: T.indigoDark, color: "white", borderRadius: 10, padding: "14px", fontWeight: 800 },
+              input: { border: "1px solid " + T.border, borderRadius: 10, padding: "13px" },
+              formFieldInput: { color: T.text },
+              dividerLine: { background: T.border },
+              socialButtonsBlockButton: { borderRadius: 10 },
+            },
+          }}
+          afterSignInUrl="/dashboard"  // redirect to your dashboard
+          forceRedirectUrl="/dashboard"
+        />
+      </div>
+{step === "signup" && (
+  <div style={{ animation: "fadeIn 0.4s ease-out" }}>
+    <div style={{ fontSize: 30, fontWeight: 900, color: T.text, marginBottom: 6 }}>Create Your Practice</div>
+    <div style={{ fontSize: 14, color: T.textSoft, marginBottom: 32, lineHeight: 1.5 }}>
+      Get started with Level AI — secure onboarding in minutes.
+    </div>
+
+    <div style={{ border: "1px solid " + T.border, borderRadius: 12, overflow: "hidden", background: T.bgCard, padding: "20px" }}>
+      <SignUp
+        appearance={{
+          elements: {
+            rootBox: { width: "100%" },
+            card: { boxShadow: "none", border: "none", background: "transparent" },
+            headerTitle: { fontSize: "24px", color: T.text },
+            headerSubtitle: { color: T.textSoft },
+            formButtonPrimary: { background: T.indigoDark, color: "white", borderRadius: 10, padding: "14px", fontWeight: 800 },
+            input: { border: "1px solid " + T.border, borderRadius: 10, padding: "13px" },
+            formFieldInput: { color: T.text },
+          },
+        }}
+        afterSignUpUrl="/onboarding"  // redirect to your custom onboarding
+        forceRedirectUrl="/onboarding"
+      />
+    </div>
+
+    <button
+      onClick={() => setStep("login")}
+      style={{ marginTop: 24, color: T.textSoft, fontSize: 13, textDecoration: "underline", background: "none", border: "none", cursor: "pointer" }}
+    >
+      ← Already have an account? Sign in
+    </button>
+  </div>
+)}
+      {/* New Practice / Sign Up Button */}
+      <button
+        onClick={() => setStep("signup")}  // or directly open SignUp modal
+        style={{
+          width: "100%",
+          padding: "16px",
+          background: "transparent",
+          color: T.indigoDark,
+          border: "2px solid " + T.indigoDark,
+          borderRadius: 12,
+          fontSize: 17,
+          fontWeight: 800,
+          cursor: "pointer",
+        }}
+      >
+        New Practice — Create Account
+      </button>
+    </div>
+  </div>
+)}
 
           {/* ───────── MFA ───────── */}
           {step === "mfa" && (
@@ -2784,9 +2852,10 @@ export default function LevelAI() {
   );
 
   // ── Auth gate ─────────────────────────────────────────────────────────────────
+  // ── Auth gate ─────────────────────────────────────────────────────────────────
   if (authState === "auth") {
     return (
-      <div style={{ position:"relative", height:"100vh", overflow:"hidden" }}>
+      <div style={{ position: "relative", height: "100vh", overflow: "hidden" }}>
         <AuthFlow onComplete={() => setAuthState("dashboard")} showToast={showToast} />
         {toastMsg && <ToastBar msg={toastMsg} />}
       </div>
