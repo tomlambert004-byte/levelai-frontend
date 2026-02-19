@@ -1,5 +1,5 @@
 "use client";
-import { SignedIn, SignedOut, useAuth } from "@clerk/nextjs";
+import { SignedIn, SignedOut, useAuth, SignIn } from "@clerk/nextjs";
 import { useState, useCallback, useEffect, useRef } from "react";
 // ... your other imports (T, dollars, etc.) ...
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
@@ -468,66 +468,7 @@ function AuthFlow({ onComplete, showToast }) {
           {/* ───────── LOGIN ───────── */}
     {step === "login" && (
   <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-    <div style={{ fontSize: 30, fontWeight: 900, color: T.text, marginBottom: 6 }}>Welcome back</div>
-    <div style={{ fontSize: 14, color: T.textSoft, marginBottom: 32, lineHeight: 1.5 }}>
-      Sign in to your Level AI practice dashboard.
-    </div>
-
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-      <SignInButton mode="modal">
-        <button 
-          style={{ 
-            width: "100%", 
-            padding: "16px", 
-            background: T.indigoDark, 
-            color: "white", 
-            borderRadius: 12, 
-            border: "none", 
-            fontSize: 17, 
-            fontWeight: 800, 
-            cursor: "pointer" 
-          }}
-        >
-          Sign In
-        </button>
-      </SignInButton>
-
-      <SignUpButton mode="modal">
-        <button 
-          style={{ 
-            width: "100%", 
-            padding: "16px", 
-            background: "transparent", 
-            color: T.indigoDark, 
-            border: "2px solid " + T.indigoDark, 
-            borderRadius: 12, 
-            fontSize: 17, 
-            fontWeight: 800, 
-            cursor: "pointer" 
-          }}
-        >
-          New Practice — Create Account
-        </button>
-      </SignUpButton>
-
-      {/* Sign Out button for testing */}
-      <button 
-        onClick={() => window.Clerk.signOut()}
-        style={{ 
-          marginTop: 20, 
-          color: T.textSoft, 
-          fontSize: 13, 
-          textDecoration: "underline", 
-          background: "none", 
-          border: "none", 
-          cursor: "pointer" 
-        }}
-      >
-        Sign Out (for testing)
-      </button>
-
-    </div>
+    <SignIn routing="hash" />
   </div>
 )}
           {/* ───────── MFA ───────── */}
@@ -2528,7 +2469,7 @@ function ToastBar({ msg }) {
   );
 }
 export default function LevelAI() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
   const [toastMsg, setToastMsg] = useState("");
 
   // ── Core data state ──────────────────────────────────────────────────────────
@@ -2840,6 +2781,13 @@ export default function LevelAI() {
   );
 
   // ── Auth gate ─────────────────────────────────────────────────────────────────
+  if (!isLoaded) {
+    return (
+      <div style={{ height: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: T.textSoft, fontSize: 14, fontWeight: 700 }}>Loading…</div>
+      </div>
+    );
+  }
   if (!isSignedIn) {
     return (
       <div style={{ position: "relative", height: "100vh", overflow: "hidden" }}>
