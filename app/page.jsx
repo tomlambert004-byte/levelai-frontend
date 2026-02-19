@@ -967,16 +967,31 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
               </div>
             )}
 
+            {result.ai_summary && (
+              <div style={{ background:"#1e2a1e", border:"1px solid " + T.limeBorder, borderRadius:10, padding:"12px 14px", marginBottom:14 }}>
+                <div style={{ color:T.lime, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:6 }}>&#x1F916; AI Benefits Summary</div>
+                <div style={{ color:"#c8f0c8", fontSize:12, lineHeight:"1.6", fontWeight:500 }}>{result.ai_summary}</div>
+              </div>
+            )}
+
+            {result.estimated_patient_responsibility_cents != null && (
+              <div style={{ background:T.amberLight, border:"1px solid " + T.amberBorder, borderRadius:10, padding:"10px 14px", marginBottom:14, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ color:T.amberDark, fontSize:12, fontWeight:700 }}>Est. Patient Responsibility</span>
+                <span style={{ color:T.amberDark, fontSize:18, fontWeight:900 }}>{dollars(result.estimated_patient_responsibility_cents)}</span>
+              </div>
+            )}
+
             <SectionLabel>Plan Status</SectionLabel>
             <div style={{ background:T.bg, borderRadius:10, border:"1px solid " + T.border }}>
               {[
-                { label:"Status", value:result.verification_status?.replace(/_/g," ") },
+                { label:"Status", value:result.plan_status === "terminated" ? "Inactive / Terminated" : result.verification_status?.replace(/_/g," "), warn: result.plan_status === "terminated" },
                 { label:"Payer", value:result.payer_name },
                 { label:"Annual Max", value:dollars(result.annual_maximum_cents) },
                 { label:"Remaining", value:dollars(result.annual_remaining_cents), warn:(result.annual_remaining_cents||0)<30000 },
                 { label:"Deductible", value:dollars(result.individual_deductible_cents) },
-                { label:"Deductible Met", value:(result.individual_deductible_met_cents||0)>=(result.individual_deductible_cents||1)?"Yes":"No" },
-              ].map((row,i,arr)=>(
+                { label:"Deductible Met", value:(result.individual_deductible_met_cents||0)>=(result.individual_deductible_cents||1)?"Yes ✓":"No — $" + (((result.individual_deductible_cents||0)-(result.individual_deductible_met_cents||0))/100).toFixed(0) + " gap", warn:(result.individual_deductible_met_cents||0)<(result.individual_deductible_cents||1) },
+                result.copay_pct ? { label:"Insurance Pays", value: result.copay_pct + "%" } : null,
+              ].filter(Boolean).map((row,i,arr)=>(
                 <div key={row.label} style={{ display:"flex", justifyContent:"space-between", padding:"9px 14px", borderBottom:i<arr.length-1?"1px solid "+T.border:"none" }}>
                   <span style={{ color:T.textMid, fontSize:12, fontWeight:600 }}>{row.label}</span>
                   <span style={{ color:row.warn?T.amber:T.text, fontSize:13, fontWeight:700 }}>{row.value}</span>
@@ -1013,6 +1028,56 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
                     <div key={row.label} style={{ display:"flex", justifyContent:"space-between", padding:"9px 14px", borderBottom:i<arr.length-1?"1px solid "+T.border:"none" }}>
                       <span style={{ color:T.textMid, fontSize:12, fontWeight:600 }}>{row.label}</span>
                       <span style={{ color:row.warn?T.amber:T.text, fontSize:13, fontWeight:700 }}>{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {result.basic && (
+              <>
+                <SectionLabel>Basic Services</SectionLabel>
+                <div style={{ background:T.bg, borderRadius:10, border:"1px solid " + T.border }}>
+                  {[
+                    { label:"Coverage", value:pct(result.basic.coverage_pct) },
+                  ].map((row,i,arr)=>(
+                    <div key={row.label} style={{ display:"flex", justifyContent:"space-between", padding:"9px 14px", borderBottom:i<arr.length-1?"1px solid "+T.border:"none" }}>
+                      <span style={{ color:T.textMid, fontSize:12, fontWeight:600 }}>{row.label}</span>
+                      <span style={{ color:T.text, fontSize:13, fontWeight:700 }}>{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {result.major && (
+              <>
+                <SectionLabel>Major Services</SectionLabel>
+                <div style={{ background:T.bg, borderRadius:10, border:"1px solid " + T.border }}>
+                  {[
+                    { label:"Coverage", value:pct(result.major.coverage_pct) },
+                  ].map((row,i,arr)=>(
+                    <div key={row.label} style={{ display:"flex", justifyContent:"space-between", padding:"9px 14px", borderBottom:i<arr.length-1?"1px solid "+T.border:"none" }}>
+                      <span style={{ color:T.textMid, fontSize:12, fontWeight:600 }}>{row.label}</span>
+                      <span style={{ color:T.text, fontSize:13, fontWeight:700 }}>{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {result.ortho?.covered && (
+              <>
+                <SectionLabel>Orthodontics</SectionLabel>
+                <div style={{ background:T.bg, borderRadius:10, border:"1px solid " + T.border }}>
+                  {[
+                    { label:"Lifetime Max", value:dollars(result.ortho.lifetime_maximum_cents) },
+                    { label:"Used", value:dollars(result.ortho.used_cents) },
+                    { label:"Remaining", value:dollars((result.ortho.lifetime_maximum_cents||0)-(result.ortho.used_cents||0)) },
+                  ].map((row,i,arr)=>(
+                    <div key={row.label} style={{ display:"flex", justifyContent:"space-between", padding:"9px 14px", borderBottom:i<arr.length-1?"1px solid "+T.border:"none" }}>
+                      <span style={{ color:T.textMid, fontSize:12, fontWeight:600 }}>{row.label}</span>
+                      <span style={{ color:T.text, fontSize:13, fontWeight:700 }}>{row.value}</span>
                     </div>
                   ))}
                 </div>
@@ -1466,9 +1531,10 @@ function CalendarView({ patients, results, triageMap, onSelectDay, currentDayLoc
 }
 
 // ── Week Ahead ────────────────────────────────────────────────────────────────
-function WeekAhead({ patients, agentLog, triageMap, results, onApprove, onDismiss, showToast, onSelectPatient, isMounted }) {
+function WeekAhead({ patients, agentLog, triageMap, results, onApprove, onDismiss, showToast, onSelectPatient, onVerify, isMounted }) {
   const today = isMounted ? new Date() : new Date();
   const todayStr = today.toISOString().split("T")[0];
+  const [expandedPatient, setExpandedPatient] = useState(null);
 
   // Build the next 7 weekdays
   const weekDays = getNextWeekdays(today, 7);
@@ -1567,8 +1633,8 @@ function WeekAhead({ patients, agentLog, triageMap, results, onApprove, onDismis
                             {fmtDate(p.appointmentDate)}{p.appointmentTime ? " · " + p.appointmentTime : ""} · {p.procedure || "Procedure TBD"}
                           </div>
                         </div>
-                        <button onClick={() => onSelectPatient(p)} style={{ background:"transparent", border:"1px solid " + (isCritical ? T.redBorder : T.amberBorder), borderRadius:8, padding:"6px 12px", cursor:"pointer", fontSize:11, fontWeight:700, color:T.textMid }}>
-                          View Chart
+                        <button onClick={() => setExpandedPatient(expandedPatient?.id === p.id ? null : p)} style={{ background:"transparent", border:"1px solid " + (isCritical ? T.redBorder : T.amberBorder), borderRadius:8, padding:"6px 12px", cursor:"pointer", fontSize:11, fontWeight:700, color:T.textMid }}>
+                          {expandedPatient?.id === p.id ? "Close ✕" : "View Benefits"}
                         </button>
                       </div>
 
@@ -1615,6 +1681,54 @@ function WeekAhead({ patients, agentLog, triageMap, results, onApprove, onDismis
                           </div>
                         </div>
                       )}
+
+                      {/* Inline expanded benefit panel */}
+                      {expandedPatient?.id === p.id && (() => {
+                        const r = results[p.id];
+                        if (!r) return (
+                          <div style={{ padding:"12px 16px 16px", borderTop:"1px solid " + T.border }}>
+                            <div style={{ color:T.textSoft, fontSize:12 }}>No verification data yet. Run verification from the Schedule tab.</div>
+                          </div>
+                        );
+                        const dedMet = (r.individual_deductible_met_cents||0) >= (r.individual_deductible_cents||1);
+                        return (
+                          <div style={{ padding:"14px 16px 16px", borderTop:"1px solid " + T.border, background:T.bg }}>
+                            {r.ai_summary && (
+                              <div style={{ background:"#1e2a1e", border:"1px solid " + T.limeBorder, borderRadius:8, padding:"10px 12px", marginBottom:12 }}>
+                                <div style={{ color:T.lime, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:5 }}>&#x1F916; AI Summary</div>
+                                <div style={{ color:"#c8f0c8", fontSize:11, lineHeight:"1.6" }}>{r.ai_summary}</div>
+                              </div>
+                            )}
+                            {r.estimated_patient_responsibility_cents != null && (
+                              <div style={{ background:T.amberLight, border:"1px solid " + T.amberBorder, borderRadius:8, padding:"8px 12px", marginBottom:12, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                                <span style={{ color:T.amberDark, fontSize:11, fontWeight:700 }}>Est. Patient Responsibility</span>
+                                <span style={{ color:T.amberDark, fontSize:16, fontWeight:900 }}>{dollars(r.estimated_patient_responsibility_cents)}</span>
+                              </div>
+                            )}
+                            <div style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:8, overflow:"hidden", marginBottom:8 }}>
+                              {[
+                                { label:"Payer", value: r.payer_name },
+                                { label:"Annual Max", value: dollars(r.annual_maximum_cents) },
+                                { label:"Remaining", value: dollars(r.annual_remaining_cents), warn:(r.annual_remaining_cents||0)<30000 },
+                                { label:"Deductible", value: dollars(r.individual_deductible_cents) },
+                                { label:"Deductible Met", value: dedMet ? "Yes ✓" : "No — $" + (((r.individual_deductible_cents||0)-(r.individual_deductible_met_cents||0))/100).toFixed(0) + " gap", warn:!dedMet },
+                                r.copay_pct ? { label:"Insurance Pays", value: r.copay_pct + "%" } : null,
+                                r.preventive ? { label:"Preventive", value: r.preventive.coverage_pct + "%" } : null,
+                                r.basic ? { label:"Basic", value: r.basic.coverage_pct + "%" } : null,
+                                r.restorative ? { label:"Major/Restorative", value: r.restorative.coverage_pct + "%" } : null,
+                                r.restorative?.crown_waiting_period_months > 0 ? { label:"Crown Waiting Period", value: r.restorative.crown_waiting_period_months + " months", warn:true } : null,
+                                r.restorative?.composite_posterior_downgrade ? { label:"Composite Downgrade", value:"Yes — amalgam rate", warn:true } : null,
+                                r.ortho?.covered ? { label:"Ortho Lifetime Max", value: dollars(r.ortho.lifetime_maximum_cents) } : null,
+                              ].filter(Boolean).map((row,i,arr) => (
+                                <div key={row.label} style={{ display:"flex", justifyContent:"space-between", padding:"7px 12px", borderBottom:i<arr.length-1?"1px solid "+T.border:"none" }}>
+                                  <span style={{ color:T.textMid, fontSize:11, fontWeight:600 }}>{row.label}</span>
+                                  <span style={{ color:row.warn?T.amber:T.text, fontSize:12, fontWeight:700 }}>{row.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
@@ -1624,23 +1738,63 @@ function WeekAhead({ patients, agentLog, triageMap, results, onApprove, onDismis
             {clearPatients.length > 0 && (
               <>
                 <div style={{ fontSize:11, fontWeight:900, color:T.textSoft, textTransform:"uppercase", letterSpacing:"0.08em", marginTop: issuePatients.length > 0 ? 12 : 0, marginBottom:4, flexShrink:0 }}>All Clear</div>
-                {clearPatients.map(p => (
-                  <div key={p.id} onClick={() => onSelectPatient(p)}
-                    style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:12, padding:"12px 16px", display:"flex", alignItems:"center", gap:12, cursor:"pointer", transition:"0.15s", flexShrink:0 }}
-                    onMouseEnter={e => e.currentTarget.style.borderColor = T.limeBorder}
-                    onMouseLeave={e => e.currentTarget.style.borderColor = T.border}>
-                    <div style={{ flex:1 }}>
-                      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                        <span style={{ fontSize:13, fontWeight:800, color:T.text }}>{p.name}</span>
-                        <Badge label="Clear" color={T.limeDark} bg={T.limeLight} border={T.limeBorder} />
+                {clearPatients.map(p => {
+                  const isExpanded = expandedPatient?.id === p.id;
+                  const r = results[p.id];
+                  return (
+                    <div key={p.id}
+                      style={{ background:T.bgCard, border:"1px solid " + (isExpanded ? T.limeBorder : T.border), borderRadius:12, overflow:"hidden", flexShrink:0, transition:"0.15s" }}>
+                      <div onClick={() => setExpandedPatient(isExpanded ? null : p)}
+                        style={{ padding:"12px 16px", display:"flex", alignItems:"center", gap:12, cursor:"pointer" }}
+                        onMouseEnter={e => e.currentTarget.parentElement.style.borderColor = T.limeBorder}
+                        onMouseLeave={e => e.currentTarget.parentElement.style.borderColor = isExpanded ? T.limeBorder : T.border}>
+                        <div style={{ flex:1 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            <span style={{ fontSize:13, fontWeight:800, color:T.text }}>{p.name}</span>
+                            <Badge label="Clear" color={T.limeDark} bg={T.limeLight} border={T.limeBorder} />
+                          </div>
+                          <div style={{ fontSize:11, color:T.textSoft, marginTop:3 }}>
+                            {fmtDate(p.appointmentDate)}{p.appointmentTime ? " · " + p.appointmentTime : ""} · {p.procedure || "Procedure TBD"}
+                          </div>
+                        </div>
+                        <div style={{ color:T.textSoft, fontSize:11, fontWeight:700 }}>{isExpanded ? "Close ✕" : "View →"}</div>
                       </div>
-                      <div style={{ fontSize:11, color:T.textSoft, marginTop:3 }}>
-                        {fmtDate(p.appointmentDate)}{p.appointmentTime ? " · " + p.appointmentTime : ""} · {p.procedure || "Procedure TBD"}
-                      </div>
+                      {isExpanded && r && (
+                        <div style={{ padding:"12px 16px 14px", borderTop:"1px solid " + T.border, background:T.bg }}>
+                          {r.ai_summary && (
+                            <div style={{ background:"#1e2a1e", border:"1px solid " + T.limeBorder, borderRadius:8, padding:"10px 12px", marginBottom:10 }}>
+                              <div style={{ color:T.lime, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:5 }}>&#x1F916; AI Summary</div>
+                              <div style={{ color:"#c8f0c8", fontSize:11, lineHeight:"1.6" }}>{r.ai_summary}</div>
+                            </div>
+                          )}
+                          {r.estimated_patient_responsibility_cents != null && (
+                            <div style={{ background:T.amberLight, border:"1px solid " + T.amberBorder, borderRadius:8, padding:"8px 12px", marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                              <span style={{ color:T.amberDark, fontSize:11, fontWeight:700 }}>Est. Patient Responsibility</span>
+                              <span style={{ color:T.amberDark, fontSize:16, fontWeight:900 }}>{dollars(r.estimated_patient_responsibility_cents)}</span>
+                            </div>
+                          )}
+                          <div style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:8, overflow:"hidden" }}>
+                            {[
+                              { label:"Payer", value: r.payer_name },
+                              { label:"Annual Max", value: dollars(r.annual_maximum_cents) },
+                              { label:"Remaining", value: dollars(r.annual_remaining_cents) },
+                              { label:"Deductible Met", value:(r.individual_deductible_met_cents||0)>=(r.individual_deductible_cents||1)?"Yes ✓":"No" },
+                              r.copay_pct ? { label:"Insurance Pays", value: r.copay_pct + "%" } : null,
+                              r.preventive ? { label:"Preventive", value: r.preventive.coverage_pct + "%" } : null,
+                              r.basic ? { label:"Basic", value: r.basic.coverage_pct + "%" } : null,
+                              r.restorative ? { label:"Major/Restorative", value: r.restorative.coverage_pct + "%" } : null,
+                            ].filter(Boolean).map((row,i,arr) => (
+                              <div key={row.label} style={{ display:"flex", justifyContent:"space-between", padding:"7px 12px", borderBottom:i<arr.length-1?"1px solid "+T.border:"none" }}>
+                                <span style={{ color:T.textMid, fontSize:11, fontWeight:600 }}>{row.label}</span>
+                                <span style={{ color:T.text, fontSize:12, fontWeight:700 }}>{row.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div style={{ color:T.textSoft, fontSize:11, fontWeight:700 }}>View &rarr;</div>
-                  </div>
-                ))}
+                  );
+                })}
               </>
             )}
           </div>
@@ -2857,6 +3011,7 @@ export default function LevelAI() {
             onDismiss={handleDismiss}
             showToast={showToast}
             onSelectPatient={p => { setSelected(p); setTab("schedule"); }}
+            onVerify={handleVerify}
             isMounted={isMounted}
           />
         )}
