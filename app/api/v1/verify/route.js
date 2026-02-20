@@ -367,21 +367,33 @@ export async function POST(request) {
           insuranceName: insurance_name || body.insurance || "",
         });
 
-        // Store to Postgres if prisma is available
+        // Store to Postgres — look up real practiceId from Clerk auth
         try {
           const { prisma } = await import("../../../../lib/prisma.js");
+          const { auth }   = await import("@clerk/nextjs/server");
+          const { userId } = await auth();
+          // Upsert practice so it always exists; falls back to "demo" if unauthed
+          let practiceId = "demo";
+          if (userId) {
+            const practice = await prisma.practice.upsert({
+              where:  { clerkUserId: userId },
+              update: {},
+              create: { clerkUserId: userId, name: "My Practice" },
+            });
+            practiceId = practice.id;
+          }
           await prisma.verificationResult.create({
             data: {
-              practiceId:        "demo",   // replaced once auth is wired
-              memberIdUsed:      member_id || body.memberId || null,
-              payerIdUsed:       resolvedPayerId,
-              trigger:           trigger || "manual",
+              practiceId,
+              memberIdUsed:       member_id || body.memberId || null,
+              payerIdUsed:        resolvedPayerId,
+              trigger:            trigger || "manual",
               verificationStatus: normalized.verification_status,
-              planStatus:        normalized.plan_status,
-              payerName:         normalized.payer_name,
-              source:            "stedi",
-              rawResponse:       raw,
-              normalizedResult:  normalized,
+              planStatus:         normalized.plan_status,
+              payerName:          normalized.payer_name,
+              source:             "stedi",
+              rawResponse:        raw,
+              normalizedResult:   normalized,
               durationMs,
             },
           });
