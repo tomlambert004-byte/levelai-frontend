@@ -43,7 +43,10 @@ function parseTime(timeStr) {
 }
 
 function fixtureForDate(date) {
-  const dow = new Date(date + "T12:00:00").getDay();
+  let dow = new Date(date + "T12:00:00").getDay();
+  // Demo mode: remap weekends to nearest weekday so the schedule is never empty
+  if (dow === 0) dow = 1; // Sunday → Monday
+  if (dow === 6) dow = 5; // Saturday → Friday
   const slots = WEEKLY_SCHEDULE[dow] || [];
   const patientMap = Object.fromEntries(ALL_PATIENTS.map(p => [p.id, p]));
   const nowMs = Date.now();
