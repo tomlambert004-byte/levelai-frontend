@@ -93,13 +93,16 @@ function triagePatient(patient, result) {
 // Base URL: NEXT_PUBLIC_API_URL env var → falls back to localhost:8000 for dev.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API_BASE =
+const PYTHON_BASE =
   (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_API_URL)
     ? process.env.NEXT_PUBLIC_API_URL
     : "http://localhost:8000";
 
+// Routes under /api/v1/* are Next.js routes (same origin).
+// Routes under /api/verify and /api/chat go to the Python service.
 async function apiFetch(path, options = {}) {
-  const url = `${API_BASE}${path}`;
+  const isNextRoute = path.startsWith("/api/v1/");
+  const url = isNextRoute ? path : `${PYTHON_BASE}${path}`;
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json", ...options.headers },
     ...options,
