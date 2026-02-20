@@ -1374,6 +1374,181 @@ function PreauthWidget({ patient, result, triage, showToast }) {
   return null;
 }
 
+// ── OON Estimator Widget ──────────────────────────────────────────────────────
+// Renders the Out-of-Network financial breakdown inside BenefitsPanel.
+// Props: oon (OONEstimateResult object), patient, showToast
+function OONEstimatorWidget({ oon, patient, showToast }) {
+  const [expanded, setExpanded] = useState(false);
+  const [sending, setSending]   = useState(false);
+
+  if (!oon) return null;
+
+  const fmt = (cents) => "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtD = (dollars) => "$" + Number(dollars).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const handleSuperbill = () => {
+    setSending(true);
+    setTimeout(() => {
+      setSending(false);
+      showToast("📄 Secure Superbill emailed to patient for direct reimbursement!");
+    }, 1400);
+  };
+
+  const isOON   = oon.network_status === "out_of_network";
+  const officeFee   = oon.office_fee_cents       != null ? fmt(oon.office_fee_cents)        : fmtD(oon.office_fee);
+  const allowable   = oon.allowable_amount_cents  != null ? fmt(oon.allowable_amount_cents)  : fmtD(oon.allowable_amount);
+  const estIns      = oon.estimated_insurance_payment_cents != null ? fmt(oon.estimated_insurance_payment_cents) : fmtD(oon.estimated_insurance_payment);
+  const patientOwes = oon.patient_responsibility_cents      != null ? fmt(oon.patient_responsibility_cents)      : fmtD(oon.patient_responsibility);
+  const dedRemaining = oon.remaining_deductible_cents != null ? fmt(oon.remaining_deductible_cents) : fmtD(oon.remaining_deductible);
+  const covPct  = oon.oon_coverage_pct ?? 50;
+
+  const stepStatusIcon = (s) => s === "complete" ? "✅" : s === "skipped" ? "⏭️" : "❌";
+
+  return (
+    <div style={{ borderRadius: 12, overflow: "hidden", border: "2px solid #f97316", marginBottom: 16,
+      boxShadow: "0 0 0 4px rgba(249,115,22,0.08)" }}>
+
+      {/* ── Header badge ── */}
+      <div style={{ background: "linear-gradient(135deg, #ea580c 0%, #9a3412 100%)", padding: "12px 16px",
+        display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 20 }}>🌐</span>
+          <div>
+            <div style={{ color: "white", fontWeight: 900, fontSize: 13, letterSpacing: "0.03em" }}>
+              OUT-OF-NETWORK
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 1 }}>
+              {oon.data_source_label || "Allowable sourced via waterfall"}
+            </div>
+          </div>
+        </div>
+        <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 8, padding: "4px 10px",
+          color: "white", fontWeight: 800, fontSize: 11 }}>
+          {oon.procedure_code || patient?.procedure?.match(/D\d{4}/)?.[0] || "OON"}
+        </div>
+      </div>
+
+      <div style={{ background: "#fff7ed", padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+
+        {/* ── Fee comparison row ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ background: "white", border: "1px solid #fed7aa", borderRadius: 8, padding: "10px 12px" }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#9a3412", textTransform: "uppercase",
+              letterSpacing: "0.05em", marginBottom: 3 }}>Office Fee</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: "#1c1917" }}>{officeFee}</div>
+            <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>Billed charge</div>
+          </div>
+          <div style={{ background: "white", border: "1px solid #fed7aa", borderRadius: 8, padding: "10px 12px" }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#9a3412", textTransform: "uppercase",
+              letterSpacing: "0.05em", marginBottom: 3 }}>OON Allowable</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: "#ea580c" }}>{allowable}</div>
+            <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>Payer recognizes</div>
+          </div>
+        </div>
+
+        {/* ── Math breakdown ── */}
+        <div style={{ background: "white", border: "1px solid #fed7aa", borderRadius: 10, padding: "12px 14px" }}>
+          <div style={{ fontSize: 11, fontWeight: 900, color: "#9a3412", marginBottom: 10,
+            textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            📐 Financial Breakdown
+          </div>
+          {[
+            { label: `OON Allowable Amount`,             value: allowable,    muted: false },
+            { label: `− Remaining OON Deductible`,        value: `(${dedRemaining})`, muted: true },
+            { label: `× Payer Covers OON`,                value: `${covPct}%`, muted: true },
+            { label: null },  // divider
+            { label: `= Est. Insurance Payment`,          value: estIns,       muted: false, highlight: true },
+          ].map((row, i) => {
+            if (row.label === null) return (
+              <div key={i} style={{ borderTop: "1px solid #fed7aa", margin: "8px 0" }} />
+            );
+            return (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                marginBottom: 5, padding: row.highlight ? "5px 8px" : "1px 0",
+                background: row.highlight ? "#fff7ed" : "transparent",
+                borderRadius: row.highlight ? 6 : 0 }}>
+                <span style={{ fontSize: 12, color: row.muted ? "#9ca3af" : "#374151",
+                  fontWeight: row.highlight ? 800 : 500 }}>
+                  {row.label}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: row.highlight ? 900 : 600,
+                  color: row.highlight ? "#16a34a" : row.muted ? "#9ca3af" : "#111827" }}>
+                  {row.value}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Patient responsibility — big number ── */}
+        <div style={{ background: "linear-gradient(135deg, #1c1917, #292524)", borderRadius: 10,
+          padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#f97316", textTransform: "uppercase",
+              letterSpacing: "0.06em", marginBottom: 4 }}>
+              Total Est. Patient Out-of-Pocket
+            </div>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>
+              Office fee minus est. insurance payment
+            </div>
+          </div>
+          <div style={{ fontSize: 28, fontWeight: 900, color: "#f97316" }}>
+            {patientOwes}
+          </div>
+        </div>
+
+        {/* ── Waterfall steps (collapsible) ── */}
+        <button onClick={() => setExpanded(e => !e)}
+          style={{ background: "none", border: "1px dashed #fed7aa", borderRadius: 8, color: "#9a3412",
+            fontSize: 11, fontWeight: 800, cursor: "pointer", padding: "7px 12px", width: "100%",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          {expanded ? "▲" : "▼"} {expanded ? "Hide" : "Show"} Data Sourcing Waterfall
+        </button>
+
+        {expanded && (
+          <div style={{ background: "white", border: "1px solid #fed7aa", borderRadius: 10,
+            overflow: "hidden", animation: "fadeIn 0.2s ease-out" }}>
+            {(oon.waterfall_steps || []).map((s, i) => (
+              <div key={i} style={{ display: "flex", gap: 12, padding: "10px 14px",
+                borderBottom: i < (oon.waterfall_steps.length - 1) ? "1px solid #fff7ed" : "none",
+                background: i % 2 === 0 ? "white" : "#fffbf7" }}>
+                <div style={{ flexShrink: 0, width: 28, height: 28, borderRadius: "50%",
+                  background: s.status === "complete" ? "#dcfce7" : s.status === "skipped" ? "#f3f4f6" : "#fee2e2",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>
+                  {stepStatusIcon(s.status)}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 900, color: "#374151", marginBottom: 2 }}>
+                    Step {s.step}: {s.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.4 }}>
+                    {s.result}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Superbill CTA ── */}
+        <button onClick={handleSuperbill} disabled={sending}
+          style={{ background: sending ? "#9ca3af" : "linear-gradient(135deg, #ea580c, #dc2626)",
+            color: "white", border: "none", borderRadius: 10, padding: "13px",
+            fontWeight: 900, fontSize: 13, cursor: sending ? "not-allowed" : "pointer",
+            width: "100%", transition: "0.2s", letterSpacing: "0.02em",
+            boxShadow: sending ? "none" : "0 4px 14px rgba(234,88,12,0.4)" }}
+          onMouseEnter={e => { if (!sending) e.currentTarget.style.transform = "translateY(-1px)"; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}>
+          {sending ? "⏳ Generating Superbill…" : "📄 Generate Digital Superbill"}
+        </button>
+        <div style={{ fontSize: 10, color: "#9a3412", textAlign: "center", marginTop: -4 }}>
+          Sends secure PDF to patient for direct insurance reimbursement
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Benefits Panel ────────────────────────────────────────────────────────────
 function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast }) {
   if (!patient) return (
@@ -1385,6 +1560,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
 
   const loading = phaseInfo && phaseInfo.phase !== "complete" && phaseInfo.phase !== "error";
   const isRPA = result?._source === "hybrid";
+  const isOON = result?.in_network === false || result?.oon_estimate != null;
 
   return (
     <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden" }}>
@@ -1403,6 +1579,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
         <div style={{ marginTop:10, display:"flex", gap:6, flexWrap:"wrap" }}>
           <div style={{ fontSize:11, color:T.textMid, fontWeight:600 }}>{patient.appointmentTime} · {patient.procedure}</div>
           {isRPA && <Badge label="RPA" color={T.rpaDark} bg={T.rpaLight} border={T.rpaBorder} icon="Bot" />}
+          {isOON && <Badge label="Out-of-Network" color="#9a3412" bg="#fff7ed" border="#fed7aa" icon="Globe" />}
         </div>
       </div>
 
@@ -1417,6 +1594,15 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
 
         {!loading && result && (
           <>
+            {/* OON Estimator — shown when result carries oon_estimate block */}
+            {result.oon_estimate && (
+              <OONEstimatorWidget
+                oon={result.oon_estimate}
+                patient={patient}
+                showToast={showToast}
+              />
+            )}
+
             {triage && (triage.block.length>0 || triage.notify.length>0) && (
               <div>
                 {triage.block.length > 0 && (
