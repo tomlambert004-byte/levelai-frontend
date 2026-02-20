@@ -353,7 +353,7 @@ const VALIDATORS = {
 // validate: fn(value) → string|null  OR  one of the VALIDATORS keys
 // error: externally-controlled error string (e.g. from auth errors)
 const OInput = ({ label, type = "text", placeholder, value, onChange, required, validate, error: extError }) => {
-  const [touched, setTouched] = React.useState(false);
+  const [touched, setTouched] = useState(false);
   const validatorFn = typeof validate === "string" ? VALIDATORS[validate] : validate;
   const inlineErr = touched && validatorFn ? validatorFn(value || "") : null;
   const showErr = inlineErr || (touched && required && !value?.trim() ? "This field is required" : null) || extError;
@@ -2076,8 +2076,9 @@ function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, onOpenAl
   return (
     <div style={{ display:"flex", gap:12, marginBottom:20, flexWrap:"wrap" }}>
       {blockedCount > 0 && (
-         <div onClick={onOpenAlerts} style={{ flex:"1 1 180px", cursor:"pointer", background:T.redLight, border:"1px solid "+T.redBorder, padding:"14px 18px", borderRadius:12, display:"flex", alignItems:"center", gap:12, transition:"0.15s", boxShadow:"0 2px 4px rgba(0,0,0,0.02)" }}
-              onMouseEnter={e=>e.currentTarget.style.borderColor=T.red} onMouseLeave={e=>e.currentTarget.style.borderColor=T.redBorder}>
+         <div onClick={onOpenAlerts} style={{ flex:"1 1 180px", cursor:"pointer", background:T.redLight, border:"1px solid "+T.redBorder, padding:"14px 18px", borderRadius:12, display:"flex", alignItems:"center", gap:12, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }}
+              onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(220,38,38,0.15)"; e.currentTarget.style.borderColor=T.red; }}
+              onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor=T.redBorder; }}>
              <span style={{fontSize:24}}>🚨</span>
              <div>
                  <div style={{fontSize:15, fontWeight:900, color:T.red}}>{blockedCount} Action{blockedCount!==1?"s":""} Needed</div>
@@ -2086,8 +2087,9 @@ function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, onOpenAl
          </div>
       )}
       {notifyCount > 0 && (
-         <div onClick={onOpenNotify} style={{ flex:"1 1 180px", cursor:"pointer", background:T.amberLight, border:"1px solid "+T.amberBorder, padding:"14px 18px", borderRadius:12, display:"flex", alignItems:"center", gap:12, transition:"0.15s", boxShadow:"0 2px 4px rgba(0,0,0,0.02)" }}
-              onMouseEnter={e=>e.currentTarget.style.borderColor=T.amberDark} onMouseLeave={e=>e.currentTarget.style.borderColor=T.amberBorder}>
+         <div onClick={onOpenNotify} style={{ flex:"1 1 180px", cursor:"pointer", background:T.amberLight, border:"1px solid "+T.amberBorder, padding:"14px 18px", borderRadius:12, display:"flex", alignItems:"center", gap:12, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }}
+              onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(180,83,9,0.15)"; e.currentTarget.style.borderColor=T.amberDark; }}
+              onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor=T.amberBorder; }}>
              <span style={{fontSize:24}}>📞</span>
              <div>
                  <div style={{fontSize:15, fontWeight:900, color:T.amberDark}}>{notifyCount} Call{notifyCount!==1?"s":""} Queued</div>
@@ -2096,7 +2098,9 @@ function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, onOpenAl
          </div>
       )}
       {botCount > 0 && (
-         <div style={{ flex:"1 1 200px", background:T.rpaLight, border:"1px solid "+T.rpaBorder, padding:"14px 18px", borderRadius:12, display:"flex", alignItems:"center", gap:12 }}>
+         <div style={{ flex:"1 1 200px", background:T.rpaLight, border:"1px solid "+T.rpaBorder, padding:"14px 18px", borderRadius:12, display:"flex", alignItems:"center", gap:12, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }}
+              onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(3,105,161,0.12)"; }}
+              onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; }}>
              <span style={{fontSize:24}}>🤖</span>
              <div>
                  <div style={{fontSize:15, fontWeight:900, color:T.rpaDark}}>{botCount} Auto-Verified</div>
@@ -2142,56 +2146,250 @@ function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, i
   );
 }
 
-// ── Directory Modal for Calendar Schedule ────────────────────────────────────
-function DirectorySearchModal({ time, date, onSelect, onClose }) {
-  const [query, setQuery] = useState("");
+// ── Directory Modal — Schedule + Pre-Verify ───────────────────────────────────
+const MOCK_DIRECTORY = [
+  { id: "dir_1", name: "Amanda Lewis",   dob: "1985-04-12", procedure: "Implant Consult",  insurance: "MetLife",       phone: "(512) 555-1111", provider: "Dr. Patel",     fee: 25000,  memberId: "MET88899", fixtureId: "p1" },
+  { id: "dir_2", name: "David Chen",     dob: "1992-10-30", procedure: "Prophy + BWX",     insurance: "Delta Dental",  phone: "(512) 555-2222", provider: "Dr. Chen",      fee: 18500,  memberId: "DD77733",  fixtureId: "p2" },
+  { id: "dir_3", name: "Sarah Jenkins",  dob: "1970-02-14", procedure: "Crown Prep #18",   insurance: "Cigna",         phone: "(512) 555-3333", provider: "Dr. Kim",       fee: 145000, memberId: "CIG44422", fixtureId: "p3" },
+  { id: "dir_4", name: "Michael Vance",  dob: "2001-08-05", procedure: "Root Canal",       insurance: "Guardian",      phone: "(512) 555-4444", provider: "Dr. Rodriguez", fee: 115000, memberId: "GRD11100", fixtureId: "p5" },
+  { id: "dir_5", name: "Jessica Taylor", dob: "1998-12-22", procedure: "Composite Fill",   insurance: "Aetna DMO",     phone: "(512) 555-5555", provider: "Dr. Patel",     fee: 25000,  memberId: "AET9900",  fixtureId: "p1" },
+];
 
-  const mockDirectory = [
-    { id: "dir_1", name: "Amanda Lewis", dob: "1985-04-12", procedure: "Implant Consult", insurance: "MetLife", phone: "(512) 555-1111", provider: "Dr. Patel", fee: 25000, memberId: "MET88899" },
-    { id: "dir_2", name: "David Chen", dob: "1992-10-30", procedure: "Prophy + BWX", insurance: "Delta Dental", phone: "(512) 555-2222", provider: "Dr. Chen", fee: 18500, memberId: "DD77733" },
-    { id: "dir_3", name: "Sarah Jenkins", dob: "1970-02-14", procedure: "Crown Prep #18", insurance: "Cigna", phone: "(512) 555-3333", provider: "Dr. Kim", fee: 145000, memberId: "CIG44422" },
-    { id: "dir_4", name: "Michael Vance", dob: "2001-08-05", procedure: "Root Canal", insurance: "Guardian", phone: "(512) 555-4444", provider: "Dr. Rodriguez", fee: 115000, memberId: "GRD11100" },
-    { id: "dir_5", name: "Jessica Taylor", dob: "1998-12-22", procedure: "Composite Fill", insurance: "Aetna DMO", phone: "(512) 555-5555", provider: "Dr. Patel", fee: 25000, memberId: "AET9900" },
-  ];
+const TIME_SLOTS = ["8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM"];
 
-  const filtered = mockDirectory.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+function DirectorySearchModal({ onSelect, onClose }) {
+  const [mode, setMode]           = useState("schedule"); // "schedule" | "preverify"
+  const [step, setStep]           = useState(1);          // 1=date/time, 2=patient search
+  const [selDate, setSelDate]     = useState("");
+  const [selTime, setSelTime]     = useState("9:00 AM");
+  const [query, setQuery]         = useState("");
+  const [verifying, setVerifying] = useState(null);       // patient id being verified
+  const [verifyRes, setVerifyRes] = useState({});         // map id -> result|error
+
+  // Build next 7 weekdays from today
+  const weekdays = (() => {
+    const days = [];
+    const d = new Date();
+    while (days.length < 7) {
+      if (d.getDay() !== 0 && d.getDay() !== 6) {
+        days.push({
+          dateStr: d.toISOString().split("T")[0],
+          label: d.toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric" }),
+        });
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    return days;
+  })();
+
+  const filtered = MOCK_DIRECTORY.filter(p =>
+    p.name.toLowerCase().includes(query.toLowerCase()) ||
+    p.dob.includes(query) ||
+    p.insurance.toLowerCase().includes(query.toLowerCase())
+  );
+
+  const handlePreVerify = async (p) => {
+    setVerifying(p.id);
+    try {
+      const res = await apiPostVerify(p.fixtureId || "p1", "manual");
+      setVerifyRes(prev => ({ ...prev, [p.id]: { ok: true, data: res } }));
+    } catch (e) {
+      setVerifyRes(prev => ({ ...prev, [p.id]: { ok: false, error: e.message } }));
+    } finally {
+      setVerifying(null);
+    }
+  };
+
+  const tabBtn = (id, label) => (
+    <button onClick={() => { setMode(id); setStep(1); setQuery(""); setVerifyRes({}); }}
+            style={{ flex:1, padding:"10px 0", fontWeight:800, fontSize:13, cursor:"pointer", border:"none",
+                     borderBottom: mode===id ? "3px solid white" : "3px solid transparent",
+                     background:"transparent", color: mode===id ? "white" : "rgba(255,255,255,0.6)",
+                     transition:"all 0.15s" }}>
+      {label}
+    </button>
+  );
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:5000, display:"flex", alignItems:"center", justifyContent:"center" }} onClick={(e)=>{if(e.target===e.currentTarget) onClose();}}>
-      <div style={{ background:T.bgCard, width: 480, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: "80vh" }}>
-        <div style={{ padding: "16px 20px", background: T.indigoDark, color: "white", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 900 }}>Select Patient from PMS</div>
-            <div style={{ fontSize: 12, opacity: 0.8 }}>Scheduling for {time}</div>
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:5000, display:"flex", alignItems:"center", justifyContent:"center" }}
+         onClick={e => { if (e.target===e.currentTarget) onClose(); }}>
+      <div style={{ background:T.bgCard, width:500, borderRadius:14, overflow:"hidden", display:"flex", flexDirection:"column", maxHeight:"88vh", boxShadow:"0 24px 64px rgba(0,0,0,0.22)" }}>
+
+        {/* ── Header ── */}
+        <div style={{ background:T.indigoDark, color:"white" }}>
+          <div style={{ padding:"16px 20px 0", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div style={{ fontSize:16, fontWeight:900 }}>Patient Lookup</div>
+            <button onClick={onClose} style={{ background:"transparent", border:"none", color:"white", fontSize:24, cursor:"pointer", lineHeight:1 }}>&times;</button>
           </div>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "white", fontSize: 24, cursor: "pointer" }}>&times;</button>
+          {/* Mode tabs */}
+          <div style={{ display:"flex", marginTop:10 }}>
+            {tabBtn("schedule", "📅 Schedule Appointment")}
+            {tabBtn("preverify", "🔍 Pre-Verify Only")}
+          </div>
         </div>
 
-        <div style={{ padding: 16, borderBottom: "1px solid " + T.border }}>
-          <input type="text" placeholder="Search by name or DOB..." value={query} onChange={e=>setQuery(e.target.value)} autoFocus
-                 style={{ width: "100%", padding: "10px 14px", border: "1px solid " + T.border, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
-        </div>
-
-        <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-          {filtered.length === 0 ? (
-             <div style={{ textAlign: "center", padding: "20px", color: T.textSoft, fontSize: 13 }}>No patients found.</div>
-          ) : (
-            filtered.map(p => (
-              <div key={p.id} onClick={() => onSelect({...p, appointmentTime: time, appointmentDate: date, id: "p_dir_" + Date.now()})}
-                   style={{ border: "1px solid " + T.border, borderRadius: 8, padding: "12px 16px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", transition: "0.15s" }}
-                   onMouseEnter={e => e.currentTarget.style.borderColor = T.indigo} onMouseLeave={e => e.currentTarget.style.borderColor = T.border}>
-                 <div>
-                   <div style={{ fontSize: 14, fontWeight: 900, color: T.text }}>{p.name}</div>
-                   <div style={{ fontSize: 11, color: T.textSoft, marginTop: 4 }}>DOB {p.dob} &middot; {p.procedure}</div>
-                 </div>
-                 <div style={{ textAlign: "right" }}>
-                   <div style={{ fontSize: 12, fontWeight: 800, color: T.textMid }}>{p.insurance}</div>
-                   <div style={{ fontSize: 11, color: T.textSoft, marginTop: 4 }}>{p.provider}</div>
-                 </div>
+        {/* ── SCHEDULE MODE ── */}
+        {mode === "schedule" && (
+          <>
+            {/* Step indicator */}
+            <div style={{ padding:"10px 20px", borderBottom:"1px solid "+T.border, background:T.bg, display:"flex", alignItems:"center", gap:8 }}>
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <div style={{ width:22, height:22, borderRadius:"50%", background: step>=1 ? T.indigoDark : T.border, color:"white", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900 }}>1</div>
+                <span style={{ fontSize:12, fontWeight:700, color: step>=1 ? T.indigoDark : T.textSoft }}>Date & Time</span>
               </div>
-            ))
-          )}
-        </div>
+              <div style={{ flex:1, height:2, background: step>=2 ? T.indigoDark : T.border, borderRadius:2 }} />
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <div style={{ width:22, height:22, borderRadius:"50%", background: step>=2 ? T.indigoDark : T.border, color:"white", display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:900 }}>2</div>
+                <span style={{ fontSize:12, fontWeight:700, color: step>=2 ? T.indigoDark : T.textSoft }}>Select Patient</span>
+              </div>
+            </div>
+
+            {step === 1 && (
+              <div style={{ padding:20, display:"flex", flexDirection:"column", gap:16 }}>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:800, color:T.textMid, marginBottom:10, textTransform:"uppercase", letterSpacing:"0.05em" }}>Select Appointment Date</div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                    {weekdays.map(d => (
+                      <button key={d.dateStr} onClick={() => setSelDate(d.dateStr)}
+                              style={{ padding:"8px 14px", borderRadius:8, border:"2px solid", cursor:"pointer", fontSize:12, fontWeight:700, transition:"all 0.15s",
+                                       borderColor: selDate===d.dateStr ? T.indigoDark : T.border,
+                                       background:  selDate===d.dateStr ? T.indigoLight : T.bgCard,
+                                       color:       selDate===d.dateStr ? T.indigoDark  : T.textMid }}>
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:800, color:T.textMid, marginBottom:10, textTransform:"uppercase", letterSpacing:"0.05em" }}>Select Time Slot</div>
+                  <select value={selTime} onChange={e=>setSelTime(e.target.value)}
+                          style={{ width:"100%", padding:"10px 14px", border:"1px solid "+T.border, borderRadius:8, fontSize:14, fontFamily:"inherit", outline:"none", background:T.bgCard, color:T.text }}>
+                    {TIME_SLOTS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <button onClick={() => { if (selDate) setStep(2); }}
+                        style={{ marginTop:4, padding:"12px 0", borderRadius:9, border:"none", fontWeight:900, fontSize:14, cursor: selDate ? "pointer" : "not-allowed",
+                                 background: selDate ? T.indigoDark : T.border, color: selDate ? "white" : T.textSoft, transition:"all 0.15s" }}>
+                  {selDate ? `Continue — ${weekdays.find(d=>d.dateStr===selDate)?.label} at ${selTime}` : "Select a date to continue →"}
+                </button>
+              </div>
+            )}
+
+            {step === 2 && (
+              <>
+                <div style={{ padding:"10px 16px", borderBottom:"1px solid "+T.border, background:T.indigoLight, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                  <span style={{ fontSize:12, fontWeight:800, color:T.indigoDark }}>
+                    📅 {weekdays.find(d=>d.dateStr===selDate)?.label} &nbsp;·&nbsp; 🕐 {selTime}
+                  </span>
+                  <button onClick={()=>setStep(1)} style={{ fontSize:11, fontWeight:800, color:T.indigoDark, background:"transparent", border:"none", cursor:"pointer", textDecoration:"underline" }}>Change</button>
+                </div>
+                <div style={{ padding:"12px 16px", borderBottom:"1px solid "+T.border }}>
+                  <input type="text" placeholder="Search by name, DOB, or insurance..." value={query} onChange={e=>setQuery(e.target.value)} autoFocus
+                         style={{ width:"100%", padding:"10px 14px", border:"1px solid "+T.border, borderRadius:8, fontSize:14, outline:"none", fontFamily:"inherit", boxSizing:"border-box" }} />
+                </div>
+                <div style={{ flex:1, overflowY:"auto", padding:12, display:"flex", flexDirection:"column", gap:8 }}>
+                  {filtered.length === 0
+                    ? <div style={{ textAlign:"center", padding:20, color:T.textSoft, fontSize:13 }}>No patients found.</div>
+                    : filtered.map(p => (
+                        <div key={p.id} onClick={() => onSelect({ ...p, appointmentTime:selTime, appointmentDate:selDate, id:"p_dir_"+Date.now() })}
+                             style={{ border:"1px solid "+T.border, borderRadius:9, padding:"12px 16px", cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center", transition:"all 0.15s" }}
+                             onMouseEnter={e => { e.currentTarget.style.borderColor=T.indigoDark; e.currentTarget.style.background=T.indigoLight; }}
+                             onMouseLeave={e => { e.currentTarget.style.borderColor=T.border; e.currentTarget.style.background=T.bgCard; }}>
+                          <div>
+                            <div style={{ fontSize:14, fontWeight:900, color:T.text }}>{p.name}</div>
+                            <div style={{ fontSize:11, color:T.textSoft, marginTop:3 }}>DOB {p.dob} &middot; {p.procedure}</div>
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <div style={{ fontSize:12, fontWeight:800, color:T.textMid }}>{p.insurance}</div>
+                            <div style={{ fontSize:11, color:T.textSoft, marginTop:3 }}>{p.provider}</div>
+                          </div>
+                        </div>
+                      ))
+                  }
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {/* ── PRE-VERIFY MODE ── */}
+        {mode === "preverify" && (
+          <>
+            <div style={{ padding:"10px 16px", borderBottom:"1px solid "+T.border, background:T.rpaLight }}>
+              <div style={{ fontSize:12, color:T.rpaDark, fontWeight:700 }}>
+                🔒 Verify a patient&apos;s insurance without adding them to the schedule queue.
+              </div>
+            </div>
+            <div style={{ padding:"12px 16px", borderBottom:"1px solid "+T.border }}>
+              <input type="text" placeholder="Search by name, DOB, or insurance..." value={query} onChange={e=>setQuery(e.target.value)} autoFocus
+                     style={{ width:"100%", padding:"10px 14px", border:"1px solid "+T.border, borderRadius:8, fontSize:14, outline:"none", fontFamily:"inherit", boxSizing:"border-box" }} />
+            </div>
+            <div style={{ flex:1, overflowY:"auto", padding:12, display:"flex", flexDirection:"column", gap:10 }}>
+              {filtered.length === 0
+                ? <div style={{ textAlign:"center", padding:20, color:T.textSoft, fontSize:13 }}>No patients found.</div>
+                : filtered.map(p => {
+                    const vr = verifyRes[p.id];
+                    const isVerifying = verifying === p.id;
+                    return (
+                      <div key={p.id} style={{ border:"1px solid "+T.border, borderRadius:10, overflow:"hidden" }}>
+                        <div style={{ padding:"12px 16px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                          <div>
+                            <div style={{ fontSize:14, fontWeight:900, color:T.text }}>{p.name}</div>
+                            <div style={{ fontSize:11, color:T.textSoft, marginTop:3 }}>DOB {p.dob} &middot; {p.insurance} &middot; {p.procedure}</div>
+                          </div>
+                          {!vr && (
+                            <button onClick={() => handlePreVerify(p)} disabled={isVerifying}
+                                    style={{ padding:"7px 14px", borderRadius:7, border:"none", fontWeight:800, fontSize:12, cursor: isVerifying ? "default" : "pointer",
+                                             background: isVerifying ? T.rpaLight : T.rpaDark, color:"white", transition:"all 0.15s", whiteSpace:"nowrap", flexShrink:0, marginLeft:12 }}>
+                              {isVerifying ? "Verifying…" : "Verify Insurance"}
+                            </button>
+                          )}
+                          {vr && (
+                            <button onClick={() => setVerifyRes(prev => { const n={...prev}; delete n[p.id]; return n; })}
+                                    style={{ padding:"5px 10px", borderRadius:6, border:"1px solid "+T.border, background:T.bgCard, color:T.textSoft, fontSize:11, cursor:"pointer", flexShrink:0, marginLeft:12 }}>
+                              Clear
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Inline result */}
+                        {vr && vr.ok && (
+                          <div style={{ padding:"12px 16px", borderTop:"1px solid "+T.border, background:T.limeLight }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
+                              <span style={{ fontSize:14 }}>✅</span>
+                              <span style={{ fontSize:13, fontWeight:900, color:T.limeDark }}>
+                                {vr.data.plan_status === "active" ? "Active Coverage" : vr.data.plan_status}
+                              </span>
+                            </div>
+                            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"6px 16px" }}>
+                              {[
+                                ["Plan",         vr.data.plan_name || p.insurance],
+                                ["Member ID",    vr.data.member_id || p.memberId],
+                                ["Deductible",   vr.data.deductible_remaining != null ? `$${(vr.data.deductible_remaining/100).toFixed(0)} remaining` : "--"],
+                                ["Max Benefit",  vr.data.annual_max_remaining  != null ? `$${(vr.data.annual_max_remaining/100).toFixed(0)} left`      : "--"],
+                                ["Preventive",   vr.data.preventive_coverage   != null ? vr.data.preventive_coverage + "%"  : "--"],
+                                ["Basic",        vr.data.basic_coverage        != null ? vr.data.basic_coverage + "%"       : "--"],
+                              ].map(([label, val]) => (
+                                <div key={label}>
+                                  <div style={{ fontSize:10, fontWeight:700, color:T.limeDark, opacity:0.7, textTransform:"uppercase" }}>{label}</div>
+                                  <div style={{ fontSize:12, fontWeight:800, color:T.text }}>{val}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {vr && !vr.ok && (
+                          <div style={{ padding:"10px 16px", borderTop:"1px solid "+T.redBorder, background:T.redLight }}>
+                            <span style={{ fontSize:12, color:T.red, fontWeight:700 }}>⚠ {vr.error || "Verification failed"}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+              }
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -2629,7 +2827,9 @@ function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast, res
               { label:"Outreach",       value:outreach.length,                                      color:T.amberDark,bg:T.amberLight,  border:T.amberBorder },
               { label:"Calls Avoided",  value:verifications.filter(e=>e.trigger!=="manual").length, color:T.rpaDark,  bg:T.rpaLight,    border:T.rpaBorder   },
             ].map(s=>(
-              <div key={s.label} style={{ flex:"1 1 180px", background:s.bg, border:"1px solid " + s.border, borderRadius:10, padding:"12px 14px" }}>
+              <div key={s.label} style={{ flex:"1 1 180px", background:s.bg, border:"1px solid " + s.border, borderRadius:10, padding:"12px 14px", transition:"all 0.2s", cursor:"default", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }}
+                onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(0,0,0,0.12)"; e.currentTarget.style.borderColor=s.color; }}
+                onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor=s.border; }}>
                 <div style={{ color:s.color, fontSize:22, fontWeight:900, lineHeight:1 }}>{s.value}</div>
                 <div style={{ color:s.color, fontSize:10, fontWeight:700, marginTop:4, opacity:0.75 }}>{s.label}</div>
               </div>
@@ -2952,7 +3152,7 @@ function Analytics({ patients, results, agentLog }) {
 // so it never gets re-created inside Settings render, which would reset hooks).
 // validate: fn(v)→string|null  OR  a VALIDATORS key string ("email","npi",etc.)
 const SInput = ({ label, type = "text", placeholder, value, onChange, validate, required }) => {
-  const [touched, setTouched] = React.useState(false);
+  const [touched, setTouched] = useState(false);
   const validatorFn = typeof validate === "string" ? VALIDATORS[validate] : validate;
   const inlineErr = touched && validatorFn ? validatorFn(value || "") : null;
   const reqErr    = touched && required && !value?.trim() ? "This field is required" : null;
@@ -3517,16 +3717,12 @@ export default function LevelAI() {
   const [schedulePanel, setSchedulePanel] = useState("benefits");
   const [dismissedAlerts, setDismissedAlerts] = useState({ blocked: false, notify: false });
   const [showDirectoryModal, setShowDirectoryModal] = useState(false);
-  const [newPatientPreseedTime, setNewPatientPreseedTime] = useState("9:00 AM");
-  const [newPatientPreseedDate, setNewPatientPreseedDate] = useState("");
 
   // Track which patients have had auto-verify queued this session
   const autoQueued = useRef(new Set());
 
   // ── Mount ────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const todayStr = new Date().toISOString().split("T")[0];
-    setNewPatientPreseedDate(todayStr);
     setIsMounted(true);
   }, []);
 
@@ -3618,7 +3814,6 @@ export default function LevelAI() {
     setSelectedDayDate(date);
     setSelectedDayPatients(null); // triggers skeleton
     setDayPanelLoading(true);
-    setNewPatientPreseedDate(dateStr);
     try {
       const data = await apiGetDailySchedule(dateStr);
       setSelectedDayPatients(data);
@@ -3737,9 +3932,7 @@ export default function LevelAI() {
     loadDayPanel(date);
   };
 
-  const handleAddPatientClick = (time, preseedDate) => {
-    setNewPatientPreseedTime(time);
-    if (preseedDate) setNewPatientPreseedDate(preseedDate);
+  const handleAddPatientClick = () => {
     setShowDirectoryModal(true);
   };
 
@@ -3994,7 +4187,7 @@ export default function LevelAI() {
                 </div>
                 <div style={{ display:"flex", gap:8 }}>
                   <button
-                    onClick={() => handleAddPatientClick("9:00 AM", todayStrLocal)}
+                    onClick={() => handleAddPatientClick()}
                     style={{ background:T.bgCard, color:T.text, border:"1px solid " + T.border, padding:"8px 16px", borderRadius:8, fontWeight:800, cursor:"pointer", fontSize:12 }}>
                     + New Patient
                   </button>
@@ -4102,14 +4295,12 @@ export default function LevelAI() {
       {/* ── Directory modal ───────────────────────────────────────────────── */}
       {showDirectoryModal && (
         <DirectorySearchModal
-          time={newPatientPreseedTime}
-          date={newPatientPreseedDate}
           onClose={() => setShowDirectoryModal(false)}
           onSelect={(p) => {
             const diff = new Date(p.appointmentDate) - new Date();
             handleAddPatient({ ...p, hoursUntil: Math.floor(diff / (1000 * 60 * 60)) + 9 });
             setShowDirectoryModal(false);
-            showToast(`${p.name} added to schedule!`);
+            showToast(`${p.name} added — ${p.appointmentDate} at ${p.appointmentTime}!`);
           }}
         />
       )}
