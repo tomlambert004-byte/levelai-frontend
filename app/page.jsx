@@ -3351,18 +3351,18 @@ function EmailPDFModal({ isOpen, onClose, defaultEmail = "", patientName = "", d
 // Used exclusively by OONEstimatorWidget for claim-ready superbill actions.
 function SuperbillActionBar({ onDownloadPDF, onFaxToCarrier, onEmailToPatient }) {
   const btnStyle = {
-    display:"flex", alignItems:"center", gap:6, flex:1, justifyContent:"center",
-    padding:"10px 16px", borderRadius:8, border:"1px solid " + T.border,
-    background:T.bgCard, color:T.textMid, fontSize:12, fontWeight:700,
-    cursor:"pointer", transition:"all 0.15s", whiteSpace:"nowrap",
+    display:"flex", alignItems:"center", gap:6, flex:"1 1 auto", justifyContent:"center",
+    padding:"8px 12px", borderRadius:8, border:"1px solid " + T.border,
+    background:T.bgCard, color:T.textMid, fontSize:11, fontWeight:700,
+    cursor:"pointer", transition:"all 0.15s", whiteSpace:"nowrap", minWidth:0,
   };
   const hoverIn = e => { e.currentTarget.style.borderColor = T.indigo; e.currentTarget.style.color = T.indigo; };
   const hoverOut = e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMid; };
   return (
-    <div style={{ display:"flex", gap:8 }}>
-      <button style={btnStyle} onClick={onDownloadPDF} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>📥 Download PDF</button>
-      <button style={btnStyle} onClick={onFaxToCarrier} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>📠 Fax to Carrier</button>
-      <button style={btnStyle} onClick={onEmailToPatient} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>📧 Email to Patient</button>
+    <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+      <button style={btnStyle} onClick={onDownloadPDF} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>📥 Download</button>
+      <button style={btnStyle} onClick={onFaxToCarrier} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>📠 Fax</button>
+      <button style={btnStyle} onClick={onEmailToPatient} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>📧 Email</button>
     </div>
   );
 }
@@ -4538,7 +4538,7 @@ const SInput = ({ label, type = "text", placeholder, value, onChange, validate, 
   );
 };
 
-function Settings({ showToast, onSyncComplete }) {
+function Settings({ showToast, sandboxMode, onSyncComplete }) {
   const [activeTab, setActiveTab]   = useState("general");
 
   // General
@@ -4557,6 +4557,18 @@ function Settings({ showToast, onSyncComplete }) {
   const handlePmsSync = async () => {
     setSyncStatus("syncing");
     setSyncResult(null);
+
+    // In sandbox mode, skip the auth-requiring API call and just reload fixture data
+    if (sandboxMode) {
+      setTimeout(() => {
+        setSyncStatus("done");
+        setSyncResult({ synced: 8, message: "Sandbox — loaded fixture patients" });
+        showToast("✅ 8 patients loaded from sandbox fixtures");
+        if (onSyncComplete) onSyncComplete();
+      }, 800);
+      return;
+    }
+
     try {
       const res = await fetch("/api/v1/pms/sync", {
         method: "POST",
@@ -5406,6 +5418,11 @@ export default function LevelAI() {
     setTimeout(() => { setToastMsg(""); setToastFading(false); }, 3500);
   }, []);
 
+  // Clear lingering toasts when user signs out (prevents PII on login screen)
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) { setToastMsg(""); setToastFading(false); }
+  }, [isLoaded, isSignedIn]);
+
   // ── Onboarding wizard (new-practice signup) ───────────────────────────────────
   const [showWizard, setShowWizard] = useState(false);
   useEffect(() => {
@@ -5686,7 +5703,7 @@ export default function LevelAI() {
       apiResult = await apiPostVerify(patient.id, trigger, patient);
     } catch (e) {
       setPhase(patient.id, { phase: "error", error: e.message });
-      showToast(`Verification failed for ${patient.name}: ${e.message}`);
+      showToast(`Verification failed: ${e.message}`);
       return;
     }
     runPhases.push("api");
@@ -5962,7 +5979,6 @@ export default function LevelAI() {
     return (
       <div style={{ position: "relative", height: "100vh", overflow: "hidden" }}>
         <AuthFlow onComplete={() => {}} showToast={showToast} onSandbox={() => { setSandboxMode(true); setAccountMode("sandbox"); setDailyLoading(false); }} />
-        {toastMsg && <ToastBar msg={toastMsg} fading={toastFading} />}
       </div>
     );
   }
@@ -6184,7 +6200,7 @@ export default function LevelAI() {
 
         {tab === "settings" && (
           <div key="settings" style={{ animation:"fadeIn 0.3s ease-out", height:"100%", display:"flex", flexDirection:"column" }}>
-          <Settings showToast={showToast} onSyncComplete={() => loadWeekSchedule(new Date().toISOString().split("T")[0])} />
+          <Settings showToast={showToast} sandboxMode={sandboxMode} onSyncComplete={() => loadWeekSchedule(new Date().toISOString().split("T")[0])} />
           </div>
         )}
 
