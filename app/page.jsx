@@ -2948,6 +2948,39 @@ function Analytics({ patients, results, agentLog }) {
   );
 }
 
+// SInput — Settings form input with inline validation (hoisted to module level
+// so it never gets re-created inside Settings render, which would reset hooks).
+// validate: fn(v)→string|null  OR  a VALIDATORS key string ("email","npi",etc.)
+const SInput = ({ label, type = "text", placeholder, value, onChange, validate, required }) => {
+  const [touched, setTouched] = React.useState(false);
+  const validatorFn = typeof validate === "string" ? VALIDATORS[validate] : validate;
+  const inlineErr = touched && validatorFn ? validatorFn(value || "") : null;
+  const reqErr    = touched && required && !value?.trim() ? "This field is required" : null;
+  const showErr   = inlineErr || reqErr;
+  const borderColor = showErr ? "#ef4444" : touched && !showErr && value ? "#16a34a" : T.border;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <label style={{ fontSize: 11, fontWeight: 800, color: T.textMid, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        {label}{required && <span style={{ color:"#ef4444", marginLeft:3 }}>*</span>}
+      </label>
+      <input type={type} placeholder={placeholder} value={value} onChange={onChange}
+        style={{ padding: "11px 14px", border: "1.5px solid " + borderColor, borderRadius: 8, fontSize: 14,
+          background: showErr ? "#fef2f2" : T.bgCard, outline: "none", color: T.text, fontFamily: "inherit",
+          width: "100%", transition: "border-color 0.2s, box-shadow 0.2s",
+          boxShadow: showErr ? "0 0 0 3px rgba(239,68,68,0.10)" : touched && !showErr && value ? "0 0 0 3px rgba(22,163,74,0.08)" : "none" }}
+        onFocus={e => e.target.style.borderColor = showErr ? "#ef4444" : T.indigoDark}
+        onBlur={e  => { setTouched(true); e.target.style.borderColor = borderColor; }} />
+      {showErr && (
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: -2 }}>
+          <span style={{ fontSize: 13, lineHeight: 1 }}>⚠️</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#dc2626" }}>{showErr}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 function Settings({ showToast }) {
   const [activeTab, setActiveTab]   = useState("general");
 
@@ -2985,37 +3018,8 @@ function Settings({ showToast }) {
   };
 
   // ── sub-components ────────────────────────────────────────────────────────
-  // SInput — Settings form input with inline validation
-  // validate: fn(v)→string|null  OR  VALIDATORS key ("email","npi","taxId",etc.)
-  const SInput = ({ label, type = "text", placeholder, value, onChange, validate, required }) => {
-    const [touched, setTouched] = React.useState(false);
-    const validatorFn = typeof validate === "string" ? VALIDATORS[validate] : validate;
-    const inlineErr = touched && validatorFn ? validatorFn(value || "") : null;
-    const reqErr    = touched && required && !value?.trim() ? "This field is required" : null;
-    const showErr   = inlineErr || reqErr;
-    const borderColor = showErr ? "#ef4444" : touched && !showErr && value ? "#16a34a" : T.border;
-
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <label style={{ fontSize: 11, fontWeight: 800, color: T.textMid, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          {label}{required && <span style={{ color:"#ef4444", marginLeft:3 }}>*</span>}
-        </label>
-        <input type={type} placeholder={placeholder} value={value} onChange={onChange}
-          style={{ padding: "11px 14px", border: "1.5px solid " + borderColor, borderRadius: 8, fontSize: 14,
-            background: showErr ? "#fef2f2" : T.bgCard, outline: "none", color: T.text, fontFamily: "inherit",
-            width: "100%", transition: "border-color 0.2s, box-shadow 0.2s",
-            boxShadow: showErr ? "0 0 0 3px rgba(239,68,68,0.10)" : touched && !showErr && value ? "0 0 0 3px rgba(22,163,74,0.08)" : "none" }}
-          onFocus={e => e.target.style.borderColor = showErr ? "#ef4444" : T.indigoDark}
-          onBlur={e  => { setTouched(true); e.target.style.borderColor = borderColor; }} />
-        {showErr && (
-          <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: -2 }}>
-            <span style={{ fontSize: 13, lineHeight: 1 }}>⚠️</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#dc2626" }}>{showErr}</span>
-          </div>
-        )}
-      </div>
-    );
-  };
+  // SInput is hoisted to module level (above Settings) to avoid the
+  // "component defined inside render" hook-reset bug.
 
   const Toggle = ({ label, description, defaultChecked }) => (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 0", borderBottom: "1px solid " + T.border }}>
