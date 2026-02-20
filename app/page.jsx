@@ -5274,6 +5274,7 @@ export default function LevelAI() {
   const [showWizard, setShowWizard] = useState(false);
   useEffect(() => {
     if (isSignedIn && typeof window !== "undefined") {
+      // Legacy flag from custom sign-up form — still respected
       if (localStorage.getItem("pulp_needs_onboarding") === "1") {
         setShowWizard(true);
       }
@@ -5377,6 +5378,11 @@ export default function LevelAI() {
         .then(r => r.json()).then(d => {
           if (d.practice?.accountMode) setAccountMode(d.practice.accountMode);
           if (d.practice) setPractice(d.practice);
+          // If practice has no name, this is a new user who needs onboarding
+          // (covers Clerk invite flow, Google OAuth, and any other sign-up path)
+          if (d.practice && !d.practice.name) {
+            setShowWizard(true);
+          }
         })
         .catch(() => {}); // non-blocking — fail silently if DB not reachable
     }
