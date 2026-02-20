@@ -403,14 +403,29 @@ export async function POST(request) {
       return Response.json({ error: "patient_id is required." }, { status: 400 });
     }
 
+    // ── Check sandbox mode — skip Stedi entirely ────────────────────────────────
+    let isSandbox = false;
+    try {
+      const { prisma: _p } = await import("../../../../lib/prisma.js");
+      const { auth: _a }   = await import("@clerk/nextjs/server");
+      const { userId: _uid } = await _a();
+      if (_uid) {
+        const _prac = await _p.practice.findUnique({ where: { clerkUserId: _uid } });
+        if (_prac?.accountMode === "sandbox") isSandbox = true;
+      } else {
+        // No auth = sandbox / demo mode
+        isSandbox = true;
+      }
+    } catch { /* if lookup fails, default to trying Stedi */ }
+
     // ── Try real Stedi call first ──────────────────────────────────────────────
     const stediKey = process.env.STEDI_API_KEY;
     const resolvedPayerId = resolvePayerId
       ? resolvePayerId(insurance_name, payer_id)
       : null;
 
-    // Use Stedi if: key is set, we have a memberId, and a payer ID we can resolve
-    const canUseStedi = stediKey && (member_id || body.memberId) && resolvedPayerId && stediVerify;
+    // Use Stedi if: key is set, we have a memberId, a payer ID we can resolve, AND not sandbox
+    const canUseStedi = !isSandbox && stediKey && (member_id || body.memberId) && resolvedPayerId && stediVerify;
 
     if (canUseStedi) {
       try {

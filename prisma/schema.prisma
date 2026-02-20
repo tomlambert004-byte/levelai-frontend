@@ -14,11 +14,15 @@ model Practice {
   name        String
   npi         String?
   taxId       String?
+  accountMode String   @default("sandbox")  // "sandbox" | "live"
+  pmsSystem   String?                        // "Open Dental" | "Dentrix" | "Eaglesoft"
+  pmsSyncKey  String?                        // encrypted PMS sync key / eKey
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   patients            Patient[]
   verificationResults VerificationResult[]
+  smsQueue            SmsQueue[]
 }
 
 // ── A patient record belonging to a practice ─────────────────────────────────
@@ -49,6 +53,7 @@ model Patient {
   updatedAt DateTime @updatedAt
 
   verificationResults VerificationResult[]
+  smsQueue            SmsQueue[]
 }
 
 // ── A single eligibility verification result ─────────────────────────────────
@@ -72,4 +77,27 @@ model VerificationResult {
 
   verifiedAt DateTime @default(now())
   durationMs Int?
+}
+
+// ── SMS draft queue (approve-before-send outreach) ────────────────────────────
+model SmsQueue {
+  id             String    @id @default(cuid())
+  practiceId     String
+  practice       Practice  @relation(fields: [practiceId], references: [id])
+  patientId      String?
+  patient        Patient?  @relation(fields: [patientId], references: [id])
+
+  recipientPhone String
+  recipientName  String?
+  draftMessage   String
+  triggerType    String              // "reschedule_proposed" | "outreach_queued"
+  status         String    @default("draft")  // draft | approved | sent | failed | dismissed
+  approvedBy     String?             // clerkUserId who approved
+  approvedAt     DateTime?
+  sentAt         DateTime?
+  twilioSid      String?             // Twilio message SID after send
+  errorMessage   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

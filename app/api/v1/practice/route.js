@@ -25,11 +25,14 @@ export async function POST(request) {
       `${user?.firstName || ""} ${user?.lastName || ""}`.trim() ||
       "My Practice";
 
-    // Upsert — create if not exists, update name/npi/taxId if provided
+    // Upsert — create if not exists, update fields if provided
     const updateData = {};
-    if (body.name)   updateData.name  = body.name;
-    if (body.npi)    updateData.npi   = body.npi;
-    if (body.taxId)  updateData.taxId = body.taxId;
+    if (body.name)        updateData.name        = body.name;
+    if (body.npi)         updateData.npi         = body.npi;
+    if (body.taxId)       updateData.taxId       = body.taxId;
+    if (body.accountMode) updateData.accountMode = body.accountMode;
+    if (body.pmsSystem)   updateData.pmsSystem   = body.pmsSystem;
+    if (body.pmsSyncKey)  updateData.pmsSyncKey  = body.pmsSyncKey;
 
     const practice = await prisma.practice.upsert({
       where:  { clerkUserId: userId },
@@ -37,8 +40,11 @@ export async function POST(request) {
       create: {
         clerkUserId: userId,
         name:        practiceName,
-        npi:         body.npi   || null,
-        taxId:       body.taxId || null,
+        npi:         body.npi         || null,
+        taxId:       body.taxId       || null,
+        accountMode: body.accountMode || "sandbox",
+        pmsSystem:   body.pmsSystem   || null,
+        pmsSyncKey:  body.pmsSyncKey  || null,
       },
     });
 

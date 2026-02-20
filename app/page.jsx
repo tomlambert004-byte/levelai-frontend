@@ -477,7 +477,7 @@ const NextBtn = ({ label = "Continue →", onClick, type = "button", disabled = 
     {label}
   </button>
 );
-function AuthFlow({ onComplete, showToast }) {
+function AuthFlow({ onComplete, showToast, onSandbox }) {
   const { signIn, setActive: setSignInActive, isLoaded: signInLoaded } = useSignIn();
   const { signUp, setActive: setSignUpActive, isLoaded: signUpLoaded } = useSignUp();
 
@@ -627,6 +627,17 @@ function AuthFlow({ onComplete, showToast }) {
                     border: "2px solid " + T.indigoDark, borderRadius: 10, fontSize: 15, fontWeight: 800, cursor: "pointer" }}>
                   New Practice — Create Account
                 </button>
+                {onSandbox && (
+                  <button onClick={onSandbox}
+                    style={{ width: "100%", padding: "14px", marginTop: 12, background: "transparent",
+                      color: T.textSoft, border: "2px dashed " + T.borderStrong, borderRadius: 10,
+                      fontSize: 14, fontWeight: 700, cursor: "pointer", transition: "0.2s",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = T.indigo; e.currentTarget.style.color = T.indigo; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = T.borderStrong; e.currentTarget.style.color = T.textSoft; }}>
+                    🧪 Test Drive the Sandbox — No Login Required
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -796,6 +807,12 @@ function OnboardingWizard({ onComplete, showToast }) {
   const startPmsSync = () => {
     if (!pmsSystem || !pmsSyncKey) return;
     setSyncPhase(0);
+    // Persist PMS credentials to practice record in parallel (non-blocking)
+    fetch("/api/v1/practice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pmsSystem, pmsSyncKey }),
+    }).catch(() => {}); // Animation continues regardless
     let i = 0;
     syncTimer.current = setInterval(() => {
       i += 1;
@@ -1291,6 +1308,19 @@ function OnboardingWizard({ onComplete, showToast }) {
                   onClick={() => {
                     const hasEmails = invites.some(i => i.email.trim());
                     if (hasEmails) showToast("Invites sent! Your team will receive an email shortly. 🎉");
+                    // Persist practice data to Postgres (non-blocking)
+                    fetch("/api/v1/practice", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        name: pracName || undefined,
+                        npi: npi || undefined,
+                        taxId: taxId || undefined,
+                        pmsSystem: pmsSystem || undefined,
+                        pmsSyncKey: pmsSyncKey || undefined,
+                        accountMode: "live",
+                      }),
+                    }).catch(() => {}); // non-blocking
                     onComplete();
                   }}
                   style={{
@@ -1325,6 +1355,7 @@ function PreauthWidget({ patient, result, triage, showToast }) {
   const [attachments, setAttachments] = useState([]);
   const [summary, setSummary]       = useState(null);
   const [errorMsg, setErrorMsg]     = useState(null);
+  const [preauthEmailOpen, setPreauthEmailOpen] = useState(false);
   const stageTimer = useRef(null);
 
   useEffect(() => () => clearInterval(stageTimer.current), []);
@@ -1647,46 +1678,26 @@ function PreauthWidget({ patient, result, triage, showToast }) {
       </div>
 
       {/* Action buttons */}
-      <div style={{ padding:"10px 16px", borderTop:"1px solid "+T.limeBorder,
-        display:"flex", gap:8, background:"#f0fdf4", flexWrap:"wrap" }}>
-        {/* Primary: Download */}
-        <button onClick={handleDownloadPDF}
-          style={{ flex:"2 1 140px", background:T.indigoDark, color:"white", border:"none", borderRadius:7,
-            padding:"10px 12px", fontWeight:800, cursor:"pointer", fontSize:12, display:"flex",
-            alignItems:"center", justifyContent:"center", gap:6,
-            boxShadow:"0 3px 10px rgba(79,70,229,0.25)" }}
-          onMouseEnter={e=>e.currentTarget.style.opacity="0.9"}
-          onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-          📥 Download Letter
-        </button>
-        {/* Secondary: Print to PDF */}
-        <button onClick={handlePrintPDF}
-          style={{ flex:"1 1 100px", background:T.bgCard, color:T.indigoDark, border:"1px solid "+T.indigoBorder,
-            borderRadius:7, padding:"10px 12px", fontWeight:800, cursor:"pointer", fontSize:12,
-            display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}
-          onMouseEnter={e=>{e.currentTarget.style.background=T.indigoLight;}}
-          onMouseLeave={e=>{e.currentTarget.style.background=T.bgCard;}}>
-          🖨️ Print / PDF
-        </button>
-        {/* Email */}
-        <button onClick={handleEmail}
-          style={{ flex:"1 1 80px", background:T.bgCard, color:T.textMid, border:"1px solid "+T.border,
-            borderRadius:7, padding:"10px 12px", fontWeight:800, cursor:"pointer", fontSize:12,
-            display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}
-          onMouseEnter={e=>{e.currentTarget.style.background=T.bg;}}
-          onMouseLeave={e=>{e.currentTarget.style.background=T.bgCard;}}>
-          ✉️ Email
-        </button>
-        {/* Copy text */}
-        <button onClick={() => { navigator.clipboard.writeText(letter); showToast("Letter copied to clipboard!"); }}
-          style={{ flex:"1 1 80px", background:T.bgCard, color:T.textMid, border:"1px solid "+T.border,
-            borderRadius:7, padding:"10px 12px", fontWeight:800, cursor:"pointer", fontSize:12,
-            display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}
-          onMouseEnter={e=>{e.currentTarget.style.background=T.bg;}}
-          onMouseLeave={e=>{e.currentTarget.style.background=T.bgCard;}}>
-          📋 Copy
-        </button>
+      <div style={{ padding:"10px 16px", borderTop:"1px solid "+T.limeBorder, background:"#f0fdf4" }}>
+        <PDFActionBar
+          onDownloadPDF={handleDownloadPDF}
+          onEmailPDF={() => setPreauthEmailOpen(true)}
+          onFaxPDF={() => showToast("📠 Fax integration coming soon — use Download PDF + manual fax for now.")}
+          onCopy={() => { navigator.clipboard.writeText(letter); showToast("Letter copied to clipboard!"); }}
+        />
       </div>
+      <EmailPDFModal
+        isOpen={preauthEmailOpen}
+        onClose={() => setPreauthEmailOpen(false)}
+        defaultEmail={patient?.email || ""}
+        patientName={patient?.name || "Patient"}
+        documentType="Pre-Auth Letter"
+        onSend={async ({ email, subject, message }) => {
+          // Placeholder — in production this would call a server-side email API
+          await new Promise(r => setTimeout(r, 800));
+        }}
+        showToast={showToast}
+      />
     </div>
   );
 
@@ -1698,19 +1709,76 @@ function PreauthWidget({ patient, result, triage, showToast }) {
 // Props: oon (OONEstimateResult object), patient, showToast
 function OONEstimatorWidget({ oon, patient, showToast }) {
   const [expanded, setExpanded] = useState(false);
-  const [sending, setSending]   = useState(false);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
 
   if (!oon) return null;
 
   const fmt = (cents) => "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtD = (dollars) => "$" + Number(dollars).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const handleSuperbill = () => {
-    setSending(true);
-    setTimeout(() => {
-      setSending(false);
-      showToast("📄 Secure Superbill emailed to patient for direct reimbursement!");
-    }, 1400);
+  const buildSuperbillHtml = () => {
+    const pName = patient?.name || "Patient";
+    const pDob = patient?.dob || "";
+    const proc = patient?.procedure || "";
+    const ins = patient?.insurance || "";
+    const offFee = oon.office_fee_cents != null ? fmt(oon.office_fee_cents) : fmtD(oon.office_fee);
+    const allow = oon.allowable_amount_cents != null ? fmt(oon.allowable_amount_cents) : fmtD(oon.allowable_amount);
+    const estPay = oon.estimated_insurance_payment_cents != null ? fmt(oon.estimated_insurance_payment_cents) : fmtD(oon.estimated_insurance_payment);
+    const patResp = oon.patient_responsibility_cents != null ? fmt(oon.patient_responsibility_cents) : fmtD(oon.patient_responsibility);
+    const today = new Date().toLocaleDateString("en-US", { year:"numeric", month:"long", day:"numeric" });
+    return `<!DOCTYPE html><html><head><title>Superbill - ${pName}</title>
+      <style>body{font-family:Helvetica,Arial,sans-serif;margin:40px;color:#1c1917}
+      h1{font-size:22px;margin-bottom:4px}h2{font-size:14px;color:#6b7280;margin-top:0}
+      .header{border-bottom:2px solid #ea580c;padding-bottom:16px;margin-bottom:24px}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+      .box{border:1px solid #e5e7eb;border-radius:8px;padding:12px}
+      .label{font-size:10px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
+      .value{font-size:18px;font-weight:900}
+      .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6}
+      .total{background:#1c1917;color:#f97316;border-radius:8px;padding:16px;margin-top:16px;display:flex;justify-content:space-between;align-items:center}
+      .total .label{color:#f97316}.total .value{font-size:24px;font-weight:900;color:#f97316}
+      .footer{margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center}
+      @media print{body{margin:20px}}</style></head><body>
+      <div class="header"><h1>📄 Digital Superbill</h1><h2>For Out-of-Network Reimbursement</h2></div>
+      <div class="grid"><div class="box"><div class="label">Patient</div><div style="font-weight:800">${pName}</div>
+      <div style="font-size:11px;color:#6b7280">DOB: ${pDob}</div></div>
+      <div class="box"><div class="label">Date of Service</div><div style="font-weight:800">${today}</div>
+      <div style="font-size:11px;color:#6b7280">${ins}</div></div></div>
+      <div class="box" style="margin:16px 0"><div class="label">Procedure</div>
+      <div style="font-weight:800;font-size:14px">${proc}</div></div>
+      <div style="border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin:16px 0">
+      <div class="label" style="margin-bottom:12px">📐 Financial Breakdown</div>
+      <div class="row"><span>Office Fee (Billed)</span><span style="font-weight:700">${offFee}</span></div>
+      <div class="row"><span>OON Allowable Amount</span><span style="font-weight:700">${allow}</span></div>
+      <div class="row"><span>OON Coverage Rate</span><span style="font-weight:700">${oon.oon_coverage_pct ?? 50}%</span></div>
+      <div class="row"><span style="font-weight:800;color:#16a34a">Est. Insurance Payment</span><span style="font-weight:900;color:#16a34a">${estPay}</span></div>
+      </div>
+      <div class="total"><div><div class="label">Total Patient Responsibility</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5)">Office fee minus est. insurance payment</div></div>
+      <div class="value">${patResp}</div></div>
+      <div class="footer">Generated by Level AI • ${today} • This is not a claim — submit to your insurance for reimbursement.</div>
+      </body></html>`;
+  };
+
+  const handleDownloadPDF = () => {
+    const html = buildSuperbillHtml();
+    const iframe = document.createElement("iframe");
+    iframe.style.display = "none";
+    document.body.appendChild(iframe);
+    iframe.contentDocument.write(html);
+    iframe.contentDocument.close();
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    setTimeout(() => document.body.removeChild(iframe), 2000);
+    showToast("📄 Superbill print dialog opened!");
+  };
+
+  const handleCopy = () => {
+    const pName = patient?.name || "Patient";
+    const offFee = oon.office_fee_cents != null ? fmt(oon.office_fee_cents) : fmtD(oon.office_fee);
+    const patResp = oon.patient_responsibility_cents != null ? fmt(oon.patient_responsibility_cents) : fmtD(oon.patient_responsibility);
+    const text = `Superbill — ${pName}\nProcedure: ${patient?.procedure || ""}\nOffice Fee: ${offFee}\nEst. Patient Responsibility: ${patResp}\nGenerated: ${new Date().toLocaleDateString()}`;
+    navigator.clipboard.writeText(text).then(() => showToast("📋 Superbill summary copied!")).catch(() => showToast("Could not copy"));
   };
 
   const isOON   = oon.network_status === "out_of_network";
@@ -1849,20 +1917,28 @@ function OONEstimatorWidget({ oon, patient, showToast }) {
           </div>
         )}
 
-        {/* ── Superbill CTA ── */}
-        <button onClick={handleSuperbill} disabled={sending}
-          style={{ background: sending ? "#9ca3af" : "linear-gradient(135deg, #ea580c, #dc2626)",
-            color: "white", border: "none", borderRadius: 10, padding: "13px",
-            fontWeight: 900, fontSize: 13, cursor: sending ? "not-allowed" : "pointer",
-            width: "100%", transition: "0.2s", letterSpacing: "0.02em",
-            boxShadow: sending ? "none" : "0 4px 14px rgba(234,88,12,0.4)" }}
-          onMouseEnter={e => { if (!sending) e.currentTarget.style.transform = "translateY(-1px)"; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}>
-          {sending ? "⏳ Generating Superbill…" : "📄 Generate Digital Superbill"}
-        </button>
+        {/* ── Superbill Actions ── */}
+        <PDFActionBar
+          onDownloadPDF={handleDownloadPDF}
+          onEmailPDF={() => setEmailModalOpen(true)}
+          onFaxPDF={() => showToast("📠 Fax integration coming soon — use Download PDF + manual fax for now.")}
+          onCopy={handleCopy}
+        />
         <div style={{ fontSize: 10, color: "#9a3412", textAlign: "center", marginTop: -4 }}>
-          Sends secure PDF to patient for direct insurance reimbursement
+          Generate secure superbill for direct insurance reimbursement
         </div>
+        <EmailPDFModal
+          isOpen={emailModalOpen}
+          onClose={() => setEmailModalOpen(false)}
+          defaultEmail={patient?.email || ""}
+          patientName={patient?.name || "Patient"}
+          documentType="Superbill"
+          onSend={async ({ email }) => {
+            // Placeholder — in production this would call a server-side email API
+            await new Promise(r => setTimeout(r, 800));
+          }}
+          showToast={showToast}
+        />
       </div>
     </div>
   );
@@ -2082,6 +2158,11 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
                     <div style={{ color:T.amberDark, fontSize:11, fontWeight:900, marginBottom:6 }}>PATIENT NOTIFICATION ADVISED</div>
                     {triage.notify.map((r,i)=><div key={i} style={{ color:T.amberDark, fontSize:12, fontWeight:600, marginBottom:i<triage.notify.length-1?4:0 }}>{"- " + r}</div>)}
                   </div>
+                )}
+                {/* Show PreauthWidget for Medicaid PA even without block issues */}
+                {triage.block.length === 0 && (isMedicaidPatient(patient) || result?._is_medicaid) &&
+                  result?.medicaid_info?.prior_auth_required?.some(c => (patient.procedure || "").match(/D\d{4}/g)?.includes(c)) && (
+                  <PreauthWidget patient={patient} result={result} triage={triage} showToast={showToast} />
                 )}
               </div>
             )}
@@ -2794,6 +2875,123 @@ function DirectorySearchModal({ onSelect, onClose }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Email PDF Modal ──────────────────────────────────────────────────────────
+// Shared modal for emailing PDFs (superbills, pre-auth letters).
+// Props: isOpen, onClose, defaultEmail, patientName, documentType, onSend, showToast
+function EmailPDFModal({ isOpen, onClose, defaultEmail = "", patientName = "", documentType = "Document", onSend, showToast }) {
+  const [email, setEmail]     = useState(defaultEmail);
+  const [subject, setSubject] = useState(`${documentType} for ${patientName}`);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setEmail(defaultEmail);
+      setSubject(`${documentType} for ${patientName}`);
+      setMessage("");
+      setSending(false);
+    }
+  }, [isOpen, defaultEmail, patientName, documentType]);
+
+  if (!isOpen) return null;
+
+  const handleSend = async () => {
+    if (!email.trim()) { showToast("Please enter an email address."); return; }
+    setSending(true);
+    try {
+      if (onSend) await onSend({ email: email.trim(), subject, message });
+      showToast(`📧 ${documentType} sent to ${email.trim()}`);
+      onClose();
+    } catch (err) {
+      showToast(`Failed to send: ${err.message}`);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:9999, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"center", justifyContent:"center" }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ background:T.bgCard, borderRadius:16, padding:32, width:"100%", maxWidth:460,
+          border:"1px solid " + T.border, boxShadow:"0 24px 48px rgba(0,0,0,0.2)" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
+          <div style={{ fontSize:18, fontWeight:900, color:T.text }}>📧 Email {documentType}</div>
+          <button onClick={onClose} style={{ background:"none", border:"none", fontSize:20, color:T.textSoft, cursor:"pointer" }}>✕</button>
+        </div>
+
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          <div>
+            <label style={{ fontSize:12, fontWeight:700, color:T.textMid, display:"block", marginBottom:4 }}>Recipient Email</label>
+            <div style={{ display:"flex", gap:6 }}>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="patient@email.com"
+                style={{ flex:1, padding:"10px 12px", borderRadius:8, border:"1px solid " + T.borderStrong,
+                  background:T.bg, color:T.text, fontSize:14, outline:"none" }} />
+              {email && <button onClick={() => setEmail("")}
+                style={{ padding:"8px 10px", borderRadius:8, border:"1px solid " + T.border, background:T.bg,
+                  color:T.textSoft, fontSize:12, cursor:"pointer" }}>✕</button>}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize:12, fontWeight:700, color:T.textMid, display:"block", marginBottom:4 }}>Subject</label>
+            <input type="text" value={subject} onChange={e => setSubject(e.target.value)}
+              style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"1px solid " + T.borderStrong,
+                background:T.bg, color:T.text, fontSize:14, outline:"none" }} />
+          </div>
+
+          <div>
+            <label style={{ fontSize:12, fontWeight:700, color:T.textMid, display:"block", marginBottom:4 }}>Message (optional)</label>
+            <textarea value={message} onChange={e => setMessage(e.target.value)} rows={3}
+              placeholder="Add a note to the recipient..."
+              style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"1px solid " + T.borderStrong,
+                background:T.bg, color:T.text, fontSize:14, outline:"none", resize:"vertical", fontFamily:"inherit" }} />
+          </div>
+        </div>
+
+        <div style={{ display:"flex", gap:10, marginTop:24 }}>
+          <button onClick={onClose}
+            style={{ flex:1, padding:"12px", borderRadius:10, border:"1px solid " + T.border,
+              background:T.bgCard, color:T.textMid, fontSize:14, fontWeight:700, cursor:"pointer" }}>
+            Cancel
+          </button>
+          <button onClick={handleSend} disabled={sending}
+            style={{ flex:1, padding:"12px", borderRadius:10, border:"none",
+              background:T.indigo, color:"white", fontSize:14, fontWeight:800, cursor:"pointer",
+              opacity: sending ? 0.7 : 1 }}>
+            {sending ? "Sending…" : "Send Email"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PDF Action Bar ───────────────────────────────────────────────────────────
+// Universal 4-button action bar: Download PDF, Email PDF, Fax PDF, Copy.
+// Props: onDownloadPDF, onEmailPDF, onFaxPDF, onCopy, compact
+function PDFActionBar({ onDownloadPDF, onEmailPDF, onFaxPDF, onCopy, compact = false }) {
+  const btnStyle = {
+    display:"flex", alignItems:"center", gap:6,
+    padding: compact ? "8px 12px" : "10px 16px",
+    borderRadius:8, border:"1px solid " + T.border,
+    background:T.bgCard, color:T.textMid,
+    fontSize: compact ? 11 : 12, fontWeight:700,
+    cursor:"pointer", transition:"all 0.15s",
+    whiteSpace:"nowrap",
+  };
+  const hoverIn = e => { e.currentTarget.style.borderColor = T.indigo; e.currentTarget.style.color = T.indigo; };
+  const hoverOut = e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMid; };
+  return (
+    <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+      {onDownloadPDF && <button style={btnStyle} onClick={onDownloadPDF} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>📥 Download PDF</button>}
+      {onEmailPDF && <button style={btnStyle} onClick={onEmailPDF} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>📧 Email PDF</button>}
+      {onFaxPDF && <button style={btnStyle} onClick={onFaxPDF} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>📠 Fax PDF</button>}
+      {onCopy && <button style={btnStyle} onClick={onCopy} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>📋 Copy</button>}
     </div>
   );
 }
@@ -4854,6 +5052,14 @@ export default function LevelAI() {
     };
   }, [isSignedIn, resetIdle]);
 
+  // ── Sandbox mode (no login required) ─────────────────────────────────────────
+  const [sandboxMode, setSandboxMode]     = useState(false);
+  const [accountMode, setAccountMode]     = useState("live"); // "sandbox" | "live"
+  const handleLogout = useCallback(() => {
+    if (sandboxMode) { setSandboxMode(false); setAccountMode("live"); }
+    else signOut();
+  }, [sandboxMode, signOut]);
+
   // ── Core data state ──────────────────────────────────────────────────────────
   const [isMounted, setIsMounted]         = useState(false);
   const [tab, setTab]                     = useState("schedule");
@@ -4900,9 +5106,13 @@ export default function LevelAI() {
   useEffect(() => {
     setIsMounted(true);
     // Bootstrap practice record in Postgres on first login (idempotent)
-    fetch("/api/v1/practice", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
-      .catch(() => {}); // non-blocking — fail silently if DB not reachable
-  }, []);
+    // Skip in sandbox mode — no Clerk session, API would 401
+    if (isSignedIn) {
+      fetch("/api/v1/practice", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+        .then(r => r.json()).then(d => { if (d.practice?.accountMode) setAccountMode(d.practice.accountMode); })
+        .catch(() => {}); // non-blocking — fail silently if DB not reachable
+    }
+  }, [isSignedIn]);
 
   // ── Phase tracking (unchanged logic, new data source) ───────────────────────
   const isLoading = useCallback((id) => {
@@ -5116,7 +5326,34 @@ export default function LevelAI() {
     if (triage.block.length > 0 && isFuture) newEntries.push(buildRescheduleEntry(patient, triage, trigger));
     else if (triage.notify.length > 0) newEntries.push(buildOutreachEntry(patient, triage));
     setAgentLog(log => [...newEntries.reverse(), ...log]);
-  }, [isLoading, setPhase, showToast]);
+
+    // ── Module 3: Create SMS draft for block/notify patients ────────────────
+    if ((triage.block.length > 0 || triage.notify.length > 0) && patient.phone && !sandboxMode) {
+      const smsMessage = triage.block.length > 0
+        ? `Hi ${(patient.name || "").split(" ")[0]}, this is your dental office. We noticed an issue with your insurance coverage for your upcoming visit. Please call us at your earliest convenience so we can help resolve this before your appointment. Thank you!`
+        : `Hi ${(patient.name || "").split(" ")[0]}, this is your dental office. We have an update regarding your insurance coverage for your upcoming appointment. Please give us a call when you get a chance. Thank you!`;
+      fetch("/api/v1/sms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientId: patient.id?.startsWith?.("p") ? null : patient.id, // skip fixture IDs
+          recipientPhone: patient.phone,
+          recipientName: patient.name,
+          draftMessage: smsMessage,
+          triggerType: triage.block.length > 0 ? "reschedule_proposed" : "outreach_queued",
+        }),
+      }).then(r => r.json()).then(data => {
+        // Attach smsQueueId to the agent log entry so Approve/Dismiss can target it
+        if (data?.draft?.id) {
+          setAgentLog(log => log.map(e =>
+            e.patientId === patient.id && e.awaitingApproval && !e.smsQueueId
+              ? { ...e, smsQueueId: data.draft.id }
+              : e
+          ));
+        }
+      }).catch(() => {}); // non-blocking
+    }
+  }, [isLoading, setPhase, showToast, sandboxMode]);
 
   // ── Auto-verify: fires on schedule load for today, 24h, and 7d windows ───────
   useEffect(() => {
@@ -5186,7 +5423,14 @@ export default function LevelAI() {
       status: "reschedule_approved",
       resolvedAt: new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),
     }));
-    // Phase 4: PATCH /api/v1/agent-log/{entry.id}  { action: "approved" }
+    // Wire SMS: approve the draft then trigger send (non-blocking)
+    if (entry.smsQueueId) {
+      fetch("/api/v1/sms", { method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: entry.smsQueueId, status: "approved" }) })
+        .then(() => fetch("/api/v1/sms/send", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ smsQueueId: entry.smsQueueId }) }))
+        .catch(() => {}); // non-blocking
+    }
   }, []);
 
   const handleDismiss = useCallback((entry) => {
@@ -5195,7 +5439,12 @@ export default function LevelAI() {
       status: "reschedule_dismissed",
       resolvedAt: new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),
     }));
-    // Phase 4: PATCH /api/v1/agent-log/{entry.id}  { action: "dismissed" }
+    // Wire SMS: dismiss the draft (non-blocking)
+    if (entry.smsQueueId) {
+      fetch("/api/v1/sms", { method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: entry.smsQueueId, status: "dismissed" }) })
+        .catch(() => {});
+    }
   }, []);
 
   // ── Derived state (same logic as before — different source array) ────────────
@@ -5295,10 +5544,10 @@ export default function LevelAI() {
       </div>
     );
   }
-  if (!isSignedIn) {
+  if (!isSignedIn && !sandboxMode) {
     return (
       <div style={{ position: "relative", height: "100vh", overflow: "hidden" }}>
-        <AuthFlow onComplete={() => {}} showToast={showToast} />
+        <AuthFlow onComplete={() => {}} showToast={showToast} onSandbox={() => { setSandboxMode(true); setAccountMode("sandbox"); setDailyLoading(false); }} />
         {toastMsg && <ToastBar msg={toastMsg} fading={toastFading} />}
       </div>
     );
@@ -5434,7 +5683,7 @@ export default function LevelAI() {
               </div>
             )}
             <button
-              onClick={() => signOut()}
+              onClick={handleLogout}
               style={{
                 display:"flex", alignItems:"center", gap:6,
                 padding:"8px 14px", borderRadius:8, border:"1px solid " + T.border,
@@ -5443,7 +5692,7 @@ export default function LevelAI() {
                 justifyContent: sidebarOpen ? "flex-start" : "center",
                 transition:"all 0.2s",
               }}>
-              <span>{"\uD83D\uDEAA"}</span> {sidebarOpen && "Log out"}
+              <span>{"\uD83D\uDEAA"}</span> {sidebarOpen && (sandboxMode ? "Exit Sandbox" : "Log out")}
             </button>
           </div>
         </div>
@@ -5451,6 +5700,20 @@ export default function LevelAI() {
 
       {/* ── Content area ───────────────────────────────────────────────── */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+
+        {/* Sandbox mode banner */}
+        {sandboxMode && (
+          <div style={{ background:`linear-gradient(90deg, ${T.indigoLight}, ${T.amberLight})`, borderBottom:"1px solid " + T.indigoBorder,
+            padding:"6px 20px", display:"flex", alignItems:"center", justifyContent:"center", gap:8, flexShrink:0 }}>
+            <span style={{ fontSize:13 }}>🧪</span>
+            <span style={{ fontSize:12, fontWeight:800, color:T.indigoDark }}>Sandbox Mode — Using demo data. No real patient information.</span>
+            <button onClick={handleLogout}
+              style={{ marginLeft:8, padding:"3px 10px", borderRadius:6, border:"1px solid " + T.indigoBorder,
+                background:T.bgCard, color:T.indigoDark, fontSize:11, fontWeight:700, cursor:"pointer" }}>
+              Exit
+            </button>
+          </div>
+        )}
 
         {/* Status pills bar */}
         <div style={{
@@ -5724,10 +5987,10 @@ export default function LevelAI() {
                 Yes, I&apos;m here! 🙋
               </button>
               <button
-                onClick={() => signOut()}
+                onClick={handleLogout}
                 style={{ background:T.bgCard, color:T.textMid, border:"1px solid " + T.border,
                   borderRadius:10, padding:"12px 20px", fontWeight:700, fontSize:14, cursor:"pointer" }}>
-                Log out
+                {sandboxMode ? "Exit Sandbox" : "Log out"}
               </button>
             </div>
           </div>
