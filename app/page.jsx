@@ -2144,12 +2144,12 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
               const allItems = [...triageItems, ...dedupedFlags];
               if (allItems.length === 0) return null;
               return (
-                <div style={{ background:"#2a2218", border:"1px solid " + T.amberBorder, borderRadius:10, padding:"14px 16px", marginTop:10 }}>
+                <div style={{ background:T.amberLight, border:"1px solid " + T.amberBorder, borderRadius:10, padding:"14px 16px", marginTop:10 }}>
                   <div style={{ color:T.amber, fontSize:11, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10, display:"flex", alignItems:"center", gap:6 }}>
                     <span style={{ fontSize:14 }}>⚡</span> Action Required — Here's What to Do
                   </div>
                   {allItems.map((item, i) => (
-                    <div key={i} style={{ marginBottom: i < allItems.length - 1 ? 10 : 0, paddingBottom: i < allItems.length - 1 ? 10 : 0, borderBottom: i < allItems.length - 1 ? "1px solid rgba(255,180,50,0.15)" : "none" }}>
+                    <div key={i} style={{ marginBottom: i < allItems.length - 1 ? 10 : 0, paddingBottom: i < allItems.length - 1 ? 10 : 0, borderBottom: i < allItems.length - 1 ? "1px solid " + T.amberBorder : "none" }}>
                       <div style={{ color:T.text, fontSize:13, fontWeight:700, lineHeight:"1.4", display:"flex", gap:6 }}>
                         <span>{item.icon}</span>
                         <span>{item.text}</span>
@@ -4882,7 +4882,7 @@ export default function LevelAI() {
   const [agentLog, setAgentLog]           = useState([]);
 
   // ── Loading / error state ────────────────────────────────────────────────────
-  const [dailyLoading, setDailyLoading]   = useState(false);
+  const [dailyLoading, setDailyLoading]   = useState(true);
   const [dailyError, setDailyError]       = useState(null);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [dayPanelLoading, setDayPanelLoading] = useState(false);
@@ -4941,7 +4941,8 @@ export default function LevelAI() {
   // ── Fetch: rolling 7-day window (today + 7 calendar days) ────────────────────
   // Covers today for the kanban AND the next 7 days for WeekAhead + auto-verify.
   // Skips weekends (Sat/Sun) since the practice is closed and the API returns [].
-  const loadWeekSchedule = useCallback(async (anchorDate) => {
+  const loadWeekSchedule = useCallback(async (anchorDate, { silent = false } = {}) => {
+    if (!silent) setDailyLoading(true);
     // Build every calendar date from today through today+7.
     // Always include today (even weekends) — server-side fixtures remap
     // weekends to the nearest weekday so the demo is never empty.
@@ -4981,6 +4982,7 @@ export default function LevelAI() {
     });
 
     setPatients(allPatients);
+    if (!silent) setDailyLoading(false);
   }, []);
 
   // ── Fetch: calendar month summary ────────────────────────────────────────────
@@ -5042,7 +5044,7 @@ export default function LevelAI() {
       const todayStr = new Date().toISOString().split("T")[0];
       try {
         // Silently refresh the schedule from the daily API (which pulls from OD)
-        await loadWeekSchedule(todayStr);
+        await loadWeekSchedule(todayStr, { silent: true });
         lastSyncRef.current = new Date();
       } catch {
         // Non-fatal — will retry on next interval
