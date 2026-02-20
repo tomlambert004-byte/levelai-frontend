@@ -5,8 +5,8 @@
  * Each weekday has a curated, fixed patient list (3-6 patients) with
  * real appointment times. The same date always returns the same list.
  *
- * All 6 patients map to p1-p6 so the Python verify endpoint can
- * look them up in FIXTURE_MAP.
+ * All 7 patients map to p1-p7 so the verify endpoint can look them up.
+ * p7 (Lisa Chen) is an OON patient — triggers the OON Estimator widget.
  *
  * hoursUntil is computed relative to NOW so the auto-verify
  * (24h and 7d windows) triggers correctly in the UI.
@@ -85,6 +85,19 @@ const ALL_PATIENTS = [
     phone: "555-119-8847",
     email: "dokafor@email.com",
   },
+  {
+    id: "p7",
+    name: "Lisa Chen",
+    dob: "1987-06-12",
+    memberId: "HUM-334-227-LC",
+    insurance: "Humana Dental",
+    procedure: "Crown, Porcelain (D2750)",
+    provider: "Dr. Patel",
+    fee: 145000,
+    phone: "555-302-8819",
+    email: "lisa.chen@email.com",
+    isOON: true,                   // flag so UI can badge this patient
+  },
 ];
 
 // Curated weekly schedule by day-of-week (0=Sun,1=Mon,…,5=Fri,6=Sat).
@@ -97,11 +110,12 @@ const WEEKLY_SCHEDULE = {
     ["p5", "1:00 PM"],
     ["p6", "3:00 PM"],
   ],
-  2: [ // Tuesday — busy day: 5 patients
+  2: [ // Tuesday — busy day: 6 patients (p7 = OON)
     ["p2", "8:00 AM"],
     ["p4", "9:30 AM"],
     ["p1", "11:00 AM"],
     ["p3", "1:30 PM"],
+    ["p7", "2:30 PM"],
     ["p5", "3:30 PM"],
   ],
   3: [ // Wednesday — medium: 4 patients
@@ -110,10 +124,11 @@ const WEEKLY_SCHEDULE = {
     ["p4", "1:00 PM"],
     ["p1", "3:00 PM"],
   ],
-  4: [ // Thursday — busy day: 5 patients
+  4: [ // Thursday — busy day: 6 patients (p7 = OON)
     ["p5", "8:00 AM"],
-    ["p3", "9:30 AM"],
-    ["p6", "11:00 AM"],
+    ["p7", "9:00 AM"],
+    ["p3", "10:30 AM"],
+    ["p6", "12:00 PM"],
     ["p2", "1:30 PM"],
     ["p4", "3:30 PM"],
   ],
