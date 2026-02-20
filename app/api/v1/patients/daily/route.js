@@ -102,79 +102,65 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
-  // ── 1. Try Postgres first — requires auth + a practice record + DATABASE_URL ──
+  // ── Collect patients from all available sources, then merge + dedupe ──────
+
+  // 1a. DB patients (if authenticated with a practice)
+  let dbMapped = [];
   if (process.env.DATABASE_URL) {
     try {
       const { userId } = await auth();
-
       if (userId) {
         const practice = await prisma.practice.findUnique({ where: { clerkUserId: userId } });
-
         if (practice) {
           const dbPatients = await prisma.patient.findMany({
             where:   { practiceId: practice.id, appointmentDate: date },
             orderBy: { appointmentTime: "asc" },
           });
-
-          if (dbPatients.length > 0) {
-            const nowMs = Date.now();
-            const mapped = dbPatients.map(p => {
-              let hoursUntil = 0;
-              try {
-                const { hours, minutes } = parseTime(p.appointmentTime || "12:00 PM");
-                const apptDate = new Date(`${date}T${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:00`);
-                hoursUntil = Math.round(((apptDate.getTime() - nowMs) / 3600000) * 10) / 10;
-              } catch { /* leave 0 */ }
-
-              return {
-                id:              p.id,
-                name:            `${p.firstName} ${p.lastName}`,
-                dob:             p.dateOfBirth   || "",
-                memberId:        p.memberId      || "",
-                insurance:       p.insuranceName || "",
-                procedure:       p.procedure     || "",
-                provider:        p.provider      || "",
-                phone:           p.phone         || "",
-                email:           p.email         || "",
-                fee:             null,
-                isOON:           p.isOON         || false,
-                payerId:         p.payerId       || null,
-                appointmentDate: p.appointmentDate || date,
-                appointmentTime: p.appointmentTime || "",
-                hoursUntil,
-                _source:         "postgres",
-              };
-            });
-            return Response.json(mapped);
-          }
+          const nowMs = Date.now();
+          dbMapped = dbPatients.map(p => {
+            let hoursUntil = 0;
+            try {
+              const { hours, minutes } = parseTime(p.appointmentTime || "12:00 PM");
+              const apptDate = new Date(`${date}T${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:00`);
+              hoursUntil = Math.round(((apptDate.getTime() - nowMs) / 3600000) * 10) / 10;
+            } catch { /* leave 0 */ }
+            return {
+              id: p.id, name: `${p.firstName} ${p.lastName}`,
+              dob: p.dateOfBirth || "", memberId: p.memberId || "",
+              insurance: p.insuranceName || "", procedure: p.procedure || "",
+              provider: p.provider || "", phone: p.phone || "", email: p.email || "",
+              fee: null, isOON: p.isOON || false, payerId: p.payerId || null,
+              appointmentDate: p.appointmentDate || date,
+              appointmentTime: p.appointmentTime || "",
+              hoursUntil, _source: "postgres",
+            };
+          });
         }
       }
     } catch (_err) {
-      console.warn("[daily] DB lookup failed, falling through to OD API:", _err.message);
+      console.warn("[daily] DB lookup failed:", _err.message);
     }
   }
 
-  // ── 2. Merge Open Dental API results + Fixtures for a rich demo ──────────
-  // In demo mode the OD API may return only 1-2 patients from its date remap.
-  // We always include the fixture roster and layer OD results on top so the
-  // schedule is never sparse.  In production (Postgres path above), this is
-  // never reached — it exits at tier 1.
-  const fixtures = fixtureForDate(date);
-
+  // 1b. Open Dental API patients
   let odResults = [];
   try {
     odResults = await odDirectForDate(date);
   } catch (odErr) {
-    console.warn("[daily] OD API direct call failed, using fixtures only:", odErr.message);
+    console.warn("[daily] OD API call failed:", odErr.message);
   }
 
-  // Merge: fixture patients first, then any OD patients whose name isn't
-  // already in the fixture set (avoids duplicates).
-  const fixtureNames = new Set(fixtures.map(p => p.name.toLowerCase()));
-  const merged = [
-    ...fixtures,
-    ...odResults.filter(p => !fixtureNames.has(p.name.toLowerCase())),
-  ];
+  // 1c. Fixture patients (always available)
+  const fixtures = fixtureForDate(date);
+
+  // ── 2. Merge all sources — deduplicate by lowercase name ──────────────────
+  // Priority: DB > OD > Fixtures (first occurrence wins)
+  const seen = new Set();
+  const merged = [];
+  for (const p of [...dbMapped, ...odResults, ...fixtures]) {
+    const key = p.name.toLowerCase();
+    if (!seen.has(key)) { seen.add(key); merged.push(p); }
+  }
 
   // Sort by appointment time
   merged.sort((a, b) => {

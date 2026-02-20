@@ -5066,8 +5066,11 @@ export default function LevelAI() {
         showToast(`✅ ${patient.name} verified — All clear.`);
       }
     }
+    // "batch" trigger = Verify All — individual toasts suppressed, summary sent by caller
     const isFuture = patient.hoursUntil > 24;
-    const newEntries = [buildVerifyEntry(patient, finalResult, trigger, runPhases)];
+    // "batch" (Verify All) is logged as "manual" so it doesn't appear in auto-verified panel
+    const logTrigger = trigger === "batch" ? "manual" : trigger;
+    const newEntries = [buildVerifyEntry(patient, finalResult, logTrigger, runPhases)];
     if (triage.block.length > 0 && isFuture) newEntries.push(buildRescheduleEntry(patient, triage, trigger));
     else if (triage.notify.length > 0) newEntries.push(buildOutreachEntry(patient, triage));
     setAgentLog(log => [...newEntries.reverse(), ...log]);
@@ -5149,12 +5152,16 @@ export default function LevelAI() {
   const triageMap = {};
   patients.forEach(p => { if (results[p.id]) triageMap[p.id] = triagePatient(p, results[p.id]); });
 
-  const verifiedCount = patients.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.VERIFIED).length;
-  const actionCount   = patients.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.ACTION_REQUIRED).length;
-  const inactiveCount = patients.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.INACTIVE).length;
-  const pendingCount  = patients.filter(p => !results[p.id] || isLoading(p.id)).length;
-  const autoCount     = agentLog.filter(e => e.trigger !== "manual" && e.action === ACTION.VERIFIED).length;
-  const rpaCount      = agentLog.filter(e => e.rpaEscalated).length;
+  // Badge counts scoped to today's patients only (not full week)
+  const todayStrBadge = isMounted ? new Date().toISOString().split("T")[0] : "";
+  const todayOnly     = patients.filter(p => p.appointmentDate === todayStrBadge);
+  const verifiedCount = todayOnly.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.VERIFIED).length;
+  const actionCount   = todayOnly.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.ACTION_REQUIRED).length;
+  const inactiveCount = todayOnly.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.INACTIVE).length;
+  const pendingCount  = todayOnly.filter(p => !results[p.id] || isLoading(p.id)).length;
+  const todayIds      = new Set(todayOnly.map(p => p.id));
+  const autoCount     = agentLog.filter(e => e.trigger !== "manual" && e.action === ACTION.VERIFIED && todayIds.has(e.patientId)).length;
+  const rpaCount      = agentLog.filter(e => e.rpaEscalated && todayIds.has(e.patientId)).length;
   // List of patients that were auto-verified (for AutoVerifiedPanel)
   const autoVerifiedPatientIds = new Set(agentLog.filter(e => e.trigger !== "manual" && e.action === ACTION.VERIFIED).map(e => e.patientId));
   const autoVerifiedList = patients.filter(p => autoVerifiedPatientIds.has(p.id));
@@ -5481,8 +5488,17 @@ export default function LevelAI() {
                   </button>
                   <button
                     disabled={dailyLoading}
-                    onClick={() => {
-                      if (!dailyLoading) patients.forEach((p, i) => { if (!isLoading(p.id)) setTimeout(() => verify(p, "manual"), i * 300); });
+                    onClick={async () => {
+                      if (dailyLoading) return;
+                      const toVerify = patients.filter(p => !isLoading(p.id));
+                      if (toVerify.length === 0) return;
+                      showToast(`🔄 Verifying ${toVerify.length} patients…`);
+                      // Stagger verification calls but suppress individual toasts via "batch" trigger
+                      const promises = toVerify.map((p, i) =>
+                        new Promise(resolve => setTimeout(async () => { await verify(p, "batch").catch(() => {}); resolve(); }, i * 300))
+                      );
+                      await Promise.all(promises);
+                      showToast(`✅ All ${toVerify.length} patients verified.`);
                     }}
                     style={{ background: dailyLoading ? T.borderStrong : T.lime, color:"#fff", border:"none", padding:"8px 18px", borderRadius:8, fontWeight:800, cursor: dailyLoading ? "not-allowed" : "pointer", fontSize:12, transition:"all 0.2s" }}
                     onMouseEnter={e => { if(!dailyLoading) e.currentTarget.style.transform = "scale(1.03)"; }}
