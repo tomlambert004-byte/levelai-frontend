@@ -1,6 +1,6 @@
 "use client";
 export const dynamic = "force-dynamic";
-import { SignedIn, SignedOut, useAuth, useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
+import { SignedIn, SignedOut, useAuth, useClerk, useSignIn, useSignUp, useUser } from "@clerk/nextjs";
 import { useState, useCallback, useEffect, useRef } from "react";
 // Theme — dual palettes for light/dark mode
 const themes = {
@@ -5403,12 +5403,335 @@ function ToastBar({ msg, fading }) {
     </div>
   );
 }
+// ── Admin Dashboard (full-screen, shown instead of practice dashboard for admin users) ──
+function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
+  const [activeTab, setActiveTab] = useState("codes");
+  const [codes, setCodes] = useState([]);
+  const [practices, setPractices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [newCode, setNewCode] = useState(null);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/v1/admin/codes").then(r => r.json()).catch(() => ({ codes: [] })),
+      fetch("/api/v1/admin/practices").then(r => r.json()).catch(() => ({ practices: [] })),
+    ]).then(([codesData, practicesData]) => {
+      setCodes(codesData.codes || []);
+      setPractices(practicesData.practices || []);
+      setLoading(false);
+    });
+  }, []);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setNewCode(null);
+    try {
+      const res = await fetch("/api/v1/admin/generate-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ count: 1 }),
+      });
+      const data = await res.json();
+      if (data.codes?.[0]) {
+        setNewCode(data.codes[0]);
+        // Refresh the codes list
+        const updated = await fetch("/api/v1/admin/codes").then(r => r.json()).catch(() => ({ codes: [] }));
+        setCodes(updated.codes || []);
+        showToast("Activation code generated!");
+      } else {
+        showToast("Failed to generate code");
+      }
+    } catch {
+      showToast("Network error — could not generate code");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const copyCode = (code) => {
+    navigator.clipboard.writeText(code);
+    showToast("Code copied to clipboard!");
+  };
+
+  const fmtDate = (d) => {
+    if (!d) return "—";
+    return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+  };
+
+  const TABS = [
+    { id: "codes", label: "Activation Codes", icon: "🔑" },
+    { id: "practices", label: "Practices", icon: "🏥" },
+  ];
+
+  const availableCodes = codes.filter(c => !c.used).length;
+  const usedCodes = codes.filter(c => c.used).length;
+
+  return (
+    <div style={{ height: "100vh", background: "#0f172a", fontFamily: "'Nunito', sans-serif", display: "flex", overflow: "hidden" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0;}
+        ::-webkit-scrollbar{width:5px;}
+        ::-webkit-scrollbar-thumb{background:#334155;border-radius:4px;}
+        ::-webkit-scrollbar-track{background:#0f172a;}
+        @keyframes adminFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+      `}</style>
+
+      {/* ── Sidebar ── */}
+      <div style={{ width: 260, background: "#1e293b", borderRight: "1px solid #334155",
+        display: "flex", flexDirection: "column", padding: "24px 0" }}>
+
+        {/* Logo */}
+        <div style={{ padding: "0 24px", marginBottom: 32 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+            <span style={{ fontSize: 24 }}>🦷</span>
+            <span style={{ fontSize: 20, fontWeight: 900, color: "#a5f3fc", letterSpacing: "-0.02em" }}>
+              level<span style={{ color: "rgba(255,255,255,0.4)" }}>ai</span>
+            </span>
+          </div>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#f97316", letterSpacing: "0.12em", textTransform: "uppercase" }}>
+            Admin Console
+          </div>
+        </div>
+
+        {/* Nav items */}
+        <div style={{ flex: 1, padding: "0 12px", display: "flex", flexDirection: "column", gap: 4 }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
+                borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700,
+                background: activeTab === t.id ? "rgba(99,102,241,0.15)" : "transparent",
+                color: activeTab === t.id ? "#a5b4fc" : "#94a3b8",
+                transition: "all 0.15s",
+              }}>
+              <span style={{ fontSize: 16 }}>{t.icon}</span>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Bottom actions */}
+        <div style={{ padding: "0 12px", display: "flex", flexDirection: "column", gap: 4 }}>
+          <button onClick={onSwitchToPractice}
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
+              borderRadius: 8, border: "1px solid #334155", cursor: "pointer", fontSize: 12, fontWeight: 700,
+              background: "transparent", color: "#94a3b8", transition: "all 0.15s" }}>
+            <span style={{ fontSize: 14 }}>📋</span> Switch to Practice View
+          </button>
+          <button onClick={onSignOut}
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
+              borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700,
+              background: "transparent", color: "#ef4444", transition: "all 0.15s" }}>
+            <span style={{ fontSize: 14 }}>🚪</span> Sign Out
+          </button>
+        </div>
+      </div>
+
+      {/* ── Main content ── */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "32px 48px", background: "#0f172a" }}>
+        <div style={{ maxWidth: 900, animation: "adminFadeIn 0.3s ease-out" }}>
+
+          {/* ═══ Activation Codes Tab ═══ */}
+          {activeTab === "codes" && (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
+                <div>
+                  <h1 style={{ fontSize: 24, fontWeight: 900, color: "#f1f5f9", marginBottom: 4 }}>Activation Codes</h1>
+                  <p style={{ fontSize: 13, color: "#64748b" }}>Generate and manage single-use license codes for new practices</p>
+                </div>
+                <button onClick={handleGenerate} disabled={generating}
+                  style={{
+                    padding: "12px 24px", borderRadius: 10, border: "none", cursor: generating ? "not-allowed" : "pointer",
+                    background: generating ? "#334155" : "linear-gradient(135deg, #6366f1, #4f46e5)",
+                    color: "white", fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8,
+                    transition: "all 0.15s", opacity: generating ? 0.7 : 1,
+                  }}>
+                  {generating ? "⏳ Generating…" : "✨ Generate New Code"}
+                </button>
+              </div>
+
+              {/* Stats row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 28 }}>
+                <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "18px 20px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Total Codes</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#f1f5f9" }}>{codes.length}</div>
+                </div>
+                <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "18px 20px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Available</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#22c55e" }}>{availableCodes}</div>
+                </div>
+                <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "18px 20px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Redeemed</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#f97316" }}>{usedCodes}</div>
+                </div>
+              </div>
+
+              {/* Newly generated code highlight */}
+              {newCode && (
+                <div style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(79,70,229,0.08))",
+                  border: "1px solid rgba(99,102,241,0.3)", borderRadius: 14, padding: "24px 28px",
+                  marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#a5b4fc", textTransform: "uppercase",
+                      letterSpacing: "0.08em", marginBottom: 8 }}>New Code Generated</div>
+                    <div style={{ fontSize: 32, fontWeight: 900, color: "#f1f5f9",
+                      fontFamily: "'Courier New', Courier, monospace", letterSpacing: "0.1em" }}>
+                      {newCode}
+                    </div>
+                  </div>
+                  <button onClick={() => copyCode(newCode)}
+                    style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid rgba(99,102,241,0.4)",
+                      background: "rgba(99,102,241,0.15)", color: "#a5b4fc", fontSize: 12, fontWeight: 800,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                    📋 Copy
+                  </button>
+                </div>
+              )}
+
+              {/* Codes table */}
+              {loading ? (
+                <div style={{ textAlign: "center", color: "#64748b", padding: 40 }}>Loading codes…</div>
+              ) : codes.length === 0 ? (
+                <div style={{ textAlign: "center", color: "#64748b", padding: 40, background: "#1e293b",
+                  borderRadius: 12, border: "1px solid #334155" }}>
+                  No activation codes yet. Click &quot;Generate New Code&quot; to create one.
+                </div>
+              ) : (
+                <div style={{ background: "#1e293b", borderRadius: 12, border: "1px solid #334155", overflow: "hidden" }}>
+                  {/* Table header */}
+                  <div style={{ display: "grid", gridTemplateColumns: "200px 100px 1fr 160px 50px",
+                    padding: "12px 20px", borderBottom: "1px solid #334155", gap: 12 }}>
+                    {["Code", "Status", "Used By", "Created", ""].map(h => (
+                      <div key={h} style={{ fontSize: 10, fontWeight: 800, color: "#475569",
+                        textTransform: "uppercase", letterSpacing: "0.08em" }}>{h}</div>
+                    ))}
+                  </div>
+                  {/* Table rows */}
+                  {codes.map((c, i) => (
+                    <div key={c.id} style={{ display: "grid", gridTemplateColumns: "200px 100px 1fr 160px 50px",
+                      padding: "14px 20px", borderBottom: i < codes.length - 1 ? "1px solid #1e293b" : "none",
+                      background: i % 2 === 0 ? "transparent" : "rgba(15,23,42,0.4)", gap: 12, alignItems: "center" }}>
+                      <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: 13,
+                        fontWeight: 800, color: "#e2e8f0", letterSpacing: "0.05em" }}>{c.code}</div>
+                      <div>
+                        <span style={{
+                          display: "inline-block", padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 800,
+                          background: c.used ? "rgba(239,68,68,0.12)" : "rgba(34,197,94,0.12)",
+                          color: c.used ? "#f87171" : "#4ade80",
+                          border: `1px solid ${c.used ? "rgba(239,68,68,0.2)" : "rgba(34,197,94,0.2)"}`,
+                        }}>
+                          {c.used ? "Used" : "Available"}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: c.usedByName ? "#cbd5e1" : "#475569" }}>
+                        {c.usedByName || (c.used ? "Unknown practice" : "—")}
+                        {c.usedAt && <span style={{ color: "#475569", marginLeft: 6, fontSize: 11 }}>({fmtDate(c.usedAt)})</span>}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>{fmtDate(c.createdAt)}</div>
+                      <button onClick={() => copyCode(c.code)}
+                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #334155",
+                          background: "transparent", color: "#64748b", fontSize: 12, cursor: "pointer" }}
+                        title="Copy code">
+                        📋
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ═══ Practices Tab ═══ */}
+          {activeTab === "practices" && (
+            <div>
+              <div style={{ marginBottom: 32 }}>
+                <h1 style={{ fontSize: 24, fontWeight: 900, color: "#f1f5f9", marginBottom: 4 }}>Practices</h1>
+                <p style={{ fontSize: 13, color: "#64748b" }}>All onboarded dental practices using Level AI</p>
+              </div>
+
+              {/* Stats row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 28 }}>
+                <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "18px 20px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Total Practices</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#f1f5f9" }}>{practices.length}</div>
+                </div>
+                <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "18px 20px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Activated</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#22c55e" }}>{practices.filter(p => p.activatedAt).length}</div>
+                </div>
+                <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "18px 20px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Live Mode</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#6366f1" }}>{practices.filter(p => p.accountMode === "live").length}</div>
+                </div>
+              </div>
+
+              {loading ? (
+                <div style={{ textAlign: "center", color: "#64748b", padding: 40 }}>Loading practices…</div>
+              ) : practices.length === 0 ? (
+                <div style={{ textAlign: "center", color: "#64748b", padding: 40, background: "#1e293b",
+                  borderRadius: 12, border: "1px solid #334155" }}>
+                  No practices onboarded yet.
+                </div>
+              ) : (
+                <div style={{ background: "#1e293b", borderRadius: 12, border: "1px solid #334155", overflow: "hidden" }}>
+                  {/* Table header */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 160px 160px",
+                    padding: "12px 20px", borderBottom: "1px solid #334155", gap: 12 }}>
+                    {["Practice Name", "Mode", "PMS", "Activated", "Created"].map(h => (
+                      <div key={h} style={{ fontSize: 10, fontWeight: 800, color: "#475569",
+                        textTransform: "uppercase", letterSpacing: "0.08em" }}>{h}</div>
+                    ))}
+                  </div>
+                  {/* Table rows */}
+                  {practices.map((p, i) => (
+                    <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 160px 160px",
+                      padding: "14px 20px", borderBottom: i < practices.length - 1 ? "1px solid #1e293b" : "none",
+                      background: i % 2 === 0 ? "transparent" : "rgba(15,23,42,0.4)", gap: 12, alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "#e2e8f0" }}>{p.name || "Unnamed"}</div>
+                        {p.npi && <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>NPI: {p.npi}</div>}
+                      </div>
+                      <div>
+                        <span style={{
+                          display: "inline-block", padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 800,
+                          background: p.accountMode === "live" ? "rgba(99,102,241,0.12)" : "rgba(245,158,11,0.12)",
+                          color: p.accountMode === "live" ? "#a5b4fc" : "#fbbf24",
+                          border: `1px solid ${p.accountMode === "live" ? "rgba(99,102,241,0.2)" : "rgba(245,158,11,0.2)"}`,
+                        }}>
+                          {p.accountMode === "live" ? "Live" : "Sandbox"}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: p.pmsSystem ? "#cbd5e1" : "#475569" }}>
+                        {p.pmsSystem || "—"}
+                      </div>
+                      <div style={{ fontSize: 11, color: p.activatedAt ? "#4ade80" : "#475569" }}>
+                        {p.activatedAt ? fmtDate(p.activatedAt) : "Not activated"}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>{fmtDate(p.createdAt)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LevelAI() {
   const { mode, toggle: toggleTheme, T: currentTheme } = useTheme();
   T = currentTheme;
 
   const { isSignedIn, isLoaded } = useAuth();
   const { signOut } = useClerk();
+  const { user: clerkUser } = useUser();
+  const isAdmin = clerkUser?.publicMetadata?.role === "admin" || clerkUser?.publicMetadata?.role === "owner";
+  const [adminView, setAdminView] = useState(true); // admins default to admin dashboard
+
   const [toastMsg, setToastMsg] = useState("");
   const [toastFading, setToastFading] = useState(false);
   const showToast = useCallback((msg) => {
@@ -5983,6 +6306,20 @@ export default function LevelAI() {
     );
   }
 
+  // ── Admin Dashboard (full-screen, replaces practice view for admin users) ────
+  if (isAdmin && adminView && !sandboxMode) {
+    return (
+      <>
+        <AdminDashboard
+          showToast={showToast}
+          onSwitchToPractice={() => setAdminView(false)}
+          onSignOut={() => signOut()}
+        />
+        {toastMsg && <ToastBar msg={toastMsg} fading={toastFading} />}
+      </>
+    );
+  }
+
   // ── Dashboard ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ height:"100vh", background:T.bg, fontFamily:"'Nunito',sans-serif", display:"flex", flexDirection:"row", overflow:"hidden", position:"relative" }}>
@@ -6105,12 +6442,26 @@ export default function LevelAI() {
             {sidebarOpen && <span>Collapse</span>}
           </button>
 
-          {/* Date + Log out */}
+          {/* Date + Admin switch + Log out */}
           <div style={{ marginTop:8, padding:"0 6px", display:"flex", flexDirection:"column", gap:4 }}>
             {sidebarOpen && (
               <div style={{ color:T.textSoft, fontSize:10, padding:"4px 8px" }}>
                 {isMounted ? new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}) : ""}
               </div>
+            )}
+            {isAdmin && !sandboxMode && (
+              <button
+                onClick={() => setAdminView(true)}
+                style={{
+                  display:"flex", alignItems:"center", gap:6,
+                  padding:"8px 14px", borderRadius:8, border:"1px solid " + T.indigoBorder,
+                  background:T.indigoLight, color:T.indigoDark, fontSize:11, fontWeight:700,
+                  cursor:"pointer", width:"100%",
+                  justifyContent: sidebarOpen ? "flex-start" : "center",
+                  transition:"all 0.2s",
+                }}>
+                <span>{"\uD83D\uDD10"}</span> {sidebarOpen && "Admin Console"}
+              </button>
             )}
             <button
               onClick={handleLogout}
