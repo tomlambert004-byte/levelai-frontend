@@ -19,6 +19,7 @@ model Practice {
   phone       String?
   pmsSystem   String?                        // "Open Dental" | "Dentrix" | "Eaglesoft"
   pmsSyncKey  String?                        // encrypted PMS sync key / eKey
+  activatedAt DateTime?                      // set when activation code is redeemed
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -122,4 +123,14 @@ model AuditLog {
   @@index([practiceId])
   @@index([action])
   @@index([createdAt])
+}
+
+// ── Activation codes (one-time license keys issued after payment) ──────────
+model ActivationCode {
+  id        String    @id @default(cuid())
+  code      String    @unique              // e.g. "LVL-8F3K-X9M2"
+  used      Boolean   @default(false)
+  usedBy    String?                        // Practice.id of the practice that redeemed it
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
 }

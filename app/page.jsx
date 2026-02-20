@@ -463,10 +463,11 @@ function PhaseIndicator({ phase, reason, compact }) {
 // ── Auth & Onboarding Flow ───────────────────────────────────────────────────
 // steps: login → mfa → profile → pms → rpa → team
 const ONBOARDING_STEPS = [
-  { id: "profile", label: "Practice Profile" },
-  { id: "pms",     label: "Connect PMS" },
-  { id: "rpa",     label: "RPA Vault" },
-  { id: "team",    label: "Invite Team" },
+  { id: "activate", label: "Activation" },
+  { id: "profile",  label: "Practice Profile" },
+  { id: "pms",      label: "Connect PMS" },
+  { id: "rpa",      label: "RPA Vault" },
+  { id: "team",     label: "Invite Team" },
 ];
 
 const PMS_OPTIONS = ["Open Dental", "Dentrix", "Eaglesoft", "Curve Dental", "Carestream Dental"];
@@ -843,10 +844,11 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
 // Driven by localStorage flag "pulp_needs_onboarding" = "1".
 
 const WIZARD_STEPS = [
-  { id: "profile", label: "Practice Identity",  icon: "🏥" },
-  { id: "pms",     label: "Connect PMS",        icon: "🔌" },
-  { id: "rpa",     label: "RPA Vault",          icon: "🤖" },
-  { id: "team",    label: "Invite & Launch",    icon: "🚀" },
+  { id: "activate", label: "Activation",         icon: "🔑" },
+  { id: "profile",  label: "Practice Identity",  icon: "🏥" },
+  { id: "pms",      label: "Connect PMS",        icon: "🔌" },
+  { id: "rpa",      label: "RPA Vault",          icon: "🤖" },
+  { id: "team",     label: "Invite & Launch",    icon: "🚀" },
 ];
 
 // Top 3 payers "discovered" from the PMS sync
@@ -908,8 +910,61 @@ function WizardProgressBar({ currentStep }) {
 }
 
 function OnboardingWizard({ onComplete, showToast }) {
-  const [step, setStep]         = useState("profile");
+  const [step, setStep]         = useState("activate");
   const [animating, setAnimating] = useState(false);
+
+  // Step 0 – Activation Code
+  const [activationCode, setActivationCode] = useState("");
+  const [activationError, setActivationError] = useState("");
+  const [activationLoading, setActivationLoading] = useState(false);
+
+  // Skip activation if already done (user refreshed mid-onboarding)
+  useEffect(() => {
+    fetch("/api/v1/practice")
+      .then(r => r.json())
+      .then(d => {
+        if (d.practice?.activatedAt) setStep("profile");
+      })
+      .catch(() => {});
+  }, []);
+
+  const formatActivationCode = (raw) => {
+    const clean = raw.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    if (clean.length <= 3) return clean;
+    const afterPrefix = clean.startsWith("LVL") ? clean.slice(3) : clean;
+    const prefix = "LVL";
+    if (afterPrefix.length <= 4) return `${prefix}-${afterPrefix}`;
+    return `${prefix}-${afterPrefix.slice(0, 4)}-${afterPrefix.slice(4, 8)}`;
+  };
+
+  const handleActivate = async () => {
+    const code = activationCode.trim().toUpperCase();
+    if (!code) { setActivationError("Please enter your activation code"); return; }
+    setActivationLoading(true);
+    setActivationError("");
+    try {
+      const res = await fetch("/api/v1/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (res.ok && data.valid) {
+        showToast("Activation code accepted! Let\u2019s set up your practice.");
+        advance("profile");
+      } else if (res.status === 404) {
+        setActivationError("This activation code is not valid. Please check and try again.");
+      } else if (res.status === 409) {
+        setActivationError("This code has already been used. Contact support if this is an error.");
+      } else {
+        setActivationError(data.error || "Something went wrong. Please try again.");
+      }
+    } catch {
+      setActivationError("Network error \u2014 please check your connection and try again.");
+    } finally {
+      setActivationLoading(false);
+    }
+  };
 
   // Step 1 – Practice Identity
   const [pracName, setPracName] = useState("");
@@ -1015,6 +1070,17 @@ function OnboardingWizard({ onComplete, showToast }) {
           <WizardProgressBar currentStep={step} />
 
           {/* Left panel contextual copy */}
+          {step === "activate" && (
+            <div className="wiz-animate" style={{ color:"rgba(255,255,255,0.7)", fontSize:14, lineHeight:1.7 }}>
+              <div style={{ fontSize:28, marginBottom:16 }}>🔑</div>
+              <div style={{ fontSize:18, fontWeight:900, color:"white", marginBottom:12 }}>
+                Activate Your License
+              </div>
+              <div>
+                Enter the activation code you received after purchase. This unlocks your Level AI practice account.
+              </div>
+            </div>
+          )}
           {step === "profile" && (
             <div className="wiz-animate" style={{ color:"rgba(255,255,255,0.7)", fontSize:14, lineHeight:1.7 }}>
               <div style={{ fontSize:28, marginBottom:16 }}>👋</div>
@@ -1083,12 +1149,82 @@ function OnboardingWizard({ onComplete, showToast }) {
       }}>
         <div style={{ width: "100%", maxWidth: 500, ...contentStyle }}>
 
-          {/* ═══ STEP 1: Practice Identity ═══ */}
+          {/* ═══ STEP 1: Activation ═══ */}
+          {step === "activate" && (
+            <div className="wiz-animate">
+              <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
+                borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
+                STEP 1 OF 5
+              </div>
+              <h2 style={{ fontSize:28, fontWeight:900, color:"#1a1a18", marginBottom:8, lineHeight:1.2 }}>
+                Activate Your Account
+              </h2>
+              <p style={{ fontSize:14, color:"#a0a09a", marginBottom:32, lineHeight:1.6 }}>
+                Enter the activation code provided to you after purchase. This is a one-time code that unlocks your Level AI license.
+              </p>
+
+              <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+                <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+                  <label style={{ fontSize:11, fontWeight:800, color:"#52525a", textTransform:"uppercase", letterSpacing:"0.05em" }}>
+                    Activation Code <span style={{ color:"#ef4444", marginLeft:3 }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="LVL-XXXX-XXXX"
+                    value={activationCode}
+                    onChange={e => {
+                      setActivationCode(formatActivationCode(e.target.value));
+                      setActivationError("");
+                    }}
+                    onKeyDown={e => { if (e.key === "Enter") handleActivate(); }}
+                    maxLength={14}
+                    style={{
+                      width:"100%", padding:"18px 20px",
+                      border: `1.5px solid ${activationError ? "#ef4444" : "#c8c8c0"}`,
+                      borderRadius:12, fontSize:22, fontWeight:800,
+                      fontFamily:"'Courier New', Courier, monospace",
+                      letterSpacing:"0.15em", textAlign:"center", textTransform:"uppercase",
+                      outline:"none", transition:"border-color 0.2s, box-shadow 0.2s",
+                      color:"#1a1a18",
+                      background: activationError ? "#fef2f2" : "white",
+                      boxShadow: activationError ? "0 0 0 3px rgba(239,68,68,0.12)" : "none",
+                    }}
+                    onFocus={e => { if (!activationError) e.target.style.borderColor = "#4f46e5"; }}
+                    onBlur={e => { if (!activationError) e.target.style.borderColor = "#c8c8c0"; }}
+                  />
+                </div>
+
+                {activationError && (
+                  <div style={{ display:"flex", alignItems:"center", gap:8, background:"#fef2f2",
+                    border:"1px solid #fecaca", borderRadius:10, padding:"12px 16px" }}>
+                    <span style={{ fontSize:16 }}>❌</span>
+                    <span style={{ fontSize:13, fontWeight:700, color:"#dc2626" }}>{activationError}</span>
+                  </div>
+                )}
+
+                <div style={{ display:"flex", gap:10, alignItems:"center", background:"#f0f9ff",
+                  border:"1px solid #bae6fd", borderRadius:10, padding:"12px 16px" }}>
+                  <span style={{ fontSize:18 }}>📧</span>
+                  <span style={{ fontSize:12, color:"#0369a1", fontWeight:700 }}>
+                    Your activation code was sent to your email after purchase. Can&apos;t find it? Contact support@levelai.dental
+                  </span>
+                </div>
+
+                <NextBtn
+                  label={activationLoading ? "Validating\u2026" : "Activate \u2192"}
+                  disabled={!activationCode.trim() || activationLoading}
+                  onClick={handleActivate}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ═══ STEP 2: Practice Identity ═══ */}
           {step === "profile" && (
             <div className="wiz-animate">
               <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
                 borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
-                STEP 1 OF 4
+                STEP 2 OF 5
               </div>
               <h2 style={{ fontSize:28, fontWeight:900, color:"#1a1a18", marginBottom:8, lineHeight:1.2 }}>
                 Practice Identity
@@ -1136,7 +1272,7 @@ function OnboardingWizard({ onComplete, showToast }) {
             <div className="wiz-animate">
               <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
                 borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
-                STEP 2 OF 4
+                STEP 3 OF 5
               </div>
               <h2 style={{ fontSize:28, fontWeight:900, color:"#1a1a18", marginBottom:8, lineHeight:1.2 }}>
                 Connect Your PMS
@@ -1257,7 +1393,7 @@ function OnboardingWizard({ onComplete, showToast }) {
             <div className="wiz-animate">
               <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
                 borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
-                STEP 3 OF 4
+                STEP 4 OF 5
               </div>
               <h2 style={{ fontSize:28, fontWeight:900, color:"#1a1a18", marginBottom:8, lineHeight:1.2 }}>
                 RPA Credential Vault
@@ -1356,7 +1492,7 @@ function OnboardingWizard({ onComplete, showToast }) {
             <div className="wiz-animate">
               <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
                 borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
-                STEP 4 OF 4 — FINAL STEP
+                STEP 5 OF 5 — FINAL STEP
               </div>
               <h2 style={{ fontSize:28, fontWeight:900, color:"#1a1a18", marginBottom:8, lineHeight:1.2 }}>
                 Invite Your Team
