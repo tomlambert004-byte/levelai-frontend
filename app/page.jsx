@@ -2128,9 +2128,10 @@ function OutreachPanel({ list, agentLog, onApprove, onDismiss, onClose, onSelect
 }
 
 function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, onOpenAlerts, onOpenNotify, onOpenAutoVerified }) {
-  if (blockedCount === 0 && notifyCount === 0 && botCount === 0) return null;
+  // The banner is always shown once patients load (botCount box is always present).
+  // Only return null if there's truly nothing — no alerts, no outreach, no auto-verified patients.
   return (
-    <div style={{ display:"flex", gap:12, marginBottom:20, flexWrap:"wrap" }}>
+    <div style={{ display:"flex", gap:12, marginBottom:20, flexWrap:"wrap", paddingTop:6, overflow:"visible" }}>
       {blockedCount > 0 && (
          <div onClick={onOpenAlerts} style={{ flex:"1 1 180px", cursor:"pointer", background:T.redLight, border:"1px solid "+T.redBorder, padding:"14px 18px", borderRadius:12, display:"flex", alignItems:"center", gap:12, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }}
               onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(220,38,38,0.15)"; e.currentTarget.style.borderColor=T.red; }}
@@ -2138,7 +2139,7 @@ function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, onOpenAl
              <span style={{fontSize:24}}>🚨</span>
              <div>
                  <div style={{fontSize:15, fontWeight:900, color:T.red}}>{blockedCount} Action{blockedCount!==1?"s":""} Needed</div>
-                 <div style={{fontSize:12, color:T.red, opacity:0.8, fontWeight:600, marginTop:2}}>View flagged appts &rarr;</div>
+                 <div style={{fontSize:12, color:T.red, opacity:0.8, fontWeight:600, marginTop:2}}>View flagged appts →</div>
              </div>
          </div>
       )}
@@ -2149,23 +2150,32 @@ function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, onOpenAl
              <span style={{fontSize:24}}>📞</span>
              <div>
                  <div style={{fontSize:15, fontWeight:900, color:T.amberDark}}>{notifyCount} Call{notifyCount!==1?"s":""} Queued</div>
-                 <div style={{fontSize:12, color:T.amberDark, opacity:0.8, fontWeight:600, marginTop:2}}>View outreach list &rarr;</div>
+                 <div style={{fontSize:12, color:T.amberDark, opacity:0.8, fontWeight:600, marginTop:2}}>View outreach list →</div>
              </div>
          </div>
       )}
-      {botCount > 0 && (
-         <div onClick={onOpenAutoVerified} style={{ flex:"1 1 200px", cursor:"pointer", background:T.rpaLight, border:"1px solid "+T.rpaBorder, padding:"14px 18px", borderRadius:12, display:"flex", alignItems:"center", gap:12, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }}
-              onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(3,105,161,0.12)"; e.currentTarget.style.borderColor=T.rpaDark; }}
-              onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor=T.rpaBorder; }}>
-             <span style={{fontSize:24}}>🤖</span>
-             <div>
-                 <div style={{fontSize:15, fontWeight:900, color:T.rpaDark}}>{botCount} Auto-Verified</div>
-                 <div style={{fontSize:12, color:T.rpaDark, opacity:0.8, fontWeight:600, marginTop:2}}>{rpaCount > 0 ? `${rpaCount} via RPA` : `View details &rarr;`}</div>
-             </div>
-         </div>
-      )}
+      {/* Auto-Verified box — always shown (not gated by botCount > 0) so it's always clickable */}
+      <div onClick={onOpenAutoVerified}
+           style={{ flex:"1 1 180px", cursor:"pointer",
+             background: botCount > 0 ? T.rpaLight : T.bgCard,
+             border:"1px solid " + (botCount > 0 ? T.rpaBorder : T.border),
+             padding:"14px 18px", borderRadius:12, display:"flex", alignItems:"center", gap:12,
+             transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)",
+             opacity: botCount > 0 ? 1 : 0.6 }}
+           onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(3,105,161,0.12)"; e.currentTarget.style.borderColor=T.rpaDark; e.currentTarget.style.opacity="1"; }}
+           onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor=botCount>0?T.rpaBorder:T.border; e.currentTarget.style.opacity=botCount>0?"1":"0.6"; }}>
+        <span style={{fontSize:24}}>🤖</span>
+        <div>
+          <div style={{fontSize:15, fontWeight:900, color: botCount > 0 ? T.rpaDark : T.textMid}}>
+            {botCount} Auto-Verified
+          </div>
+          <div style={{fontSize:12, color: botCount > 0 ? T.rpaDark : T.textSoft, opacity:0.8, fontWeight:600, marginTop:2}}>
+            {botCount > 0 ? (rpaCount > 0 ? `${rpaCount} via RPA · View all →` : `View list →`) : "None yet today"}
+          </div>
+        </div>
+      </div>
     </div>
-  )
+  );
 }
 
 function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, isRPA, onSelect, colColor }) {
@@ -2885,18 +2895,19 @@ function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast, res
       <div style={{ display:"flex", gap:24, flex:1, minHeight: 0, overflow:"hidden" }}>
 
         <div style={{ flex: 1, display:"flex", flexDirection:"column", minHeight: 0, overflow:"hidden" }}>
-           <div style={{ display:"flex", flexWrap:"wrap", gap:12, marginBottom:16, flexShrink:0, justifyContent:"center" }}>
+           {/* paddingTop gives the hover lift space so boxes don't clip against the top edge */}
+           <div style={{ display:"flex", flexWrap:"wrap", gap:12, marginBottom:16, flexShrink:0, justifyContent:"center", paddingTop:8, overflow:"visible" }}>
             {[
               { label:"Auto-Verified",  value:verifications.filter(e=>e.trigger!=="manual").length, color:T.limeDark, bg:T.limeLight,   border:T.limeBorder  },
               { label:"Reschedules",    value:reschedules.length,                                   color:T.red,      bg:T.redLight,    border:T.redBorder   },
               { label:"Outreach",       value:outreach.length,                                      color:T.amberDark,bg:T.amberLight,  border:T.amberBorder },
               { label:"Zero-Touch",     value:verifications.filter(e=>e.trigger!=="manual").length, color:T.rpaDark,  bg:T.rpaLight,    border:T.rpaBorder   },
             ].map(s=>(
-              <div key={s.label} style={{ flex:"1 1 140px", maxWidth:200, background:s.bg, border:"1px solid " + s.border, borderRadius:10, padding:"12px 14px", transition:"all 0.2s", cursor:"default", boxShadow:"0 2px 4px rgba(0,0,0,0.04)", overflow:"visible" }}
+              <div key={s.label} style={{ flex:"1 1 0", minWidth:0, background:s.bg, border:"1px solid " + s.border, borderRadius:10, padding:"12px 14px", transition:"all 0.2s", cursor:"default", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }}
                 onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(0,0,0,0.12)"; e.currentTarget.style.borderColor=s.color; }}
                 onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor=s.border; }}>
                 <div style={{ color:s.color, fontSize:22, fontWeight:900, lineHeight:1 }}>{s.value}</div>
-                <div style={{ color:s.color, fontSize:10, fontWeight:700, marginTop:4, opacity:0.75, whiteSpace:"nowrap" }}>{s.label}</div>
+                <div style={{ color:s.color, fontSize:10, fontWeight:700, marginTop:4, opacity:0.75 }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -3249,7 +3260,7 @@ function Analytics({ patients, results, agentLog }) {
 
       {/* Bottom grid */}
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-        <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px" }}>
+        <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px", transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }} {...statCardHover}>
           <div style={{ color:T.text, fontSize:14, fontWeight:900, marginBottom:16 }}>Carrier Payout Rates ({currentMonthData.month})</div>
           <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
             {CARRIER_KPIS.map((carrier, idx) => {
@@ -3267,7 +3278,7 @@ function Analytics({ patients, results, agentLog }) {
           </div>
         </div>
 
-        <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px" }}>
+        <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px", transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }} {...statCardHover}>
           <div style={{ color:T.text, fontSize:14, fontWeight:900, marginBottom:16 }}>Top Denial Risks Caught</div>
           {sortedFlags.length === 0 ? (
             <div style={{ textAlign:"center", padding:"30px 0", color:T.textSoft, fontSize:12, fontWeight:600 }}>No flags detected yet.</div>
@@ -3929,7 +3940,7 @@ export default function LevelAI() {
 
   // ── Core data state ──────────────────────────────────────────────────────────
   const [isMounted, setIsMounted]         = useState(false);
-  const [tab, setTab]                     = useState("week");
+  const [tab, setTab]                     = useState("schedule");
 
   // patients: the flat list for today's Kanban + DayCardPanel.
   // CalendarView now only needs per-day summary counts (calendarSummary),
@@ -4464,15 +4475,18 @@ export default function LevelAI() {
                 </div>
               )}
 
-              <MorningBanner
-                blockedCount={blockedList.length}
-                notifyCount={notifyList.length}
-                botCount={autoCount}
-                rpaCount={rpaCount}
-                onOpenAlerts={() => { setSchedulePanel("alerts"); setPrevPanel(null); }}
-                onOpenNotify={() => { setSchedulePanel("outreach"); setPrevPanel(null); }}
-                onOpenAutoVerified={() => { setSchedulePanel("autoverified"); setPrevPanel(null); }}
-              />
+              {/* MorningBanner — shown once patients are loaded (even 0 auto-verified shows the clickable bot box) */}
+              {!dailyLoading && (
+                <MorningBanner
+                  blockedCount={blockedList.length}
+                  notifyCount={notifyList.length}
+                  botCount={autoCount}
+                  rpaCount={rpaCount}
+                  onOpenAlerts={() => { setSchedulePanel("alerts"); setPrevPanel(null); }}
+                  onOpenNotify={() => { setSchedulePanel("outreach"); setPrevPanel(null); }}
+                  onOpenAutoVerified={() => { setSchedulePanel("autoverified"); setPrevPanel(null); }}
+                />
+              )}
 
               {/* Kanban: skeleton while loading, real cards when ready */}
               {dailyLoading ? <KanbanSkeleton /> : (
