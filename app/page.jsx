@@ -337,16 +337,49 @@ function WizardProgress({ currentStep }) {
   );
 }
 // ── Shared Onboarding Helpers (hoisted outside AuthFlow to fix focus loss) ──
-const OInput = ({ label, type = "text", placeholder, value, onChange, required }) => (
-  <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-    <label style={{ fontSize: 11, fontWeight: 800, color: T.textMid, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</label>
-    <input type={type} required={required} placeholder={placeholder} value={value} onChange={onChange}
-      style={{ width: "100%", padding: "13px 16px", border: "1px solid " + T.borderStrong, borderRadius: 10,
-        fontSize: 14, outline: "none", transition: "border-color 0.2s", fontFamily: "inherit", color: T.text }}
-      onFocus={e => e.target.style.borderColor = T.indigoDark}
-      onBlur={e  => e.target.style.borderColor = T.borderStrong} />
-  </div>
-);
+
+// Built-in validators — pass one of these (or a custom fn) as the `validate` prop.
+const VALIDATORS = {
+  email:    v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) ? null : "Enter a valid email address",
+  password: v => v.length >= 8 ? null : "Password must be at least 8 characters",
+  npi:      v => /^\d{10}$/.test(v.replace(/\D/g, "")) ? null : "NPI must be exactly 10 digits",
+  taxId:    v => /^\d{2}-\d{7}$/.test(v.trim()) ? null : "Tax ID must be in XX-XXXXXXX format",
+  phone:    v => /^\+?[\d\s\-().]{10,}$/.test(v.trim()) ? null : "Enter a valid phone number (10+ digits)",
+  apiKey:   v => v.trim().length >= 8 ? null : "API key must be at least 8 characters",
+  required: v => v.trim() ? null : "This field is required",
+};
+
+// OInput — onboarding form input with inline validation
+// validate: fn(value) → string|null  OR  one of the VALIDATORS keys
+// error: externally-controlled error string (e.g. from auth errors)
+const OInput = ({ label, type = "text", placeholder, value, onChange, required, validate, error: extError }) => {
+  const [touched, setTouched] = React.useState(false);
+  const validatorFn = typeof validate === "string" ? VALIDATORS[validate] : validate;
+  const inlineErr = touched && validatorFn ? validatorFn(value || "") : null;
+  const showErr = inlineErr || (touched && required && !value?.trim() ? "This field is required" : null) || extError;
+  const borderColor = showErr ? "#ef4444" : touched && !showErr && value ? "#16a34a" : T.borderStrong;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      <label style={{ fontSize: 11, fontWeight: 800, color: T.textMid, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        {label}{required && <span style={{ color: "#ef4444", marginLeft: 3 }}>*</span>}
+      </label>
+      <input type={type} placeholder={placeholder} value={value} onChange={e => { onChange(e); }}
+        style={{ width: "100%", padding: "13px 16px", border: "1.5px solid " + borderColor, borderRadius: 10,
+          fontSize: 14, outline: "none", transition: "border-color 0.2s, box-shadow 0.2s", fontFamily: "inherit",
+          color: T.text, background: showErr ? "#fef2f2" : "white",
+          boxShadow: showErr ? "0 0 0 3px rgba(239,68,68,0.12)" : touched && !showErr && value ? "0 0 0 3px rgba(22,163,74,0.10)" : "none" }}
+        onFocus={e => e.target.style.borderColor = showErr ? "#ef4444" : T.indigoDark}
+        onBlur={e => { setTouched(true); e.target.style.borderColor = borderColor; }} />
+      {showErr && (
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: -2 }}>
+          <span style={{ fontSize: 14, lineHeight: 1 }}>⚠️</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#dc2626" }}>{showErr}</span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const NextBtn = ({ label = "Continue →", onClick, type = "button", disabled = false }) => (
   <button type={type} disabled={disabled} onClick={onClick}
@@ -496,7 +529,7 @@ function AuthFlow({ onComplete, showToast }) {
                 Sign in to your Level AI practice dashboard.
               </div>
               <form onSubmit={handleSignIn} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <OInput label="Email" type="email" placeholder="you@practice.com" value={email} onChange={e => { setEmail(e.target.value); setAuthErr(""); }} required />
+                <OInput label="Email" type="email" placeholder="you@practice.com" value={email} onChange={e => { setEmail(e.target.value); setAuthErr(""); }} required validate="email" />
                 <OInput label="Password" type="password" placeholder="••••••••" value={password} onChange={e => { setPassword(e.target.value); setAuthErr(""); }} required />
                 {authErr && <div style={{ color: T.red, fontSize: 13, fontWeight: 700, padding: "10px 14px", background: T.redLight, borderRadius: 8, border: "1px solid " + T.redBorder }}>{authErr}</div>}
                 <NextBtn type="submit" label="Sign In →" />
@@ -520,8 +553,8 @@ function AuthFlow({ onComplete, showToast }) {
                 We&apos;ll send a verification code to confirm your email.
               </div>
               <form onSubmit={handleSignUp} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <OInput label="Work Email" type="email" placeholder="you@practice.com" value={email} onChange={e => { setEmail(e.target.value); setAuthErr(""); }} required />
-                <OInput label="Password" type="password" placeholder="8+ characters" value={password} onChange={e => { setPassword(e.target.value); setAuthErr(""); }} required />
+                <OInput label="Work Email" type="email" placeholder="you@practice.com" value={email} onChange={e => { setEmail(e.target.value); setAuthErr(""); }} required validate="email" />
+                <OInput label="Password" type="password" placeholder="8+ characters" value={password} onChange={e => { setPassword(e.target.value); setAuthErr(""); }} required validate="password" />
                 {authErr && <div style={{ color: T.red, fontSize: 13, fontWeight: 700, padding: "10px 14px", background: T.redLight, borderRadius: 8, border: "1px solid " + T.redBorder }}>{authErr}</div>}
                 <NextBtn type="submit" label="Create Account →" />
               </form>
@@ -826,15 +859,19 @@ function OnboardingWizard({ onComplete, showToast }) {
 
               <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
                 <OInput label="Legal Practice Name" placeholder="e.g. Georgetown Dental Associates"
-                  value={pracName} onChange={e => setPracName(e.target.value)} required />
+                  value={pracName} onChange={e => setPracName(e.target.value)} required validate="required" />
                 <div style={{ display:"flex", gap:14 }}>
                   <div style={{ flex:1 }}>
                     <OInput label="NPI Number" placeholder="1234567890"
-                      value={npi} onChange={e => setNpi(e.target.value)} required />
+                      value={npi} onChange={e => setNpi(e.target.value.replace(/\D/g, "").slice(0,10))} required validate="npi" />
                   </div>
                   <div style={{ flex:1 }}>
                     <OInput label="Tax ID (TIN)" placeholder="XX-XXXXXXX"
-                      value={taxId} onChange={e => setTaxId(e.target.value)} required />
+                      value={taxId} onChange={e => {
+                        // Auto-format: insert hyphen after 2 digits
+                        const raw = e.target.value.replace(/[^\d]/g, "").slice(0, 9);
+                        setTaxId(raw.length > 2 ? raw.slice(0,2) + "-" + raw.slice(2) : raw);
+                      }} required validate="taxId" />
                   </div>
                 </div>
 
@@ -890,7 +927,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                         label={pmsSystem === "Open Dental" ? "eKey" : "Sync Token"}
                         type="password"
                         placeholder={pmsSystem === "Open Dental" ? "Paste your Open Dental eKey" : "Paste your API / Sync Token"}
-                        value={pmsSyncKey} onChange={e => setPmsSyncKey(e.target.value)} required />
+                        value={pmsSyncKey} onChange={e => setPmsSyncKey(e.target.value)} required validate="apiKey" />
                     </div>
                   )}
 
@@ -1042,12 +1079,12 @@ function OnboardingWizard({ onComplete, showToast }) {
                         <div style={{ padding:"14px 18px", borderTop:"1px solid #e2e2dc", background:"#f8fafc", display:"flex", gap:12 }}>
                           <div style={{ flex:1 }}>
                             <OInput label="Portal Username" placeholder="provider@practice.com"
-                              value={creds.user}
+                              value={creds.user} validate="email" required
                               onChange={e => setRpaVault(v => ({ ...v, [payer.id]: { ...v[payer.id], user: e.target.value } }))} />
                           </div>
                           <div style={{ flex:1 }}>
                             <OInput label="Portal Password" type="password" placeholder="••••••••"
-                              value={creds.pass}
+                              value={creds.pass} validate="password" required
                               onChange={e => setRpaVault(v => ({ ...v, [payer.id]: { ...v[payer.id], pass: e.target.value } }))} />
                           </div>
                         </div>
@@ -1094,7 +1131,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                     <div style={{ flex:2 }}>
                       <OInput label={i === 0 ? "Email Address" : ""}
                         type="email" placeholder="colleague@practice.com"
-                        value={inv.email}
+                        value={inv.email} validate={inv.email ? "email" : undefined}
                         onChange={e => {
                           const next = [...invites];
                           next[i] = { ...next[i], email: e.target.value };
@@ -2815,16 +2852,37 @@ function Settings({ showToast }) {
   };
 
   // ── sub-components ────────────────────────────────────────────────────────
-  const SInput = ({ label, type = "text", placeholder, value, onChange }) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <label style={{ fontSize: 11, fontWeight: 800, color: T.textMid, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</label>
-      <input type={type} placeholder={placeholder} value={value} onChange={onChange}
-        style={{ padding: "11px 14px", border: "1px solid " + T.border, borderRadius: 8, fontSize: 14,
-          background: T.bgCard, outline: "none", color: T.text, fontFamily: "inherit", width: "100%" }}
-        onFocus={e => e.target.style.borderColor = T.indigoDark}
-        onBlur={e  => e.target.style.borderColor = T.border} />
-    </div>
-  );
+  // SInput — Settings form input with inline validation
+  // validate: fn(v)→string|null  OR  VALIDATORS key ("email","npi","taxId",etc.)
+  const SInput = ({ label, type = "text", placeholder, value, onChange, validate, required }) => {
+    const [touched, setTouched] = React.useState(false);
+    const validatorFn = typeof validate === "string" ? VALIDATORS[validate] : validate;
+    const inlineErr = touched && validatorFn ? validatorFn(value || "") : null;
+    const reqErr    = touched && required && !value?.trim() ? "This field is required" : null;
+    const showErr   = inlineErr || reqErr;
+    const borderColor = showErr ? "#ef4444" : touched && !showErr && value ? "#16a34a" : T.border;
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <label style={{ fontSize: 11, fontWeight: 800, color: T.textMid, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          {label}{required && <span style={{ color:"#ef4444", marginLeft:3 }}>*</span>}
+        </label>
+        <input type={type} placeholder={placeholder} value={value} onChange={onChange}
+          style={{ padding: "11px 14px", border: "1.5px solid " + borderColor, borderRadius: 8, fontSize: 14,
+            background: showErr ? "#fef2f2" : T.bgCard, outline: "none", color: T.text, fontFamily: "inherit",
+            width: "100%", transition: "border-color 0.2s, box-shadow 0.2s",
+            boxShadow: showErr ? "0 0 0 3px rgba(239,68,68,0.10)" : touched && !showErr && value ? "0 0 0 3px rgba(22,163,74,0.08)" : "none" }}
+          onFocus={e => e.target.style.borderColor = showErr ? "#ef4444" : T.indigoDark}
+          onBlur={e  => { setTouched(true); e.target.style.borderColor = borderColor; }} />
+        {showErr && (
+          <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: -2 }}>
+            <span style={{ fontSize: 13, lineHeight: 1 }}>⚠️</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#dc2626" }}>{showErr}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const Toggle = ({ label, description, defaultChecked }) => (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 0", borderBottom: "1px solid " + T.border }}>
@@ -2906,9 +2964,9 @@ function Settings({ showToast }) {
               </span>
             </div>
             <SInput label="Portal Username / Email" placeholder="provider@practice.com"
-              value={editUser} onChange={e => setEditUser(e.target.value)} />
+              value={editUser} onChange={e => setEditUser(e.target.value)} validate="email" required />
             <SInput label="Portal Password" type="password" placeholder="••••••••"
-              value={editPass} onChange={e => setEditPass(e.target.value)} />
+              value={editPass} onChange={e => setEditPass(e.target.value)} validate="password" required />
             <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
               <button onClick={() => setEditingPayer(null)}
                 style={{ flex: 1, padding: "12px", borderRadius: 8, border: "1px solid " + T.border,
@@ -2975,18 +3033,23 @@ function Settings({ showToast }) {
               </div>
               <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12,
                 padding: 24, display: "flex", flexDirection: "column", gap: 18 }}>
-                <SInput label="Practice Name" value={pracName} onChange={e => setPracName(e.target.value)} />
+                <SInput label="Practice Name" value={pracName} onChange={e => setPracName(e.target.value)} required validate="required" />
                 <div style={{ display: "flex", gap: 14 }}>
                   <div style={{ flex: 1 }}>
-                    <SInput label="NPI Number" value={npiVal} onChange={e => setNpiVal(e.target.value)} />
+                    <SInput label="NPI Number" value={npiVal}
+                      onChange={e => setNpiVal(e.target.value.replace(/\D/g,"").slice(0,10))}
+                      validate="npi" required />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <SInput label="Tax ID (TIN)" type="password" placeholder="Encrypted"
-                      value={taxIdVal} onChange={e => setTaxIdVal(e.target.value)} />
+                    <SInput label="Tax ID (TIN)" type="password" placeholder="XX-XXXXXXX"
+                      value={taxIdVal} onChange={e => {
+                        const raw = e.target.value.replace(/[^\d]/g,"").slice(0,9);
+                        setTaxIdVal(raw.length > 2 ? raw.slice(0,2)+"-"+raw.slice(2) : raw);
+                      }} validate="taxId" />
                   </div>
                 </div>
                 <SInput label="Primary Contact Email" type="email" value={emailVal}
-                  onChange={e => setEmailVal(e.target.value)} />
+                  onChange={e => setEmailVal(e.target.value)} validate="email" required />
                 <button onClick={() => showToast("Practice profile saved.")}
                   style={{ background: T.indigoDark, color: "white", padding: "11px 24px",
                     border: "none", borderRadius: 8, fontWeight: 800, cursor: "pointer",
@@ -3079,7 +3142,8 @@ function Settings({ showToast }) {
                       <div style={{ flex: 1 }}>
                         <SInput label={pmsSystem === "Open Dental" ? "New eKey" : "New Sync Token"}
                           type="password" placeholder="Paste new token…"
-                          value={pmsSyncKey} onChange={e => setPmsSyncKey(e.target.value)} />
+                          value={pmsSyncKey} onChange={e => setPmsSyncKey(e.target.value)}
+                          validate="apiKey" required />
                       </div>
                       <button onClick={() => { setShowPmsEdit(false); showToast("PMS sync token updated."); }}
                         style={{ padding: "11px 20px", borderRadius: 8, border: "none", background: T.indigoDark,
@@ -3162,12 +3226,9 @@ function Settings({ showToast }) {
                       <div style={{ flex: 2 }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                           {idx === 0 && <label style={{ fontSize: 11, fontWeight: 800, color: T.textMid, textTransform: "uppercase", letterSpacing: "0.05em" }}>Email</label>}
-                          <input type="email" placeholder="colleague@practice.com" value={inv.email}
+                          <SInput type="email" placeholder="colleague@practice.com" value={inv.email}
                             onChange={e => { const n = [...invites]; n[idx].email = e.target.value; setInvites(n); }}
-                            style={{ padding: "11px 14px", border: "1px solid " + T.border, borderRadius: 8, fontSize: 14,
-                              background: T.bgCard, outline: "none", color: T.text, fontFamily: "inherit", width: "100%" }}
-                            onFocus={e => e.target.style.borderColor = T.indigoDark}
-                            onBlur={e => e.target.style.borderColor = T.border} />
+                            validate={inv.email ? "email" : undefined} />
                         </div>
                       </div>
                       <div style={{ flex: "0 0 130px", display: "flex", flexDirection: "column", gap: 6 }}>
