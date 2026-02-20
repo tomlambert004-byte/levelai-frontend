@@ -316,26 +316,106 @@ function deriveVerificationStatus(planStatus, actionFlags) {
   return "verified";
 }
 
+// ── Stedi imports (dynamic to avoid breaking if lib not present) ──────────────
+let stediVerify, resolvePayerId;
+try {
+  const stediMod = await import("../../../../lib/stedi.js");
+  stediVerify    = stediMod.stediVerify;
+  resolvePayerId = stediMod.resolvePayerId;
+} catch (_) {
+  // lib not available in this worktree path — will fall through to fixture
+}
+
 // ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(request) {
   try {
     const body = await request.json();
-    const patientId = body.patient_id;
+    const {
+      patient_id,
+      // Real patient fields — sent when we have actual data
+      member_id,
+      first_name,
+      last_name,
+      date_of_birth,
+      insurance_name,
+      payer_id,
+      trigger,
+    } = body;
 
-    if (!patientId) {
+    if (!patient_id) {
       return Response.json({ error: "patient_id is required." }, { status: 400 });
     }
 
-    const fixture = FIXTURES[patientId];
+    // ── Try real Stedi call first ──────────────────────────────────────────────
+    const stediKey = process.env.STEDI_API_KEY;
+    const resolvedPayerId = resolvePayerId
+      ? resolvePayerId(insurance_name, payer_id)
+      : null;
+
+    // Use Stedi if: key is set, we have a memberId, and a payer ID we can resolve
+    const canUseStedi = stediKey && (member_id || body.memberId) && resolvedPayerId && stediVerify;
+
+    if (canUseStedi) {
+      try {
+        const t0 = Date.now();
+        const { normalized, raw, durationMs } = await stediVerify({
+          memberId:      member_id || body.memberId,
+          firstName:     first_name || body.firstName || "",
+          lastName:      last_name  || body.lastName  || "",
+          dateOfBirth:   date_of_birth || body.dob || "",
+          payerId:       resolvedPayerId,
+          insuranceName: insurance_name || body.insurance || "",
+        });
+
+        // Store to Postgres if prisma is available
+        try {
+          const { prisma } = await import("../../../../lib/prisma.js");
+          await prisma.verificationResult.create({
+            data: {
+              practiceId:        "demo",   // replaced once auth is wired
+              memberIdUsed:      member_id || body.memberId || null,
+              payerIdUsed:       resolvedPayerId,
+              trigger:           trigger || "manual",
+              verificationStatus: normalized.verification_status,
+              planStatus:        normalized.plan_status,
+              payerName:         normalized.payer_name,
+              source:            "stedi",
+              rawResponse:       raw,
+              normalizedResult:  normalized,
+              durationMs,
+            },
+          });
+        } catch (_dbErr) {
+          // DB write is non-blocking — don't fail the request
+        }
+
+        return Response.json({ ...normalized, _source: "stedi" });
+      } catch (stediErr) {
+        console.warn("[verify] Stedi call failed, falling back to fixture:", stediErr.message);
+        // Fall through to fixture
+      }
+    }
+
+    // ── Fixture fallback ───────────────────────────────────────────────────────
+    const fixture = FIXTURES[patient_id];
     if (!fixture) {
-      return Response.json(
-        { error: `No fixture for patient_id '${patientId}'. Valid IDs: ${Object.keys(FIXTURES).join(", ")}.` },
-        { status: 404 }
-      );
+      // For directory patients with no fixture, return a generic active plan
+      const genericResult = normalize271(FIXTURES["p1"]);
+      return Response.json({
+        ...genericResult,
+        _source:   "mock_generic",
+        _fixture_id: "generic_active",
+        subscriber: {
+          ...genericResult.subscriber,
+          member_id:  member_id || body.memberId || "UNKNOWN",
+          first_name: first_name || body.firstName || "Patient",
+          last_name:  last_name  || body.lastName  || "",
+        },
+      });
     }
 
     const result = normalize271(fixture);
-    return Response.json(result);
+    return Response.json({ ...result, _source: canUseStedi ? "stedi_fallback_fixture" : "fixture" });
 
   } catch (err) {
     return Response.json(

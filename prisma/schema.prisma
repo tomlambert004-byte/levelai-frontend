@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── A dental practice (one per Clerk user on signup) ─────────────────────────
+model Practice {
+  id          String   @id @default(cuid())
+  clerkUserId String   @unique
+  name        String
+  npi         String?
+  taxId       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  patients            Patient[]
+  verificationResults VerificationResult[]
+}
+
+// ── A patient record belonging to a practice ─────────────────────────────────
+model Patient {
+  id          String   @id @default(cuid())
+  practiceId  String
+  practice    Practice @relation(fields: [practiceId], references: [id])
+
+  externalId  String?
+  firstName   String
+  lastName    String
+  dateOfBirth String
+  phone       String?
+  email       String?
+
+  memberId      String?
+  groupNumber   String?
+  insuranceName String?
+  payerId       String?
+
+  procedure       String?
+  provider        String?
+  appointmentDate String?
+  appointmentTime String?
+  isOON           Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  verificationResults VerificationResult[]
+}
+
+// ── A single eligibility verification result ─────────────────────────────────
+model VerificationResult {
+  id         String   @id @default(cuid())
+  practiceId String
+  practice   Practice @relation(fields: [practiceId], references: [id])
+  patientId  String?
+  patient    Patient? @relation(fields: [patientId], references: [id])
+
+  memberIdUsed       String?
+  payerIdUsed        String?
+  trigger            String?
+
+  verificationStatus String
+  planStatus         String?
+  payerName          String?
+  source             String
+  rawResponse        Json?
+  normalizedResult   Json
+
+  verifiedAt DateTime @default(now())
+  durationMs Int?
+}

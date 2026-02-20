@@ -133,12 +133,24 @@ async function apiSearchDirectory(query) {
   return apiFetch(`/api/v1/patients/directory?q=${encodeURIComponent(query)}`);
 }
 
-// POST /api/v1/verify  { patient_id, trigger }
-// Returns: VerificationResult  (Stedi / RPA pipeline result)
-async function apiPostVerify(patientId, trigger) {
+// POST /api/v1/verify  { patient_id, member_id, first_name, last_name, date_of_birth, insurance_name, payer_id, trigger }
+// Sends full patient data so the route can attempt a real Stedi call before falling back to fixtures.
+// Returns: NormalizedVerificationResult
+async function apiPostVerify(patientId, trigger, patientData = {}) {
+  const [firstName, ...rest] = (patientData.name || "").split(" ");
+  const lastName = rest.join(" ");
   return apiFetch("/api/v1/verify", {
     method: "POST",
-    body: JSON.stringify({ patient_id: patientId, trigger }),
+    body: JSON.stringify({
+      patient_id:     patientId,
+      trigger,
+      member_id:      patientData.memberId      || null,
+      first_name:     patientData.firstName     || firstName || null,
+      last_name:      patientData.lastName      || lastName  || null,
+      date_of_birth:  patientData.dob           || patientData.dateOfBirth || null,
+      insurance_name: patientData.insurance     || patientData.insuranceName || null,
+      payer_id:       patientData.payerId       || null,
+    }),
   });
 }
 
@@ -1706,7 +1718,7 @@ function OONEstimatorWidget({ oon, patient, showToast }) {
 }
 
 // ── Benefits Panel ────────────────────────────────────────────────────────────
-function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast }) {
+function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast, onBack, backLabel }) {
   if (!patient) return (
     <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100%", color:T.textSoft, gap:8 }}>
       <div style={{ fontSize:32 }}>👈</div>
@@ -1720,6 +1732,17 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
 
   return (
     <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden" }}>
+      {/* Back button row — shown when navigated from a list */}
+      {onBack && (
+        <div style={{ padding:"8px 16px", borderBottom:"1px solid " + T.border, flexShrink:0, background:T.bg }}>
+          <button onClick={onBack}
+                  style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:T.textMid, fontWeight:700, fontSize:12, cursor:"pointer", padding:"2px 0" }}
+                  onMouseEnter={e=>e.currentTarget.style.color=T.text}
+                  onMouseLeave={e=>e.currentTarget.style.color=T.textMid}>
+            ← {backLabel || "Back to list"}
+          </button>
+        </div>
+      )}
       <div style={{ padding:"16px 20px", borderBottom:"1px solid " + T.border, flexShrink:0 }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
           <div>
@@ -2820,18 +2843,18 @@ function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast, res
       <div style={{ display:"flex", gap:24, flex:1, minHeight: 0, overflow:"hidden" }}>
 
         <div style={{ flex: 1, display:"flex", flexDirection:"column", minHeight: 0, overflow:"hidden" }}>
-           <div style={{ display:"flex", flexWrap:"wrap", gap:12, marginBottom:16, flexShrink:0 }}>
+           <div style={{ display:"flex", flexWrap:"wrap", gap:12, marginBottom:16, flexShrink:0, justifyContent:"center" }}>
             {[
               { label:"Auto-Verified",  value:verifications.filter(e=>e.trigger!=="manual").length, color:T.limeDark, bg:T.limeLight,   border:T.limeBorder  },
               { label:"Reschedules",    value:reschedules.length,                                   color:T.red,      bg:T.redLight,    border:T.redBorder   },
               { label:"Outreach",       value:outreach.length,                                      color:T.amberDark,bg:T.amberLight,  border:T.amberBorder },
               { label:"Calls Avoided",  value:verifications.filter(e=>e.trigger!=="manual").length, color:T.rpaDark,  bg:T.rpaLight,    border:T.rpaBorder   },
             ].map(s=>(
-              <div key={s.label} style={{ flex:"1 1 180px", background:s.bg, border:"1px solid " + s.border, borderRadius:10, padding:"12px 14px", transition:"all 0.2s", cursor:"default", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }}
+              <div key={s.label} style={{ flex:"1 1 140px", maxWidth:200, background:s.bg, border:"1px solid " + s.border, borderRadius:10, padding:"12px 14px", transition:"all 0.2s", cursor:"default", boxShadow:"0 2px 4px rgba(0,0,0,0.04)", overflow:"visible" }}
                 onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(0,0,0,0.12)"; e.currentTarget.style.borderColor=s.color; }}
                 onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor=s.border; }}>
                 <div style={{ color:s.color, fontSize:22, fontWeight:900, lineHeight:1 }}>{s.value}</div>
-                <div style={{ color:s.color, fontSize:10, fontWeight:700, marginTop:4, opacity:0.75 }}>{s.label}</div>
+                <div style={{ color:s.color, fontSize:10, fontWeight:700, marginTop:4, opacity:0.75, whiteSpace:"nowrap" }}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -3715,15 +3738,19 @@ export default function LevelAI() {
 
   // ── UI state ─────────────────────────────────────────────────────────────────
   const [schedulePanel, setSchedulePanel] = useState("benefits");
+  const [prevPanel, setPrevPanel]         = useState(null); // for back navigation
   const [dismissedAlerts, setDismissedAlerts] = useState({ blocked: false, notify: false });
   const [showDirectoryModal, setShowDirectoryModal] = useState(false);
 
   // Track which patients have had auto-verify queued this session
   const autoQueued = useRef(new Set());
 
-  // ── Mount ────────────────────────────────────────────────────────────────────
+  // ── Mount + practice bootstrap ───────────────────────────────────────────────
   useEffect(() => {
     setIsMounted(true);
+    // Bootstrap practice record in Postgres on first login (idempotent)
+    fetch("/api/v1/practice", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+      .catch(() => {}); // non-blocking — fail silently if DB not reachable
   }, []);
 
   // ── Phase tracking (unchanged logic, new data source) ───────────────────────
@@ -3844,7 +3871,7 @@ export default function LevelAI() {
     setPhase(patient.id, { phase: "api" });
     let apiResult;
     try {
-      apiResult = await apiPostVerify(patient.id, trigger);
+      apiResult = await apiPostVerify(patient.id, trigger, patient);
     } catch (e) {
       setPhase(patient.id, { phase: "error", error: e.message });
       showToast(`Verification failed for ${patient.name}: ${e.message}`);
@@ -3860,7 +3887,7 @@ export default function LevelAI() {
       setPhase(patient.id, { phase: "rpa", reason: thin.reason, missingFields: thin.missingFields });
       try {
         // Same endpoint — backend routes trigger="rpa_fallback" to the RPA pipeline
-        const rpaResult = await apiPostVerify(patient.id, "rpa_fallback");
+        const rpaResult = await apiPostVerify(patient.id, "rpa_fallback", patient);
         if (rpaResult) {
           runPhases.push("rpa");
           setPhase(patient.id, { phase: "merging" });
@@ -3918,6 +3945,7 @@ export default function LevelAI() {
   const handleSelect = (p) => {
     setSelected(p);
     setSchedulePanel("benefits");
+    setPrevPanel(null); // direct selection — no back needed
     if (!results[p.id] && !isLoading(p.id)) verify(p, "manual");
   };
 
@@ -4271,20 +4299,22 @@ export default function LevelAI() {
               {schedulePanel === "benefits" && (
                 <BenefitsPanel patient={selected} result={selected ? results[selected.id] : null}
                   phaseInfo={selected ? phases[selected.id] : null} onVerify={verify}
-                  triage={selected ? triageMap[selected.id] : null} showToast={showToast} />
+                  triage={selected ? triageMap[selected.id] : null} showToast={showToast}
+                  onBack={prevPanel ? () => { setSchedulePanel(prevPanel); setPrevPanel(null); } : null}
+                  backLabel={prevPanel === "alerts" ? "Back to Needs Attention" : prevPanel === "outreach" ? "Back to Outreach" : null} />
               )}
               {schedulePanel === "alerts" && (
                 <AlertsPanel list={blockedList} agentLog={agentLog}
                   onApprove={handleApprove} onDismiss={handleDismiss}
                   onClose={() => setSchedulePanel("benefits")}
-                  onSelect={(p) => { setSelected(p); setSchedulePanel("benefits"); }}
+                  onSelect={(p) => { setSelected(p); setPrevPanel("alerts"); setSchedulePanel("benefits"); }}
                   showToast={showToast} />
               )}
               {schedulePanel === "outreach" && (
                 <OutreachPanel list={notifyList} agentLog={agentLog}
                   onApprove={handleApprove} onDismiss={handleDismiss}
                   onClose={() => setSchedulePanel("benefits")}
-                  onSelect={(p) => { setSelected(p); setSchedulePanel("benefits"); }}
+                  onSelect={(p) => { setSelected(p); setPrevPanel("outreach"); setSchedulePanel("benefits"); }}
                   showToast={showToast} />
               )}
             </div>
