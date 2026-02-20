@@ -161,6 +161,59 @@ function detectMedicaidStateClient(patient) {
   return null;
 }
 
+// ── Payer Pre-Auth Contact Directory ─────────────────────────────────────────
+// Pre-auth letters route to the payer's PA department, not the patient.
+// Medicaid PA goes to the state Medicaid dental office.
+const MEDICAID_PA_CONTACTS = {
+  TX: { name: "TMHP Dental Services",         email: "dental@tmhp.com",              fax: "1-512-514-4214", label: "Texas Medicaid (TMHP)" },
+  CA: { name: "Denti-Cal / Medi-Cal Dental",  email: "dental@denti-cal.ca.gov",      fax: "1-916-440-5690", label: "Denti-Cal (California)" },
+  NY: { name: "NY Medicaid Dental",           email: "dental@health.ny.gov",         fax: "1-518-486-7922", label: "NY Medicaid" },
+  FL: { name: "FL Medicaid Dental",           email: "DentaQuest-FL@dentaquest.com", fax: "1-800-329-4527", label: "FL Medicaid (DentaQuest)" },
+  PA: { name: "PA Medicaid Dental",           email: "dental@dhs.pa.gov",            fax: "1-717-772-6340", label: "PA Medicaid" },
+  IL: { name: "IL Medicaid Dental",           email: "dental@illinois.gov",          fax: "1-217-782-1604", label: "IL Medicaid" },
+  OH: { name: "OH Medicaid Dental",           email: "dental@medicaid.ohio.gov",     fax: "1-614-752-3986", label: "OH Medicaid" },
+  GA: { name: "GA Medicaid Dental",           email: "dental@dch.ga.gov",            fax: "1-404-651-6880", label: "GA Medicaid" },
+  MI: { name: "Healthy Michigan Dental",      email: "dental@michigan.gov",          fax: "1-517-763-0526", label: "MI Medicaid" },
+  NJ: { name: "NJ FamilyCare Dental",         email: "dental@dmahs.nj.gov",          fax: "1-609-588-3583", label: "NJ FamilyCare" },
+  VA: { name: "VA Medicaid Dental",           email: "dental@dmas.virginia.gov",     fax: "1-804-452-5455", label: "VA Medicaid" },
+  WA: { name: "Apple Health Dental",          email: "dental@hca.wa.gov",            fax: "1-360-725-1000", label: "WA Apple Health" },
+  AZ: { name: "AHCCCS Dental",               email: "dental@azahcccs.gov",          fax: "1-602-256-6756", label: "AZ AHCCCS" },
+  MA: { name: "MassHealth Dental",            email: "dental@mass.gov",              fax: "1-617-988-8974", label: "MassHealth" },
+};
+
+const COMMERCIAL_PA_CONTACTS = {
+  DELTA_PPO:  { name: "Delta Dental Prior Auth",  email: "preauth@delta.org",        fax: "1-800-656-2710", label: "Delta Dental" },
+  CIGNA:      { name: "Cigna Dental Prior Auth",   email: "dentalpreauth@cigna.com",  fax: "1-800-258-1189", label: "Cigna Dental" },
+  METLIFE:    { name: "MetLife Dental Prior Auth",  email: "preauth@metlife.com",      fax: "1-800-942-0854", label: "MetLife Dental" },
+  AETNA_DMO:  { name: "Aetna Dental Prior Auth",   email: "dentalpa@aetna.com",       fax: "1-800-633-6762", label: "Aetna Dental" },
+  GUARDIAN:   { name: "Guardian Dental Prior Auth", email: "dentalpa@glic.com",        fax: "1-800-541-7846", label: "Guardian Dental" },
+  HUMANA:     { name: "Humana Dental Prior Auth",   email: "dentalpa@humana.com",      fax: "1-800-233-4013", label: "Humana Dental" },
+};
+
+// Resolve the correct pre-auth recipient for a given patient + verification result
+function resolvePreAuthContact(patient, result) {
+  // 1. Medicaid → route to state Medicaid dental office
+  const isMedicaid = isMedicaidPatient(patient) || result?._is_medicaid;
+  if (isMedicaid) {
+    const state = result?._medicaid_state || detectMedicaidStateClient(patient);
+    if (state && MEDICAID_PA_CONTACTS[state]) return MEDICAID_PA_CONTACTS[state];
+    return { name: "Medicaid Dental PA Dept", email: "", fax: "", label: "Medicaid" };
+  }
+  // 2. Commercial → match payer_id from verification result
+  const payerId = result?.payer_id || "";
+  if (payerId && COMMERCIAL_PA_CONTACTS[payerId]) return COMMERCIAL_PA_CONTACTS[payerId];
+  // 3. Fuzzy match by payer name
+  const payerName = (result?.payer_name || patient?.insurance || "").toLowerCase();
+  if (payerName.includes("delta"))    return COMMERCIAL_PA_CONTACTS.DELTA_PPO;
+  if (payerName.includes("cigna"))    return COMMERCIAL_PA_CONTACTS.CIGNA;
+  if (payerName.includes("metlife"))  return COMMERCIAL_PA_CONTACTS.METLIFE;
+  if (payerName.includes("aetna"))    return COMMERCIAL_PA_CONTACTS.AETNA_DMO;
+  if (payerName.includes("guardian")) return COMMERCIAL_PA_CONTACTS.GUARDIAN;
+  if (payerName.includes("humana"))   return COMMERCIAL_PA_CONTACTS.HUMANA;
+  // 4. Unknown payer — leave email blank so user fills it in
+  return { name: result?.payer_name || patient?.insurance || "Insurance PA Dept", email: "", fax: "", label: result?.payer_name || patient?.insurance || "Insurance" };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // API CLIENT  ·  Phase 1: Data Bridge
 // All network calls live here. Every function returns the raw JSON the
@@ -1539,6 +1592,7 @@ function PreauthWidget({ patient, result, triage, showToast }) {
 
   const isMedicaidPA = isMedicaidPatient(patient) || result?._is_medicaid;
   const medicaidStatePA = result?._medicaid_state || detectMedicaidStateClient(patient);
+  const paContact = resolvePreAuthContact(patient, result);
 
   // ── IDLE ──────────────────────────────────────────────────────────────────
   if (status === "idle") return (
@@ -1689,9 +1743,11 @@ function PreauthWidget({ patient, result, triage, showToast }) {
       <EmailPDFModal
         isOpen={preauthEmailOpen}
         onClose={() => setPreauthEmailOpen(false)}
-        defaultEmail={patient?.email || ""}
+        defaultEmail={paContact.email}
         patientName={patient?.name || "Patient"}
-        documentType="Pre-Auth Letter"
+        documentType={isMedicaidPA ? `Medicaid PA Letter → ${paContact.label}` : `Pre-Auth Letter → ${paContact.label}`}
+        recipientLabel={paContact.name}
+        faxNumber={paContact.fax}
         onSend={async ({ email, subject, message }) => {
           // Placeholder — in production this would call a server-side email API
           await new Promise(r => setTimeout(r, 800));
@@ -2601,7 +2657,7 @@ function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, i
       <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:5, flexWrap:"wrap" }}>
         <span style={{ color:T.text, fontSize:13, fontWeight:800, flex:1 }}>{patient.name}</span>
         {isMedicaid && <Badge label={medicaidState ? `MEDICAID · ${medicaidState}` : "MEDICAID"} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />}
-        {isOON  && <Badge label="OON"  color={T.amberDark} bg={T.amberLight} border={T.amberBorder} />}
+        {isOON  && <Badge label={`OON · ${patient.insurance || result?.payer_name || "OON"}`} color={T.amberDark} bg={T.amberLight} border={T.amberBorder} />}
         {isAuto && <Badge label="AUTO" color={T.indigo} bg={T.indigoLight} border={T.indigoBorder} icon="Bot" />}
         {isRPA  && <Badge label="RPA"  color={T.rpaDark} bg={T.rpaLight}   border={T.rpaBorder}   icon="Bot" />}
       </div>
@@ -2882,7 +2938,7 @@ function DirectorySearchModal({ onSelect, onClose }) {
 // ── Email PDF Modal ──────────────────────────────────────────────────────────
 // Shared modal for emailing PDFs (superbills, pre-auth letters).
 // Props: isOpen, onClose, defaultEmail, patientName, documentType, onSend, showToast
-function EmailPDFModal({ isOpen, onClose, defaultEmail = "", patientName = "", documentType = "Document", onSend, showToast }) {
+function EmailPDFModal({ isOpen, onClose, defaultEmail = "", patientName = "", documentType = "Document", recipientLabel = "", faxNumber = "", onSend, showToast }) {
   const [email, setEmail]     = useState(defaultEmail);
   const [subject, setSubject] = useState(`${documentType} for ${patientName}`);
   const [message, setMessage] = useState("");
@@ -2891,7 +2947,7 @@ function EmailPDFModal({ isOpen, onClose, defaultEmail = "", patientName = "", d
   useEffect(() => {
     if (isOpen) {
       setEmail(defaultEmail);
-      setSubject(`${documentType} for ${patientName}`);
+      setSubject(`${documentType} — ${patientName}`);
       setMessage("");
       setSending(false);
     }
@@ -2919,16 +2975,28 @@ function EmailPDFModal({ isOpen, onClose, defaultEmail = "", patientName = "", d
       <div onClick={e => e.stopPropagation()}
         style={{ background:T.bgCard, borderRadius:16, padding:32, width:"100%", maxWidth:460,
           border:"1px solid " + T.border, boxShadow:"0 24px 48px rgba(0,0,0,0.2)" }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
           <div style={{ fontSize:18, fontWeight:900, color:T.text }}>📧 Email {documentType}</div>
           <button onClick={onClose} style={{ background:"none", border:"none", fontSize:20, color:T.textSoft, cursor:"pointer" }}>✕</button>
         </div>
 
+        {/* Routing info banner — shows who the document is being sent to */}
+        {recipientLabel && (
+          <div style={{ background:T.indigoLight, border:"1px solid " + T.indigoBorder, borderRadius:10, padding:"10px 14px", marginBottom:20 }}>
+            <div style={{ fontSize:10, fontWeight:900, color:T.indigoDark, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4 }}>Routing To</div>
+            <div style={{ fontSize:13, fontWeight:800, color:T.text }}>{recipientLabel}</div>
+            {faxNumber && <div style={{ fontSize:11, color:T.textMid, marginTop:2 }}>Fax: {faxNumber}</div>}
+          </div>
+        )}
+
         <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
           <div>
-            <label style={{ fontSize:12, fontWeight:700, color:T.textMid, display:"block", marginBottom:4 }}>Recipient Email</label>
+            <label style={{ fontSize:12, fontWeight:700, color:T.textMid, display:"block", marginBottom:4 }}>
+              {recipientLabel ? "Payer Email" : "Recipient Email"}
+            </label>
             <div style={{ display:"flex", gap:6 }}>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="patient@email.com"
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder={recipientLabel ? "payer-pa-dept@insurance.com" : "recipient@email.com"}
                 style={{ flex:1, padding:"10px 12px", borderRadius:8, border:"1px solid " + T.borderStrong,
                   background:T.bg, color:T.text, fontSize:14, outline:"none" }} />
               {email && <button onClick={() => setEmail("")}
@@ -2963,7 +3031,7 @@ function EmailPDFModal({ isOpen, onClose, defaultEmail = "", patientName = "", d
             style={{ flex:1, padding:"12px", borderRadius:10, border:"none",
               background:T.indigo, color:"white", fontSize:14, fontWeight:800, cursor:"pointer",
               opacity: sending ? 0.7 : 1 }}>
-            {sending ? "Sending…" : "Send Email"}
+            {sending ? "Sending…" : `Send to ${recipientLabel || "Recipient"}`}
           </button>
         </div>
       </div>
