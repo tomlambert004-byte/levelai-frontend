@@ -3084,12 +3084,20 @@ function Analytics({ patients, results, agentLog }) {
   const [selectedMonthIdx, setSelectedMonthIdx] = useState(5);
   const [hoveredBarIdx, setHoveredBarIdx]       = useState(null);
   const [showRevenueModal, setShowRevenueModal] = useState(false);
+  const [showClaimModal,   setShowClaimModal]   = useState(false);
 
   const verifiedIds = Object.keys(results);
   const totalVerified = verifiedIds.length;
-  const autoVerifications = agentLog.filter(e => e.action === ACTION.VERIFIED && e.trigger !== "manual");
-  const autoRate = totalVerified > 0 ? Math.round((autoVerifications.length / totalVerified) * 100) : 0;
-  const timeSavedHours = ((autoVerifications.length * 12) / 60).toFixed(1);
+  // Deduplicate by patient ID — agentLog can have multiple entries per patient
+  const autoVerifiedPatientIds = new Set(
+    agentLog
+      .filter(e => e.action === ACTION.VERIFIED && e.trigger !== "manual")
+      .map(e => e.patientId)
+      .filter(Boolean)
+  );
+  const autoVerifiedCount = autoVerifiedPatientIds.size;
+  const autoRate = totalVerified > 0 ? Math.round((autoVerifiedCount / totalVerified) * 100) : 0;
+  const timeSavedHours = ((autoVerifiedCount * 12) / 60).toFixed(1);
 
   let totalRevenue = 0, revenueProtected = 0, revenueAtRisk = 0;
   patients.forEach(p => {
@@ -3226,8 +3234,11 @@ function Analytics({ patients, results, agentLog }) {
 
       {/* KPI cards */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(300px, 1fr))", gap:16 }}>
-        <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px", display:"flex", flexDirection:"column", gap:8, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }} {...statCardHover}>
-          <div style={{ color:T.textSoft, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.05em" }}>Clean Claim Rate — Today&apos;s Roster</div>
+        <div onClick={() => setShowClaimModal(true)}
+             style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px", display:"flex", flexDirection:"column", gap:8, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)", cursor:"pointer" }}
+             onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-3px)"; e.currentTarget.style.boxShadow="0 10px 24px rgba(0,0,0,0.1)"; e.currentTarget.style.borderColor=T.limeBorder; }}
+             onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor=T.border; }}>
+          <div style={{ color:T.textSoft, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.05em" }}>Clean Claim Rate — Today&apos;s Roster ↗</div>
           <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
             <span style={{ fontSize:32, fontWeight:900, color:T.limeDark, lineHeight:1 }}>{protectedPct}%</span>
             <span style={{ fontSize:13, fontWeight:700, color:T.textMid }}>Protected</span>
@@ -3246,7 +3257,7 @@ function Analytics({ patients, results, agentLog }) {
             <span style={{ fontSize:13, fontWeight:700, color:T.textMid }}>Zero-touch</span>
           </div>
           <div style={{ fontSize:12, color:T.text, fontWeight:700, marginTop:4 }}>
-            {autoVerifications.length} of {totalVerified} verified automatically
+            {autoVerifiedCount} of {totalVerified} verified automatically
           </div>
         </div>
         <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px", display:"flex", flexDirection:"column", gap:8, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }} {...statCardHover}>
@@ -3452,6 +3463,172 @@ function Analytics({ patients, results, agentLog }) {
           </div>
         </div>
       )}
+
+      {/* ── Clean Claim Rate Drilldown Modal ─────────────────────────────────── */}
+      {showClaimModal && (() => {
+        // Classify each patient
+        const atRisk    = patients.filter(p => !results[p.id] || results[p.id]?.verification_status !== STATUS.VERIFIED);
+        const cleared   = patients.filter(p => results[p.id]?.verification_status === STATUS.VERIFIED);
+
+        // Gather all distinct flags across at-risk patients
+        const allFlags = {};
+        atRisk.forEach(p => {
+          (results[p.id]?.action_flags || []).filter(f => f !== "thin_data").forEach(f => {
+            allFlags[f] = (allFlags[f] || 0) + 1;
+          });
+        });
+
+        // AI-style risk narrative — built from real data
+        const topFlag = Object.entries(allFlags).sort((a,b) => b[1]-a[1])[0];
+        const unverifiedCount = patients.filter(p => !results[p.id]).length;
+        const flaggedCount    = patients.filter(p => results[p.id] && results[p.id].verification_status !== STATUS.VERIFIED).length;
+
+        const narrativeParts = [];
+        if (unverifiedCount > 0)
+          narrativeParts.push(`${unverifiedCount} patient${unverifiedCount>1?"s":""} have not been verified yet — run eligibility checks to clear.`);
+        if (flaggedCount > 0)
+          narrativeParts.push(`${flaggedCount} patient${flaggedCount>1?"s":""} returned flags after verification.`);
+        if (topFlag)
+          narrativeParts.push(`Most common issue: "${topFlag[0].replace(/_/g," ")}" (${topFlag[1]} occurrence${topFlag[1]>1?"s":""}) — review coverage details before treatment.`);
+        if (revenueAtRisk > 0)
+          narrativeParts.push(`${dollars(revenueAtRisk)} in estimated fees is currently at risk of partial denial or patient non-payment.`);
+        if (cleared.length === patients.length)
+          narrativeParts.push("All patients on today's roster are verified and cleared. Excellent clean claim rate.");
+
+        const narrative = narrativeParts.length > 0 ? narrativeParts.join(" ") : "No eligibility issues detected for today's roster.";
+
+        const getRiskLabel = (p) => {
+          const r = results[p.id];
+          if (!r) return { label:"Unverified", color:T.slate, bg:T.slateLight, border:T.border };
+          if (r.verification_status === STATUS.VERIFIED && !(r.action_flags||[]).filter(f=>f!=="thin_data").length)
+            return { label:"Cleared", color:T.limeDark, bg:T.limeLight, border:T.limeBorder };
+          if (r.verification_status === STATUS.VERIFIED)
+            return { label:"Verified w/ Flags", color:T.amberDark, bg:T.amberLight, border:T.amberBorder };
+          return { label:"At Risk", color:T.red, bg:T.redLight, border:T.redBorder };
+        };
+
+        return (
+          <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:9999,
+            display:"flex", alignItems:"center", justifyContent:"center" }}
+            onClick={() => setShowClaimModal(false)}>
+            <div style={{ background:T.bgCard, width:"92%", maxWidth:640, borderRadius:16,
+              overflow:"hidden", maxHeight:"90vh", display:"flex", flexDirection:"column" }}
+              onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div style={{ padding:"20px 24px", borderBottom:"1px solid "+T.border,
+                background: protectedPct >= 80 ? T.limeDark : T.red,
+                color:"white", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div>
+                  <div style={{ fontSize:18, fontWeight:900 }}>Clean Claim Rate — Today&apos;s Roster</div>
+                  <div style={{ fontSize:12, opacity:0.8, marginTop:2 }}>
+                    {cleared.length} of {patients.length} patients cleared · {protectedPct}% protected
+                  </div>
+                </div>
+                <button onClick={() => setShowClaimModal(false)}
+                  style={{ background:"transparent", border:"none", color:"white", fontSize:24, cursor:"pointer", lineHeight:1 }}>&times;</button>
+              </div>
+
+              <div style={{ flex:1, overflowY:"auto", padding:24, display:"flex", flexDirection:"column", gap:20 }}>
+
+                {/* AI Risk Summary */}
+                <div style={{ background:T.indigoLight, border:"1px solid "+T.indigoBorder, borderRadius:12, padding:"16px 18px" }}>
+                  <div style={{ fontSize:11, fontWeight:800, color:T.indigo, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:8 }}>
+                    AI Risk Summary
+                  </div>
+                  <div style={{ fontSize:13, color:T.text, lineHeight:1.7, fontWeight:500 }}>
+                    {narrative}
+                  </div>
+                </div>
+
+                {/* Revenue snapshot */}
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                  <div style={{ background:T.limeLight, border:"1px solid "+T.limeBorder, borderRadius:10, padding:"14px 16px" }}>
+                    <div style={{ fontSize:11, fontWeight:800, color:T.limeDark, textTransform:"uppercase", letterSpacing:"0.05em" }}>Revenue Cleared</div>
+                    <div style={{ fontSize:24, fontWeight:900, color:T.limeDark, marginTop:4 }}>{dollars(revenueProtected)}</div>
+                    <div style={{ fontSize:11, color:T.textSoft, marginTop:2 }}>{cleared.length} patient{cleared.length!==1?"s":""}</div>
+                  </div>
+                  <div style={{ background:T.redLight, border:"1px solid "+T.redBorder, borderRadius:10, padding:"14px 16px" }}>
+                    <div style={{ fontSize:11, fontWeight:800, color:T.red, textTransform:"uppercase", letterSpacing:"0.05em" }}>Revenue At Risk</div>
+                    <div style={{ fontSize:24, fontWeight:900, color:T.red, marginTop:4 }}>{dollars(revenueAtRisk)}</div>
+                    <div style={{ fontSize:11, color:T.textSoft, marginTop:2 }}>{atRisk.length} patient{atRisk.length!==1?"s":""}</div>
+                  </div>
+                </div>
+
+                {/* Per-patient breakdown */}
+                <div>
+                  <div style={{ fontSize:13, fontWeight:900, color:T.text, marginBottom:10 }}>Patient Breakdown</div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    {patients.map(p => {
+                      const risk = getRiskLabel(p);
+                      const r    = results[p.id];
+                      const flags = (r?.action_flags || []).filter(f => f !== "thin_data");
+                      return (
+                        <div key={p.id} style={{ display:"flex", alignItems:"center", gap:12,
+                          background:T.bg, border:"1px solid "+T.border, borderRadius:10,
+                          padding:"12px 14px" }}>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:13, fontWeight:800, color:T.text }}>{p.name}</div>
+                            <div style={{ fontSize:11, color:T.textSoft, marginTop:2 }}>
+                              {p.insurance || "No insurance"} · {p.procedure || ""}
+                            </div>
+                            {flags.length > 0 && (
+                              <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginTop:6 }}>
+                                {flags.map((f,i) => (
+                                  <span key={i} style={{ fontSize:10, fontWeight:700, color:T.amberDark,
+                                    background:T.amberLight, border:"1px solid "+T.amberBorder,
+                                    borderRadius:4, padding:"2px 7px" }}>
+                                    {f.replace(/_/g," ")}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4, flexShrink:0 }}>
+                            <span style={{ fontSize:11, fontWeight:800, color:risk.color,
+                              background:risk.bg, border:"1px solid "+risk.border,
+                              borderRadius:6, padding:"3px 10px" }}>
+                              {risk.label}
+                            </span>
+                            {p.fee ? (
+                              <span style={{ fontSize:11, fontWeight:700, color:T.textMid }}>
+                                {dollars(p.fee)}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Common flags summary */}
+                {Object.keys(allFlags).length > 0 && (
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:900, color:T.text, marginBottom:10 }}>Flag Breakdown</div>
+                    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                      {Object.entries(allFlags).sort((a,b)=>b[1]-a[1]).map(([flag, count], i) => (
+                        <div key={i} style={{ display:"flex", alignItems:"center", gap:12 }}>
+                          <div style={{ flex:1, fontSize:12, fontWeight:700, color:T.text, textTransform:"capitalize" }}>
+                            {flag.replace(/_/g," ")}
+                          </div>
+                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                            <div style={{ width:80, height:6, background:T.redLight, borderRadius:3, overflow:"hidden" }}>
+                              <div style={{ height:"100%", width:`${(count/atRisk.length)*100}%`, background:T.red, borderRadius:3 }} />
+                            </div>
+                            <span style={{ fontSize:11, fontWeight:800, color:T.red, minWidth:20, textAlign:"right" }}>{count}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -4478,9 +4655,14 @@ export default function LevelAI() {
     const settled = await Promise.allSettled(fetchDates.map(d => apiGetDailySchedule(d)));
 
     const allPatients = [];
+    const seen = new Set();
     settled.forEach((r, i) => {
       if (r.status !== "fulfilled") return;
       r.value.forEach(p => {
+        // Deduplicate by patient+date+time (same fixture patient can appear on multiple days)
+        const key = `${p.id}_${p.appointmentDate}_${p.appointmentTime}`;
+        if (seen.has(key)) return;
+        seen.add(key);
         if (p.hoursUntil != null) { allPatients.push(p); return; }
         const diff = new Date(`${p.appointmentDate}T${p.appointmentTime || "09:00"}`) - new Date();
         allPatients.push({ ...p, hoursUntil: Math.floor(diff / (1000 * 60 * 60)) });

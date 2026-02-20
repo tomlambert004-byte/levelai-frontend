@@ -25,13 +25,20 @@ export async function POST(request) {
       `${user?.firstName || ""} ${user?.lastName || ""}`.trim() ||
       "My Practice";
 
-    // Upsert — create if not exists, return existing if already there
+    // Upsert — create if not exists, update name/npi/taxId if provided
+    const updateData = {};
+    if (body.name)   updateData.name  = body.name;
+    if (body.npi)    updateData.npi   = body.npi;
+    if (body.taxId)  updateData.taxId = body.taxId;
+
     const practice = await prisma.practice.upsert({
       where:  { clerkUserId: userId },
-      update: {},  // don't overwrite existing data on subsequent logins
+      update: updateData,
       create: {
         clerkUserId: userId,
         name:        practiceName,
+        npi:         body.npi   || null,
+        taxId:       body.taxId || null,
       },
     });
 
