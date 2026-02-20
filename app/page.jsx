@@ -1327,70 +1327,107 @@ function PreauthWidget({ patient, result, triage, showToast }) {
     setLoadStage(0);
   };
 
-  const handleDownloadPDF = () => {
-    const safeName = (patient.name || "Patient").replace(/\s+/g, "_");
-    const date     = patient.appointmentDate || new Date().toISOString().split("T")[0];
-    const filename = `PreAuth_${safeName}_${date}.pdf`;
-
-    const attachList = attachments.map(f => `  • ${f.filename} — ${f.description}`).join("\n");
-
-    const htmlContent = `<!DOCTYPE html>
+  // Shared: build the formatted HTML letter document
+  const buildLetterHtml = () => {
+    const safeName = (patient.name || "Patient");
+    return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>Pre-Authorization Letter — ${patient.name}</title>
+  <title>Pre-Authorization Letter — ${safeName}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: Georgia, "Times New Roman", serif; font-size: 12pt; line-height: 1.7; color: #1a1a18; padding: 0; }
-    @page { margin: 1in; }
-    @media print { body { padding: 0; } }
-    .header { border-bottom: 2px solid #1a1a18; padding-bottom: 12px; margin-bottom: 24px; }
-    .header h1 { font-size: 10pt; letter-spacing: 0.1em; text-transform: uppercase; color: #555; font-family: Arial, sans-serif; }
-    .header h2 { font-size: 18pt; font-weight: bold; margin-top: 4px; }
-    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin-bottom: 20px; font-size: 10pt; font-family: Arial, sans-serif; }
-    .meta-grid .label { font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
-    .letter-body { white-space: pre-wrap; font-size: 11pt; line-height: 1.75; }
-    .attachments { margin-top: 24px; padding: 16px; background: #f8f8f6; border: 1px solid #ddd; border-radius: 4px; }
-    .attachments h3 { font-size: 10pt; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
-    .attachments ul { list-style: none; padding: 0; }
-    .attachments li { font-size: 10pt; padding: 3px 0; font-family: Arial, sans-serif; }
-    .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #ccc; font-size: 9pt; color: #888; font-family: Arial, sans-serif; }
+    body { font-family: Georgia, "Times New Roman", serif; font-size: 12pt; line-height: 1.7; color: #1a1a18; background: #fff; }
+    @page { margin: 1in; size: letter; }
+    .page { max-width: 740px; margin: 0 auto; padding: 48px 48px 64px; }
+    @media print { .no-print { display: none !important; } .page { padding: 0; max-width: 100%; } }
+    .practice-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1a1a18; padding-bottom: 14px; margin-bottom: 28px; }
+    .practice-name { font-family: Arial, sans-serif; font-size: 18pt; font-weight: 900; color: #1a1a18; }
+    .practice-sub  { font-family: Arial, sans-serif; font-size: 9pt; color: #666; margin-top: 3px; }
+    .badge { font-family: Arial, sans-serif; font-size: 8pt; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; background: #4f46e5; color: white; padding: 4px 10px; border-radius: 20px; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 32px; margin-bottom: 28px; padding: 16px 20px; background: #f8f8f6; border: 1px solid #e2e2dc; border-radius: 6px; font-family: Arial, sans-serif; font-size: 10pt; }
+    .meta-grid .lbl { font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.05em; font-size: 9pt; }
+    .letter-body { white-space: pre-wrap; font-size: 11.5pt; line-height: 1.85; }
+    .attachments { margin-top: 28px; padding: 16px 20px; background: #f8f8f6; border: 1px solid #e2e2dc; border-radius: 6px; }
+    .attachments h3 { font-family: Arial, sans-serif; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 900; margin-bottom: 10px; color: #555; }
+    .attachments li { font-size: 10pt; font-family: Arial, sans-serif; padding: 3px 0; }
+    .footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #ccc; font-size: 8.5pt; color: #999; font-family: Arial, sans-serif; display: flex; justify-content: space-between; }
+    .print-btn { position: fixed; bottom: 24px; right: 24px; background: #4f46e5; color: white; font-family: Arial, sans-serif; font-weight: 900; font-size: 14px; padding: 13px 26px; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 6px 20px rgba(79,70,229,0.35); }
+    .print-btn:hover { background: #4338ca; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>Georgetown Dental Associates — Pre-Authorization Request</h1>
-    <h2>Letter of Medical Necessity</h2>
+  <div class="page">
+    <div class="practice-header">
+      <div>
+        <div class="practice-name">Georgetown Dental Associates</div>
+        <div class="practice-sub">1234 Dental Way, Suite 100 · Georgetown, TX 78626 · (555) 555-0100<br/>NPI: 1234567890 · Tax ID: 74-1234567</div>
+      </div>
+      <div class="badge">Pre-Authorization Request</div>
+    </div>
+    <div class="meta-grid">
+      <div><span class="lbl">Patient</span><br/>${patient.name || "—"}</div>
+      <div><span class="lbl">Date of Birth</span><br/>${patient.dob || "—"}</div>
+      <div><span class="lbl">Member ID</span><br/>${patient.memberId || "—"}</div>
+      <div><span class="lbl">Insurance</span><br/>${patient.insurance || "—"}</div>
+      <div><span class="lbl">Procedure</span><br/>${patient.procedure || "—"}</div>
+      <div><span class="lbl">Date of Service</span><br/>${patient.appointmentDate || "—"}</div>
+    </div>
+    <div class="letter-body">${letter.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+    ${attachments.length > 0 ? `
+    <div class="attachments">
+      <h3>Supporting Documents (${attachments.length})</h3>
+      <ul style="list-style:none;padding:0">${attachments.map(f=>`<li>• <strong>${f.filename}</strong> — ${f.description}</li>`).join("")}</ul>
+    </div>` : ""}
+    <div class="footer">
+      <span>Generated by Level AI · ${new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})}</span>
+      <span>Confidential — for insurance submission only</span>
+    </div>
   </div>
-  <div class="meta-grid">
-    <div><span class="label">Patient:</span> ${patient.name}</div>
-    <div><span class="label">DOB:</span> ${patient.dob || "—"}</div>
-    <div><span class="label">Member ID:</span> ${patient.memberId || "—"}</div>
-    <div><span class="label">Insurance:</span> ${patient.insurance || "—"}</div>
-    <div><span class="label">Procedure:</span> ${patient.procedure || "—"}</div>
-    <div><span class="label">Date of Service:</span> ${patient.appointmentDate || "—"}</div>
-  </div>
-  <div class="letter-body">${letter.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
-  ${attachments.length > 0 ? `
-  <div class="attachments">
-    <h3>Supporting Documents</h3>
-    <ul>${attachments.map(f => `<li>• <strong>${f.filename}</strong> — ${f.description}</li>`).join("")}</ul>
-  </div>` : ""}
-  <div class="footer">Generated by Level AI · ${new Date().toLocaleDateString("en-US", { year:"numeric", month:"long", day:"numeric" })} · Confidential — for insurance submission only</div>
+  <button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
 </body>
 </html>`;
+  };
 
-    const iframe = document.createElement("iframe");
-    iframe.style.cssText = "position:fixed;width:0;height:0;border:0;opacity:0;";
-    document.body.appendChild(iframe);
-    iframe.contentDocument.write(htmlContent);
-    iframe.contentDocument.close();
-    iframe.contentWindow.document.title = filename;
-    setTimeout(() => {
-      iframe.contentWindow.print();
-      setTimeout(() => document.body.removeChild(iframe), 1000);
-    }, 300);
+  // Download as .html file — opens in any browser, prints perfectly to PDF
+  const handleDownloadPDF = () => {
+    const safeName = (patient.name || "Patient").replace(/\s+/g, "_");
+    const date     = patient.appointmentDate || new Date().toISOString().split("T")[0];
+    const filename = `PreAuth_${safeName}_${date}.html`;
+    const blob     = new Blob([buildLetterHtml()], { type: "text/html;charset=utf-8" });
+    const url      = URL.createObjectURL(blob);
+    const a        = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 500);
+    showToast("Downloaded! Open the file → Print → Save as PDF 📄");
+  };
+
+  // Open in new tab with auto-print prompt
+  const handlePrintPDF = () => {
+    const win = window.open("", "_blank");
+    if (!win) { showToast("Pop-up blocked — allow pop-ups and try again"); return; }
+    win.document.write(buildLetterHtml());
+    win.document.close();
+    setTimeout(() => win.print(), 600);
     showToast("Print dialog opened — choose 'Save as PDF' ↓");
+  };
+
+  // Email via mailto: with subject + plain-text body
+  const handleEmail = () => {
+    const subject = encodeURIComponent(
+      `Pre-Authorization Request — ${patient.name} — ${patient.insurance || "Insurance"}`
+    );
+    const attachNote = attachments.length > 0
+      ? `\n\nATTACHMENTS REQUIRED:\n${attachments.map(f=>`• ${f.filename} — ${f.description}`).join("\n")}`
+      : "";
+    const body = encodeURIComponent(
+      `Please see the pre-authorization letter below:\n\n${letter}${attachNote}\n\n---\nGenerated by Level AI`
+    );
+    // mailto has a ~2000 char URL limit — truncate gracefully
+    const mailtoUrl = `mailto:?subject=${subject}&body=${body}`.slice(0, 2000);
+    window.open(mailtoUrl, "_self");
+    showToast("Email client opened with letter pre-filled ✉️");
   };
 
   // ── IDLE ──────────────────────────────────────────────────────────────────
@@ -1518,22 +1555,43 @@ function PreauthWidget({ patient, result, triage, showToast }) {
 
       {/* Action buttons */}
       <div style={{ padding:"10px 16px", borderTop:"1px solid "+T.limeBorder,
-        display:"flex", gap:8, background:"#f0fdf4" }}>
+        display:"flex", gap:8, background:"#f0fdf4", flexWrap:"wrap" }}>
+        {/* Primary: Download */}
         <button onClick={handleDownloadPDF}
-          style={{ flex:2, background:T.indigoDark, color:"white", border:"none", borderRadius:7,
-            padding:"10px", fontWeight:800, cursor:"pointer", fontSize:12, display:"flex",
-            alignItems:"center", justifyContent:"center", gap:6 }}>
-          📄 Download Pre-Auth PDF
+          style={{ flex:"2 1 140px", background:T.indigoDark, color:"white", border:"none", borderRadius:7,
+            padding:"10px 12px", fontWeight:800, cursor:"pointer", fontSize:12, display:"flex",
+            alignItems:"center", justifyContent:"center", gap:6,
+            boxShadow:"0 3px 10px rgba(79,70,229,0.25)" }}
+          onMouseEnter={e=>e.currentTarget.style.opacity="0.9"}
+          onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+          📥 Download Letter
         </button>
-        <button onClick={() => { navigator.clipboard.writeText(letter); showToast("Letter copied!"); }}
-          style={{ flex:1, background:T.bgCard, color:T.indigoDark, border:"1px solid "+T.indigoBorder,
-            borderRadius:7, padding:"10px", fontWeight:800, cursor:"pointer", fontSize:12 }}>
-          Copy Text
+        {/* Secondary: Print to PDF */}
+        <button onClick={handlePrintPDF}
+          style={{ flex:"1 1 100px", background:T.bgCard, color:T.indigoDark, border:"1px solid "+T.indigoBorder,
+            borderRadius:7, padding:"10px 12px", fontWeight:800, cursor:"pointer", fontSize:12,
+            display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}
+          onMouseEnter={e=>{e.currentTarget.style.background=T.indigoLight;}}
+          onMouseLeave={e=>{e.currentTarget.style.background=T.bgCard;}}>
+          🖨️ Print / PDF
         </button>
-        <button onClick={() => showToast("Fax queued to " + patient.insurance + "!")}
-          style={{ flex:1, background:T.bgCard, color:T.textMid, border:"1px solid "+T.border,
-            borderRadius:7, padding:"10px", fontWeight:800, cursor:"pointer", fontSize:12 }}>
-          📠 Fax
+        {/* Email */}
+        <button onClick={handleEmail}
+          style={{ flex:"1 1 80px", background:T.bgCard, color:T.textMid, border:"1px solid "+T.border,
+            borderRadius:7, padding:"10px 12px", fontWeight:800, cursor:"pointer", fontSize:12,
+            display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}
+          onMouseEnter={e=>{e.currentTarget.style.background=T.bg;}}
+          onMouseLeave={e=>{e.currentTarget.style.background=T.bgCard;}}>
+          ✉️ Email
+        </button>
+        {/* Copy text */}
+        <button onClick={() => { navigator.clipboard.writeText(letter); showToast("Letter copied to clipboard!"); }}
+          style={{ flex:"1 1 80px", background:T.bgCard, color:T.textMid, border:"1px solid "+T.border,
+            borderRadius:7, padding:"10px 12px", fontWeight:800, cursor:"pointer", fontSize:12,
+            display:"flex", alignItems:"center", justifyContent:"center", gap:5 }}
+          onMouseEnter={e=>{e.currentTarget.style.background=T.bg;}}
+          onMouseLeave={e=>{e.currentTarget.style.background=T.bgCard;}}>
+          📋 Copy
         </button>
       </div>
     </div>
