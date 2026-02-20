@@ -92,8 +92,9 @@ function triagePatient(patient, result) {
 
   if (result.plan_status !== "active") block.push("Insurance plan is inactive or terminated");
 
-  const rem = result.annual_remaining_cents ?? 0;
-  if (rem === 0) block.push("Annual maximum fully exhausted -- patient responsible for 100% of fee");
+  // null/undefined = no annual max (e.g. Medicaid) — only flag when explicitly 0
+  const rem = result.annual_remaining_cents;
+  if (rem != null && rem === 0) block.push("Annual maximum fully exhausted -- patient responsible for 100% of fee");
 
   const isProsthetic = /implant|bridge|denture|partial/i.test(patient?.procedure || "");
   if (result.missing_tooth_clause?.applies && isProsthetic) block.push("Missing Tooth Clause will deny coverage for today's procedure. Pre-auth required.");
@@ -2103,8 +2104,8 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
               {[
                 { label:"Status", value:result.plan_status === "terminated" ? "Inactive / Terminated" : result.verification_status?.replace(/_/g," "), warn: result.plan_status === "terminated" },
                 { label:"Payer", value:result.payer_name },
-                { label:"Annual Max", value:dollars(result.annual_maximum_cents) },
-                { label:"Remaining", value:dollars(result.annual_remaining_cents), warn:(result.annual_remaining_cents||0)<30000 },
+                { label:"Annual Max", value:result.annual_maximum_cents != null ? dollars(result.annual_maximum_cents) : "No Limit" },
+                { label:"Remaining", value:result.annual_remaining_cents != null ? dollars(result.annual_remaining_cents) : "N/A", warn:result.annual_remaining_cents != null && result.annual_remaining_cents < 30000 },
                 { label:"Deductible", value:dollars(result.individual_deductible_cents) },
                 { label:"Deductible Met", value:(result.individual_deductible_met_cents||0)>=(result.individual_deductible_cents||1)?"Yes ✓":"No — $" + (((result.individual_deductible_cents||0)-(result.individual_deductible_met_cents||0))/100).toFixed(0) + " gap", warn:(result.individual_deductible_met_cents||0)<(result.individual_deductible_cents||1) },
                 result.copay_pct ? { label:"Insurance Pays", value: result.copay_pct + "%" } : null,
