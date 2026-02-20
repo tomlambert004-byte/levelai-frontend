@@ -6110,7 +6110,9 @@ export default function LevelAI() {
   }, [isLoading, setPhase, showToast, sandboxMode, preauthCache]);
 
   // ── Auto-verify: fires on schedule load for today, 24h, and 7d windows ───────
+  // Skipped for admin users — they use the admin console, not patient verifications.
   useEffect(() => {
+    if (isAdmin) return;
     const todayISO = new Date().toISOString().split("T")[0];
     patients.forEach((patient, idx) => {
       const h = patient.hoursUntil;
