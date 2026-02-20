@@ -270,26 +270,24 @@ function SectionLabel({ children }) {
 }
 
 function PhaseIndicator({ phase, reason, compact }) {
-  const cfg = {
-    api:     { icon:"Search", label:"Querying Clearinghouse...", color:T.lime,    bg:T.limeLight  },
-    rpa:     { icon:"Bot",    label:"AI logging into portal...", color:T.rpa,     bg:T.rpaLight   },
-    merging: { icon:"Zap",    label:"Merging data...",           color:T.indigo,  bg:T.indigoLight},
-  }[phase] || { icon:"Circle", label:"Verifying...", color:T.slate, bg:T.slateLight };
+  // Simplified — show a single clean "Verifying..." status, no technical pipeline detail
+  const isRPA = phase === "rpa";
+  const color  = isRPA ? T.rpaDark  : T.indigoDark;
+  const bg     = isRPA ? T.rpaLight : T.indigoLight;
+  const border = isRPA ? T.rpaBorder : T.indigoBorder;
+  const label  = isRPA ? "Checking payer portal…" : "Verifying insurance…";
 
   if (compact) return (
-    <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 8px", borderRadius:6, background:cfg.bg }}>
-      <span style={{ width:6, height:6, borderRadius:"50%", background:cfg.color, animation:"pulse 1.5s infinite", flexShrink:0 }} />
-      <span style={{ color:cfg.color, fontSize:10, fontWeight:700 }}>{cfg.label}</span>
+    <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 8px", borderRadius:6, background:bg }}>
+      <span style={{ width:6, height:6, borderRadius:"50%", background:color, animation:"pulse 1.5s infinite", flexShrink:0 }} />
+      <span style={{ color, fontSize:10, fontWeight:700 }}>{label}</span>
     </div>
   );
 
   return (
-    <div style={{ padding:"12px 16px", background:cfg.bg, borderRadius:8, border:"1px solid " + (phase==="rpa"?T.rpaBorder:T.limeBorder) }}>
-      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom: reason?4:0 }}>
-        <span style={{ width:8, height:8, borderRadius:"50%", background:cfg.color, animation:"pulse 1.5s infinite", flexShrink:0 }} />
-        <span style={{ color:cfg.color, fontSize:12, fontWeight:800 }}>{cfg.label}</span>
-      </div>
-      {reason && <div style={{ color:cfg.color, fontSize:11, opacity:0.8, marginLeft:16 }}>{reason}</div>}
+    <div style={{ padding:"12px 16px", background:bg, borderRadius:8, border:"1px solid "+border, display:"flex", alignItems:"center", gap:10 }}>
+      <span style={{ width:8, height:8, borderRadius:"50%", background:color, animation:"pulse 1.5s infinite", flexShrink:0 }} />
+      <span style={{ color, fontSize:12, fontWeight:800 }}>{label}</span>
     </div>
   );
 }
@@ -1462,21 +1460,23 @@ function PreauthWidget({ patient, result, triage, showToast }) {
       {/* Header bar */}
       <div style={{ padding:"10px 16px", background:T.limeDark, display:"flex",
         justifyContent:"space-between", alignItems:"center" }}>
-        <span style={{ color:"white", fontSize:12, fontWeight:900 }}>
-          ✓ Letter of Medical Necessity — Ready
-        </span>
-        <div style={{ display:"flex", gap:6 }}>
-          <button onClick={() => { navigator.clipboard.writeText(letter); showToast("Copied to clipboard!"); }}
-            style={{ background:"rgba(255,255,255,0.2)", color:"white", border:"none",
-              borderRadius:5, padding:"4px 10px", fontWeight:800, cursor:"pointer", fontSize:11 }}>
-            Copy
-          </button>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <button onClick={handleReset}
-            style={{ background:"transparent", color:"rgba(255,255,255,0.7)", border:"none",
-              borderRadius:5, padding:"4px 8px", fontWeight:800, cursor:"pointer", fontSize:13 }}>
-            ✕
+            style={{ display:"flex", alignItems:"center", gap:5, background:"rgba(255,255,255,0.15)", color:"white", border:"none",
+              borderRadius:5, padding:"4px 10px", fontWeight:800, cursor:"pointer", fontSize:11 }}
+            onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.25)"}
+            onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.15)"}>
+            ← Back
           </button>
+          <span style={{ color:"white", fontSize:12, fontWeight:900 }}>
+            ✓ Letter of Medical Necessity — Ready
+          </span>
         </div>
+        <button onClick={() => { navigator.clipboard.writeText(letter); showToast("Copied to clipboard!"); }}
+          style={{ background:"rgba(255,255,255,0.2)", color:"white", border:"none",
+            borderRadius:5, padding:"4px 10px", fontWeight:800, cursor:"pointer", fontSize:11 }}>
+          Copy
+        </button>
       </div>
 
       {/* Attached files list */}
@@ -1747,18 +1747,17 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
           <div>
             <div style={{ color:T.text, fontSize:16, fontWeight:900 }}>{patient.name}</div>
-            <div style={{ color:T.textSoft, fontSize:11, marginTop:2 }}>DOB {patient.dob} · {patient.memberId}</div>
+            <div style={{ color:T.textSoft, fontSize:11, marginTop:2 }}>{patient.insurance} · {patient.appointmentTime}</div>
           </div>
           {!loading && (
             <button onClick={()=>onVerify(patient,"manual")} style={{ padding:"7px 14px", borderRadius:8, border:"1px solid " + T.border, background:T.bg, color:T.textMid, fontWeight:700, cursor:"pointer", fontSize:11 }}>
-              Re-verify
+              ↻ Re-verify
             </button>
           )}
         </div>
-        <div style={{ marginTop:10, display:"flex", gap:6, flexWrap:"wrap" }}>
-          <div style={{ fontSize:11, color:T.textMid, fontWeight:600 }}>{patient.appointmentTime} · {patient.procedure}</div>
-          {isRPA && <Badge label="RPA" color={T.rpaDark} bg={T.rpaLight} border={T.rpaBorder} icon="Bot" />}
-          {isOON && <Badge label="Out-of-Network" color="#9a3412" bg="#fff7ed" border="#fed7aa" icon="Globe" />}
+        <div style={{ marginTop:8, display:"flex", gap:6, flexWrap:"wrap" }}>
+          {isRPA && <Badge label="RPA Verified" color={T.rpaDark} bg={T.rpaLight} border={T.rpaBorder} icon="🤖" />}
+          {isOON && <Badge label="Out-of-Network" color="#9a3412" bg="#fff7ed" border="#fed7aa" icon="⚠" />}
         </div>
       </div>
 
@@ -2007,6 +2006,40 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
   );
 }
 
+// ── Auto-Verified Panel ───────────────────────────────────────────────────────
+function AutoVerifiedPanel({ list, onClose, onSelect }) {
+  return (
+    <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden" }}>
+      <div style={{ padding:"16px 20px", borderBottom:"1px solid "+T.border, display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
+        <div>
+          <div style={{ fontSize:18, fontWeight:900, color:T.rpaDark }}>🤖 Auto-Verified Today</div>
+          <div style={{ fontSize:12, color:T.textSoft, marginTop:2 }}>These patients were verified automatically — no action needed.</div>
+        </div>
+        <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", fontSize:24, color:T.textSoft }}>&times;</button>
+      </div>
+      <div style={{ flex:1, overflowY:"auto", padding:"16px 20px", display:"flex", flexDirection:"column", gap:10, minHeight:0 }}>
+        {list.length === 0 ? (
+          <div style={{ textAlign:"center", color:T.textSoft, fontSize:13, marginTop:40 }}>No auto-verified patients yet today.</div>
+        ) : list.map(p => (
+          <div key={p.id} onClick={() => onSelect(p)}
+            style={{ border:"1px solid "+T.rpaBorder, background:T.rpaLight, borderRadius:10, padding:14, cursor:"pointer", transition:"0.15s", display:"flex", justifyContent:"space-between", alignItems:"center" }}
+            onMouseEnter={e => e.currentTarget.style.borderColor=T.rpaDark}
+            onMouseLeave={e => e.currentTarget.style.borderColor=T.rpaBorder}>
+            <div>
+              <div style={{ fontWeight:800, fontSize:14, color:T.text }}>{p.name}</div>
+              <div style={{ fontSize:11, color:T.textMid, marginTop:3 }}>{p.appointmentTime} · {p.procedure}</div>
+            </div>
+            <div style={{ textAlign:"right" }}>
+              <div style={{ fontSize:11, fontWeight:800, color:T.rpaDark }}>✓ Verified</div>
+              <div style={{ fontSize:10, color:T.textSoft, marginTop:2 }}>{p.insurance}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Schedule Side Panels (Alerts, Outreach) ───────────────────────────────────
 function AlertsPanel({ list, agentLog, onApprove, onDismiss, onClose, onSelect, showToast }) {
   return (
@@ -2094,7 +2127,7 @@ function OutreachPanel({ list, agentLog, onApprove, onDismiss, onClose, onSelect
   )
 }
 
-function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, onOpenAlerts, onOpenNotify }) {
+function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, onOpenAlerts, onOpenNotify, onOpenAutoVerified }) {
   if (blockedCount === 0 && notifyCount === 0 && botCount === 0) return null;
   return (
     <div style={{ display:"flex", gap:12, marginBottom:20, flexWrap:"wrap" }}>
@@ -2121,13 +2154,13 @@ function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, onOpenAl
          </div>
       )}
       {botCount > 0 && (
-         <div style={{ flex:"1 1 200px", background:T.rpaLight, border:"1px solid "+T.rpaBorder, padding:"14px 18px", borderRadius:12, display:"flex", alignItems:"center", gap:12, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }}
-              onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(3,105,161,0.12)"; }}
-              onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; }}>
+         <div onClick={onOpenAutoVerified} style={{ flex:"1 1 200px", cursor:"pointer", background:T.rpaLight, border:"1px solid "+T.rpaBorder, padding:"14px 18px", borderRadius:12, display:"flex", alignItems:"center", gap:12, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }}
+              onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(3,105,161,0.12)"; e.currentTarget.style.borderColor=T.rpaDark; }}
+              onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor=T.rpaBorder; }}>
              <span style={{fontSize:24}}>🤖</span>
              <div>
                  <div style={{fontSize:15, fontWeight:900, color:T.rpaDark}}>{botCount} Auto-Verified</div>
-                 <div style={{fontSize:12, color:T.rpaDark, opacity:0.8, fontWeight:600, marginTop:2}}>{rpaCount > 0 ? `${rpaCount} RPA fallbacks used` : `Zero-touch workflows`}</div>
+                 <div style={{fontSize:12, color:T.rpaDark, opacity:0.8, fontWeight:600, marginTop:2}}>{rpaCount > 0 ? `${rpaCount} via RPA` : `View details &rarr;`}</div>
              </div>
          </div>
       )}
@@ -2774,6 +2807,15 @@ function WeekAhead({ patients, results, triageMap, agentLog, showToast, onSelect
                       {isOpen && (
                         <div style={{ marginTop: 14, borderTop: "1px solid " + T.indigoBorder, paddingTop: 14 }}
                           onClick={e => e.stopPropagation()}>
+                          {/* Back to list button */}
+                          <button
+                            onClick={() => setFocusedPatient(null)}
+                            style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none",
+                              color:T.textMid, fontWeight:700, fontSize:12, cursor:"pointer", padding:"2px 0", marginBottom:10 }}
+                            onMouseEnter={e=>e.currentTarget.style.color=T.text}
+                            onMouseLeave={e=>e.currentTarget.style.color=T.textMid}>
+                            ← Back to patient list
+                          </button>
                           <BenefitsPanel
                             patient={p}
                             result={results?.[p.id] || null}
@@ -2848,7 +2890,7 @@ function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast, res
               { label:"Auto-Verified",  value:verifications.filter(e=>e.trigger!=="manual").length, color:T.limeDark, bg:T.limeLight,   border:T.limeBorder  },
               { label:"Reschedules",    value:reschedules.length,                                   color:T.red,      bg:T.redLight,    border:T.redBorder   },
               { label:"Outreach",       value:outreach.length,                                      color:T.amberDark,bg:T.amberLight,  border:T.amberBorder },
-              { label:"Calls Avoided",  value:verifications.filter(e=>e.trigger!=="manual").length, color:T.rpaDark,  bg:T.rpaLight,    border:T.rpaBorder   },
+              { label:"Zero-Touch",     value:verifications.filter(e=>e.trigger!=="manual").length, color:T.rpaDark,  bg:T.rpaLight,    border:T.rpaBorder   },
             ].map(s=>(
               <div key={s.label} style={{ flex:"1 1 140px", maxWidth:200, background:s.bg, border:"1px solid " + s.border, borderRadius:10, padding:"12px 14px", transition:"all 0.2s", cursor:"default", boxShadow:"0 2px 4px rgba(0,0,0,0.04)", overflow:"visible" }}
                 onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(0,0,0,0.12)"; e.currentTarget.style.borderColor=s.color; }}
@@ -2971,6 +3013,8 @@ function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast, res
 
 function Analytics({ patients, results, agentLog }) {
   const [selectedMonthIdx, setSelectedMonthIdx] = useState(5);
+  const [hoveredBarIdx, setHoveredBarIdx]       = useState(null);
+  const [showRevenueModal, setShowRevenueModal] = useState(false);
 
   const verifiedIds = Object.keys(results);
   const totalVerified = verifiedIds.length;
@@ -2986,23 +3030,44 @@ function Analytics({ patients, results, agentLog }) {
     if (!res || res.verification_status !== STATUS.VERIFIED) revenueAtRisk += fee;
     else revenueProtected += fee;
   });
-
   const protectedPct = totalRevenue > 0 ? Math.round((revenueProtected / totalRevenue) * 100) : 0;
 
   const HISTORICAL_REV = [
-    { month: "Sep", ins: 38000, cash: 12000, verifs: 290, kpis: [{n:"Delta Dental PPO", r:91},{n:"Aetna DMO", r:88},{n:"Cigna Dental", r:82},{n:"UnitedHealthcare", r:78},{n:"MetLife", r:74}] },
-    { month: "Oct", ins: 42000, cash: 13500, verifs: 310, kpis: [{n:"Delta Dental PPO", r:92},{n:"Aetna DMO", r:89},{n:"Cigna Dental", r:83},{n:"UnitedHealthcare", r:79},{n:"MetLife", r:75}] },
-    { month: "Nov", ins: 45000, cash: 12800, verifs: 315, kpis: [{n:"Delta Dental PPO", r:93},{n:"Aetna DMO", r:90},{n:"Cigna Dental", r:84},{n:"UnitedHealthcare", r:80},{n:"MetLife", r:75}] },
-    { month: "Dec", ins: 41000, cash: 16000, verifs: 285, kpis: [{n:"Delta Dental PPO", r:93},{n:"Aetna DMO", r:88},{n:"Cigna Dental", r:84},{n:"UnitedHealthcare", r:81},{n:"MetLife", r:77}] },
-    { month: "Jan", ins: 51000, cash: 14000, verifs: 350, kpis: [{n:"Delta Dental PPO", r:94},{n:"Aetna DMO", r:90},{n:"Cigna Dental", r:85},{n:"UnitedHealthcare", r:82},{n:"MetLife", r:76}] },
-    { month: "Feb", ins: Math.round(revenueProtected/100) + 48000, cash: Math.round(revenueAtRisk/100) + 12000, verifs: 342, kpis: [{n:"Delta Dental PPO", r:96},{n:"Aetna DMO", r:92},{n:"Cigna Dental", r:87},{n:"UnitedHealthcare", r:85},{n:"MetLife", r:81}] },
+    { month:"Sep", ins:38000, cash:12000, verifs:290,
+      procedures:[{name:"Crown",rev:14000},{name:"Implant",rev:11000},{name:"Prophy",rev:8000},{name:"Root Canal",rev:5000}],
+      byInsurance:[{name:"Delta Dental",rev:22000},{name:"Cigna",rev:11000},{name:"Aetna",rev:9000},{name:"Cash",rev:8000}],
+      kpis:[{n:"Delta Dental PPO",r:91},{n:"Aetna DMO",r:88},{n:"Cigna Dental",r:82},{n:"UnitedHealthcare",r:78},{n:"MetLife",r:74}] },
+    { month:"Oct", ins:42000, cash:13500, verifs:310,
+      procedures:[{name:"Crown",rev:16000},{name:"Implant",rev:12000},{name:"Prophy",rev:9000},{name:"Root Canal",rev:6000}],
+      byInsurance:[{name:"Delta Dental",rev:24000},{name:"Cigna",rev:12000},{name:"Aetna",rev:9000},{name:"Cash",rev:10000}],
+      kpis:[{n:"Delta Dental PPO",r:92},{n:"Aetna DMO",r:89},{n:"Cigna Dental",r:83},{n:"UnitedHealthcare",r:79},{n:"MetLife",r:75}] },
+    { month:"Nov", ins:45000, cash:12800, verifs:315,
+      procedures:[{name:"Crown",rev:17000},{name:"Implant",rev:14000},{name:"Prophy",rev:9500},{name:"Root Canal",rev:7000}],
+      byInsurance:[{name:"Delta Dental",rev:26000},{name:"Cigna",rev:12000},{name:"Aetna",rev:10000},{name:"Cash",rev:9800}],
+      kpis:[{n:"Delta Dental PPO",r:93},{n:"Aetna DMO",r:90},{n:"Cigna Dental",r:84},{n:"UnitedHealthcare",r:80},{n:"MetLife",r:75}] },
+    { month:"Dec", ins:41000, cash:16000, verifs:285,
+      procedures:[{name:"Implant",rev:15000},{name:"Crown",rev:14000},{name:"Prophy",rev:8000},{name:"Composite",rev:5000}],
+      byInsurance:[{name:"Delta Dental",rev:22000},{name:"Cigna",rev:11000},{name:"Cash",rev:14000},{name:"Aetna",rev:9000}],
+      kpis:[{n:"Delta Dental PPO",r:93},{n:"Aetna DMO",r:88},{n:"Cigna Dental",r:84},{n:"UnitedHealthcare",r:81},{n:"MetLife",r:77}] },
+    { month:"Jan", ins:51000, cash:14000, verifs:350,
+      procedures:[{name:"Implant",rev:18000},{name:"Crown",rev:16000},{name:"Prophy",rev:10000},{name:"Root Canal",rev:8000}],
+      byInsurance:[{name:"Delta Dental",rev:28000},{name:"Cigna",rev:14000},{name:"Aetna",rev:11000},{name:"Cash",rev:12000}],
+      kpis:[{n:"Delta Dental PPO",r:94},{n:"Aetna DMO",r:90},{n:"Cigna Dental",r:85},{n:"UnitedHealthcare",r:82},{n:"MetLife",r:76}] },
+    { month:"Feb", ins:Math.round(revenueProtected/100)+48000, cash:Math.round(revenueAtRisk/100)+12000, verifs:342,
+      procedures:[{name:"Implant",rev:19000},{name:"Crown",rev:17000},{name:"Perio SRP",rev:11000},{name:"Root Canal",rev:9000}],
+      byInsurance:[{name:"Delta Dental",rev:30000},{name:"Cigna",rev:14000},{name:"Aetna",rev:11000},{name:"Cash",rev:Math.round(revenueAtRisk/100)+6000}],
+      kpis:[{n:"Delta Dental PPO",r:96},{n:"Aetna DMO",r:92},{n:"Cigna Dental",r:87},{n:"UnitedHealthcare",r:85},{n:"MetLife",r:81}] },
   ];
 
   const currentMonthData = HISTORICAL_REV[selectedMonthIdx];
-  const monthlyTotalRev = currentMonthData.ins + currentMonthData.cash;
-  const CARRIER_KPIS = currentMonthData.kpis;
+  const monthlyTotalRev  = currentMonthData.ins + currentMonthData.cash;
+  const CARRIER_KPIS     = currentMonthData.kpis;
 
-  const getRating = (r) => r >= 90 ? { l:"Excellent", c:T.limeDark, bg:T.limeLight, border:T.limeBorder } : r >= 80 ? { l:"Good", c:T.indigo, bg:T.indigoLight, border:T.indigoBorder } : { l:"Review Needed", c:T.red, bg:T.redLight, border:T.redBorder };
+  const getRating = (r) => r >= 90
+    ? { l:"Excellent",     c:T.limeDark, bg:T.limeLight,   border:T.limeBorder   }
+    : r >= 80
+    ? { l:"Good",          c:T.indigo,   bg:T.indigoLight, border:T.indigoBorder }
+    : { l:"Review Needed", c:T.red,      bg:T.redLight,    border:T.redBorder    };
 
   const flagsCount = {};
   Object.values(results).forEach(r => {
@@ -3015,158 +3080,309 @@ function Analytics({ patients, results, agentLog }) {
   });
   const sortedFlags = Object.entries(flagsCount).sort((a,b) => b[1] - a[1]);
 
+  // ── CSV Export ────────────────────────────────────────────────────────────────
+  const handleExport = () => {
+    const rows = [
+      ["Month","Insurance Revenue","Cash Revenue","Total Revenue","Verifications"],
+      ...HISTORICAL_REV.map(d => [d.month, d.ins, d.cash, d.ins+d.cash, d.verifs]),
+      [],
+      [`${currentMonthData.month} — Revenue by Procedure`],
+      ["Procedure","Revenue"],
+      ...currentMonthData.procedures.map(p => [p.name, p.rev]),
+      [],
+      [`${currentMonthData.month} — Revenue by Insurance`],
+      ["Insurance / Payer","Revenue"],
+      ...currentMonthData.byInsurance.map(b => [b.name, b.rev]),
+    ];
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type:"text/csv" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url;
+    a.download = `levelai_revenue_${currentMonthData.month}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ── Stat card hover style helper ─────────────────────────────────────────────
+  const statCardHover = {
+    onMouseEnter: e => { e.currentTarget.style.transform="translateY(-3px)"; e.currentTarget.style.boxShadow="0 10px 24px rgba(0,0,0,0.1)"; },
+    onMouseLeave: e => { e.currentTarget.style.transform="translateY(0)";    e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; },
+  };
+
   return (
-    <div style={{ padding: 24, height: "100%", overflowY: "auto", display: "flex", flexDirection: "column", gap: 20 }}>
-      <div>
-        <div style={{ color:T.text, fontSize:20, fontWeight:900 }}>Analytics Overview</div>
-        <div style={{ color:T.textSoft, fontSize:12, marginTop:2 }}>Interactive metrics. Select a month on the chart to update financial data.</div>
+    <div style={{ padding:24, height:"100%", overflowY:"auto", display:"flex", flexDirection:"column", gap:20 }}>
+
+      {/* Header */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+        <div>
+          <div style={{ color:T.text, fontSize:20, fontWeight:900 }}>Analytics Overview</div>
+          <div style={{ color:T.textSoft, fontSize:12, marginTop:2 }}>Click a bar to select a month · Click Total Revenue for breakdown</div>
+        </div>
+        <button onClick={handleExport}
+                style={{ padding:"9px 18px", borderRadius:8, border:"1px solid "+T.border, background:T.bgCard, color:T.text, fontWeight:800, fontSize:12, cursor:"pointer", display:"flex", alignItems:"center", gap:6, transition:"all 0.15s" }}
+                onMouseEnter={e=>{ e.currentTarget.style.background=T.indigoDark; e.currentTarget.style.color="white"; e.currentTarget.style.borderColor=T.indigoDark; }}
+                onMouseLeave={e=>{ e.currentTarget.style.background=T.bgCard; e.currentTarget.style.color=T.text; e.currentTarget.style.borderColor=T.border; }}>
+          ⬇ Export CSV
+        </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
-        <div style={{ background: T.indigoDark, color: "white", borderRadius: 12, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 4, boxShadow: "0 4px 12px rgba(49, 46, 129, 0.2)" }}>
-           <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.8 }}>Total Revenue ({currentMonthData.month})</div>
-           <div style={{ fontSize: 28, fontWeight: 900 }}>{wholeDollars(monthlyTotalRev)}</div>
-           <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.9 }}>Based on selected month</div>
+      {/* Stat cards — top row */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))", gap:16 }}>
+        {/* Total Revenue — clickable, opens breakdown modal */}
+        <div onClick={() => setShowRevenueModal(true)}
+             style={{ background:T.indigoDark, color:"white", borderRadius:12, padding:"16px 20px", display:"flex", flexDirection:"column", gap:4, boxShadow:"0 4px 12px rgba(49,46,129,0.2)", cursor:"pointer", transition:"all 0.2s" }}
+             onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-3px)"; e.currentTarget.style.boxShadow="0 12px 28px rgba(49,46,129,0.35)"; }}
+             onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)";    e.currentTarget.style.boxShadow="0 4px 12px rgba(49,46,129,0.2)"; }}>
+          <div style={{ fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.05em", opacity:0.8 }}>Total Revenue ({currentMonthData.month}) ↗</div>
+          <div style={{ fontSize:28, fontWeight:900 }}>{wholeDollars(monthlyTotalRev)}</div>
+          <div style={{ fontSize:11, fontWeight:600, opacity:0.75 }}>Click to see breakdown</div>
         </div>
-        <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 4 }}>
-           <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: T.textSoft }}>Insurance Payouts</div>
-           <div style={{ fontSize: 28, fontWeight: 900, color: T.indigo }}>{wholeDollars(currentMonthData.ins)}</div>
-           <div style={{ fontSize: 11, fontWeight: 700, color: T.textMid }}>{Math.round((currentMonthData.ins / monthlyTotalRev)*100)}% of monthly revenue</div>
+        <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px", display:"flex", flexDirection:"column", gap:4, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }} {...statCardHover}>
+          <div style={{ fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.05em", color:T.textSoft }}>Insurance Payouts</div>
+          <div style={{ fontSize:28, fontWeight:900, color:T.indigo }}>{wholeDollars(currentMonthData.ins)}</div>
+          <div style={{ fontSize:11, fontWeight:700, color:T.textMid }}>{Math.round((currentMonthData.ins/monthlyTotalRev)*100)}% of monthly revenue</div>
         </div>
-        <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 4 }}>
-           <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: T.textSoft }}>Cash / Out-of-Pocket</div>
-           <div style={{ fontSize: 28, fontWeight: 900, color: T.limeDark }}>{wholeDollars(currentMonthData.cash)}</div>
-           <div style={{ fontSize: 11, fontWeight: 700, color: T.textMid }}>{Math.round((currentMonthData.cash / monthlyTotalRev)*100)}% of monthly revenue</div>
+        <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px", display:"flex", flexDirection:"column", gap:4, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }} {...statCardHover}>
+          <div style={{ fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.05em", color:T.textSoft }}>Cash / Out-of-Pocket</div>
+          <div style={{ fontSize:28, fontWeight:900, color:T.limeDark }}>{wholeDollars(currentMonthData.cash)}</div>
+          <div style={{ fontSize:11, fontWeight:700, color:T.textMid }}>{Math.round((currentMonthData.cash/monthlyTotalRev)*100)}% of monthly revenue</div>
         </div>
-        <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12, padding: "16px 20px", display: "flex", flexDirection: "column", gap: 4 }}>
-           <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: T.textSoft }}>Verifications in {currentMonthData.month}</div>
-           <div style={{ fontSize: 28, fontWeight: 900, color: T.text }}>{currentMonthData.verifs}</div>
-           <div style={{ fontSize: 11, fontWeight: 700, color: T.textMid }}>Volume across all providers</div>
+        <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px", display:"flex", flexDirection:"column", gap:4, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }} {...statCardHover}>
+          <div style={{ fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.05em", color:T.textSoft }}>Verifications in {currentMonthData.month}</div>
+          <div style={{ fontSize:28, fontWeight:900, color:T.text }}>{currentMonthData.verifs}</div>
+          <div style={{ fontSize:11, fontWeight:700, color:T.textMid }}>Volume across all providers</div>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
-        <div style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:12, padding:"16px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ color:T.textSoft, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.05em" }}>Current Roster Clean Claim Rate</div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+      {/* KPI cards */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(300px, 1fr))", gap:16 }}>
+        <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px", display:"flex", flexDirection:"column", gap:8, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }} {...statCardHover}>
+          <div style={{ color:T.textSoft, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.05em" }}>Clean Claim Rate — Today&apos;s Roster</div>
+          <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
             <span style={{ fontSize:32, fontWeight:900, color:T.limeDark, lineHeight:1 }}>{protectedPct}%</span>
             <span style={{ fontSize:13, fontWeight:700, color:T.textMid }}>Protected</span>
           </div>
-          <div style={{ height: 6, width: "100%", background: T.redLight, borderRadius: 3, overflow: "hidden", display: "flex" }}>
-            <div style={{ height: "100%", width: `${protectedPct}%`, background: T.lime }} />
+          <div style={{ height:6, width:"100%", background:T.redLight, borderRadius:3, overflow:"hidden" }}>
+            <div style={{ height:"100%", width:`${protectedPct}%`, background:T.lime }} />
           </div>
           <div style={{ fontSize:11, color:T.textSoft, fontWeight:600, marginTop:4 }}>
-            {dollars(revenueProtected)} cleared vs {dollars(revenueAtRisk)} at risk today
+            {dollars(revenueProtected)} cleared · {dollars(revenueAtRisk)} at risk
           </div>
         </div>
-
-        <div style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:12, padding:"16px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ color:T.textSoft, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.05em" }}>Overall Automation Rate</div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px", display:"flex", flexDirection:"column", gap:8, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }} {...statCardHover}>
+          <div style={{ color:T.textSoft, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.05em" }}>Automation Rate</div>
+          <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
             <span style={{ fontSize:32, fontWeight:900, color:T.indigo, lineHeight:1 }}>{autoRate}%</span>
             <span style={{ fontSize:13, fontWeight:700, color:T.textMid }}>Zero-touch</span>
           </div>
-          <div style={{ fontSize:12, color:T.text, fontWeight:700, marginTop:4, display:"flex", alignItems:"center", gap:6 }}>
-             <span style={{ width:8, height:8, borderRadius:"50%", background:T.indigo }} />
-             {autoVerifications.length} of {totalVerified} verified automatically
+          <div style={{ fontSize:12, color:T.text, fontWeight:700, marginTop:4 }}>
+            {autoVerifications.length} of {totalVerified} verified automatically
           </div>
         </div>
-
-        <div style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:12, padding:"16px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ color:T.textSoft, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.05em" }}>Total Staff Time Saved</div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px", display:"flex", flexDirection:"column", gap:8, transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }} {...statCardHover}>
+          <div style={{ color:T.textSoft, fontSize:11, fontWeight:800, textTransform:"uppercase", letterSpacing:"0.05em" }}>Staff Time Saved</div>
+          <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
             <span style={{ fontSize:32, fontWeight:900, color:T.rpaDark, lineHeight:1 }}>{timeSavedHours}h</span>
             <span style={{ fontSize:13, fontWeight:700, color:T.textMid }}>Recovered</span>
           </div>
-          <div style={{ fontSize:12, color:T.text, fontWeight:700, marginTop:4, display:"flex", alignItems:"center", gap:6 }}>
-            <span style={{ width:8, height:8, borderRadius:"50%", background:T.rpaDark }} />
-            {autoVerifications.length} phone calls avoided
+          <div style={{ fontSize:12, color:T.text, fontWeight:700, marginTop:4 }}>
+            ~12 min saved per auto-verification
           </div>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <div style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:12, padding: "16px 20px", gridColumn: "1 / -1" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16 }}>
-             <div style={{ color:T.text, fontSize:14, fontWeight:900 }}>Revenue Generation (Cash vs. Insurance)</div>
-             <div style={{ display: "flex", gap: 12 }}>
-               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: T.textMid }}>
-                 <span style={{ width: 10, height: 10, borderRadius: 2, background: T.indigo }} /> Insurance Payout
-               </div>
-               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: T.textMid }}>
-                 <span style={{ width: 10, height: 10, borderRadius: 2, background: T.lime }} /> Cash / Out-of-Pocket
-               </div>
-             </div>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "flex-end", height: 180, gap: 20, paddingTop: 10, borderBottom: "1px solid " + T.borderStrong }}>
-            {HISTORICAL_REV.map((d, i) => {
-               const maxH = 80000;
-               const insPct = (d.ins / maxH) * 100;
-               const cashPct = (d.cash / maxH) * 100;
-               const isSelected = selectedMonthIdx === i;
-
-               return (
-                 <div key={i} onClick={() => setSelectedMonthIdx(i)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%", gap: 6, cursor: "pointer", opacity: isSelected ? 1 : 0.4, transition: "0.2s", transform: isSelected ? "scale(1.02)" : "scale(1)" }}>
-                    <div style={{ color: isSelected ? T.text : T.textSoft, fontSize: 10, fontWeight: 800 }}>${((d.ins+d.cash)/1000).toFixed(1)}k</div>
-                    <div style={{ width: "100%", maxWidth: 60, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%" }}>
-                       <div style={{ height: `${cashPct}%`, background: T.lime, borderRadius: "4px 4px 0 0", borderBottom: "2px solid white" }} title={`Cash: $${d.cash}`} />
-                       <div style={{ height: `${insPct}%`, background: T.indigo, borderRadius: "0 0 0 0" }} title={`Insurance: $${d.ins}`} />
-                    </div>
-                 </div>
-               )
-            })}
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 20, marginTop: 8 }}>
-            {HISTORICAL_REV.map((d, i) => (
-               <div key={i} style={{ flex: 1, textAlign: "center", color: selectedMonthIdx === i ? T.text : T.textSoft, fontSize: 11, fontWeight: 800 }}>{d.month}</div>
-            ))}
+      {/* Revenue chart */}
+      <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:16 }}>
+          <div style={{ color:T.text, fontSize:14, fontWeight:900 }}>Revenue Generation — Cash vs. Insurance</div>
+          <div style={{ display:"flex", gap:12 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, fontWeight:700, color:T.textMid }}>
+              <span style={{ width:10, height:10, borderRadius:2, background:T.indigo }} /> Insurance
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, fontWeight:700, color:T.textMid }}>
+              <span style={{ width:10, height:10, borderRadius:2, background:T.lime }} /> Cash / OOP
+            </div>
           </div>
         </div>
 
-        <div style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:12, padding: "16px 20px" }}>
+        <div style={{ display:"flex", alignItems:"flex-end", height:200, gap:12, paddingTop:10, borderBottom:"1px solid "+T.borderStrong }}>
+          {HISTORICAL_REV.map((d, i) => {
+            const maxH = 80000;
+            const insPct  = (d.ins  / maxH) * 100;
+            const cashPct = (d.cash / maxH) * 100;
+            const isSelected = selectedMonthIdx === i;
+            const isHovered  = hoveredBarIdx === i;
+            return (
+              <div key={i}
+                onClick={() => setSelectedMonthIdx(i)}
+                onMouseEnter={() => setHoveredBarIdx(i)}
+                onMouseLeave={() => setHoveredBarIdx(null)}
+                style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center",
+                  justifyContent:"flex-end", height:"100%", gap:6, cursor:"pointer",
+                  transition:"all 0.2s",
+                  transform: isSelected ? "translateY(-6px) scale(1.04)" : isHovered ? "translateY(-3px)" : "none",
+                  opacity: isSelected ? 1 : isHovered ? 0.85 : 0.55 }}>
+                <div style={{ color: isSelected ? T.text : T.textSoft, fontSize:10, fontWeight:800, transition:"0.2s" }}>
+                  ${((d.ins+d.cash)/1000).toFixed(1)}k
+                </div>
+                <div style={{ width:"100%", maxWidth:52, display:"flex", flexDirection:"column", justifyContent:"flex-end", height:"100%",
+                  borderRadius: isSelected||isHovered ? "6px 6px 0 0" : "4px 4px 0 0",
+                  overflow:"hidden", boxShadow: isSelected ? "0 -4px 12px rgba(99,102,241,0.3)" : "none", transition:"all 0.2s" }}>
+                  <div style={{ height:`${cashPct}%`, background:T.lime, borderBottom:"2px solid white" }} />
+                  <div style={{ height:`${insPct}%`, background:T.indigo }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display:"flex", alignItems:"flex-start", gap:12, marginTop:8 }}>
+          {HISTORICAL_REV.map((d, i) => (
+            <div key={i} style={{ flex:1, textAlign:"center", fontSize:11, fontWeight:800,
+              color: selectedMonthIdx===i ? T.indigoDark : T.textSoft, transition:"0.2s",
+              cursor:"pointer" }} onClick={() => setSelectedMonthIdx(i)}>
+              {d.month}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom grid */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+        <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px" }}>
           <div style={{ color:T.text, fontSize:14, fontWeight:900, marginBottom:16 }}>Carrier Payout Rates ({currentMonthData.month})</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
             {CARRIER_KPIS.map((carrier, idx) => {
               const rating = getRating(carrier.r);
               return (
-                <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 10, borderBottom: idx < 4 ? "1px solid " + T.border : "none" }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: T.text }}>{carrier.n}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                     <span style={{ fontSize: 14, fontWeight: 900, color: rating.c }}>{carrier.r}%</span>
-                     <Badge label={rating.l} color={rating.c} bg={rating.bg} border={rating.border} />
+                <div key={idx} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", paddingBottom:10, borderBottom:idx<4?"1px solid "+T.border:"none" }}>
+                  <span style={{ fontSize:13, fontWeight:800, color:T.text }}>{carrier.n}</span>
+                  <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                    <span style={{ fontSize:14, fontWeight:900, color:rating.c }}>{carrier.r}%</span>
+                    <Badge label={rating.l} color={rating.c} bg={rating.bg} border={rating.border} />
                   </div>
                 </div>
-              )
+              );
             })}
           </div>
         </div>
 
-        <div style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:12, padding: "16px 20px" }}>
+        <div style={{ background:T.bgCard, border:"1px solid "+T.border, borderRadius:12, padding:"16px 20px" }}>
           <div style={{ color:T.text, fontSize:14, fontWeight:900, marginBottom:16 }}>Top Denial Risks Caught</div>
           {sortedFlags.length === 0 ? (
             <div style={{ textAlign:"center", padding:"30px 0", color:T.textSoft, fontSize:12, fontWeight:600 }}>No flags detected yet.</div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
               {sortedFlags.map(([flagName, count], idx) => {
                 const max = sortedFlags[0][1];
-                const pctOfMax = (count / max) * 100;
                 return (
                   <div key={idx}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700, color: T.textMid, marginBottom: 4 }}>
-                      <span>{flagName}</span>
-                      <span>{count}</span>
+                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, fontWeight:700, color:T.textMid, marginBottom:4 }}>
+                      <span>{flagName}</span><span>{count}</span>
                     </div>
-                    <div style={{ height: 8, width: "100%", background: T.amberLight, borderRadius: 4, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${pctOfMax}%`, background: T.amber, borderRadius: 4 }} />
+                    <div style={{ height:8, width:"100%", background:T.amberLight, borderRadius:4, overflow:"hidden" }}>
+                      <div style={{ height:"100%", width:`${(count/max)*100}%`, background:T.amber, borderRadius:4 }} />
                     </div>
                   </div>
-                )
+                );
               })}
             </div>
           )}
         </div>
       </div>
+
+      {/* ── Revenue Breakdown Modal ──────────────────────────────────────────── */}
+      {showRevenueModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:9999,
+          display:"flex", alignItems:"center", justifyContent:"center" }}
+          onClick={() => setShowRevenueModal(false)}>
+          <div style={{ background:T.bgCard, width:"90%", maxWidth:580, borderRadius:16,
+            overflow:"hidden", maxHeight:"88vh", display:"flex", flexDirection:"column" }}
+            onClick={e => e.stopPropagation()}>
+
+            {/* Modal header */}
+            <div style={{ padding:"20px 24px", borderBottom:"1px solid "+T.border, background:T.indigoDark, color:"white",
+              display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ fontSize:18, fontWeight:900 }}>{currentMonthData.month} Revenue Breakdown</div>
+                <div style={{ fontSize:12, opacity:0.75, marginTop:2 }}>Total: {wholeDollars(monthlyTotalRev)}</div>
+              </div>
+              <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                <button onClick={handleExport}
+                        style={{ padding:"7px 14px", borderRadius:7, border:"1px solid rgba(255,255,255,0.3)", background:"rgba(255,255,255,0.15)", color:"white", fontWeight:800, fontSize:11, cursor:"pointer" }}>
+                  ⬇ Export CSV
+                </button>
+                <button onClick={() => setShowRevenueModal(false)}
+                        style={{ background:"transparent", border:"none", color:"white", fontSize:24, cursor:"pointer", lineHeight:1 }}>&times;</button>
+              </div>
+            </div>
+
+            <div style={{ flex:1, overflowY:"auto", padding:24, display:"flex", flexDirection:"column", gap:24 }}>
+
+              {/* By procedure */}
+              <div>
+                <div style={{ fontSize:13, fontWeight:900, color:T.text, marginBottom:12 }}>Revenue by Procedure Type</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                  {currentMonthData.procedures.map((p, i) => {
+                    const pct = Math.round((p.rev / monthlyTotalRev) * 100);
+                    return (
+                      <div key={i}>
+                        <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, fontWeight:700, color:T.textMid, marginBottom:5 }}>
+                          <span>{p.name}</span>
+                          <span style={{ color:T.text, fontWeight:900 }}>{wholeDollars(p.rev)} <span style={{ color:T.textSoft, fontWeight:600 }}>({pct}%)</span></span>
+                        </div>
+                        <div style={{ height:10, background:T.indigoLight, borderRadius:5, overflow:"hidden" }}>
+                          <div style={{ height:"100%", width:`${pct}%`, background:T.indigoDark, borderRadius:5, transition:"width 0.4s" }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* By insurance */}
+              <div>
+                <div style={{ fontSize:13, fontWeight:900, color:T.text, marginBottom:12 }}>Revenue by Insurance / Payer</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                  {currentMonthData.byInsurance.map((b, i) => {
+                    const pct = Math.round((b.rev / monthlyTotalRev) * 100);
+                    const barColor = b.name === "Cash" ? T.lime : T.indigo;
+                    const barBg    = b.name === "Cash" ? T.limeLight : T.indigoLight;
+                    return (
+                      <div key={i}>
+                        <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, fontWeight:700, color:T.textMid, marginBottom:5 }}>
+                          <span>{b.name}</span>
+                          <span style={{ color:T.text, fontWeight:900 }}>{wholeDollars(b.rev)} <span style={{ color:T.textSoft, fontWeight:600 }}>({pct}%)</span></span>
+                        </div>
+                        <div style={{ height:10, background:barBg, borderRadius:5, overflow:"hidden" }}>
+                          <div style={{ height:"100%", width:`${pct}%`, background:barColor, borderRadius:5, transition:"width 0.4s" }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Summary table */}
+              <div style={{ background:T.bg, borderRadius:10, border:"1px solid "+T.border, overflow:"hidden" }}>
+                {[
+                  { label:"Insurance Total",   val:wholeDollars(currentMonthData.ins),  color:T.indigo   },
+                  { label:"Cash / OOP Total",  val:wholeDollars(currentMonthData.cash), color:T.limeDark },
+                  { label:"Total Revenue",     val:wholeDollars(monthlyTotalRev),        color:T.text, bold:true },
+                  { label:"Verifications Run", val:currentMonthData.verifs,              color:T.textMid  },
+                ].map((row, i, arr) => (
+                  <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"10px 16px",
+                    borderBottom: i<arr.length-1 ? "1px solid "+T.border : "none",
+                    background: row.bold ? T.indigoLight : "transparent" }}>
+                    <span style={{ fontSize:12, fontWeight:700, color:T.textMid }}>{row.label}</span>
+                    <span style={{ fontSize:13, fontWeight:row.bold?900:700, color:row.color }}>{row.val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3999,6 +4215,9 @@ export default function LevelAI() {
   const pendingCount  = patients.filter(p => !results[p.id] || isLoading(p.id)).length;
   const autoCount     = agentLog.filter(e => e.trigger !== "manual" && e.action === ACTION.VERIFIED).length;
   const rpaCount      = agentLog.filter(e => e.rpaEscalated).length;
+  // List of patients that were auto-verified (for AutoVerifiedPanel)
+  const autoVerifiedPatientIds = new Set(agentLog.filter(e => e.trigger !== "manual" && e.action === ACTION.VERIFIED).map(e => e.patientId));
+  const autoVerifiedList = patients.filter(p => autoVerifiedPatientIds.has(p.id));
 
   const COLS = [
     { key:"action_required", label:"Action Required", color:T.amber,   bg:T.amberLight, border:T.amberBorder, filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.ACTION_REQUIRED },
@@ -4250,8 +4469,9 @@ export default function LevelAI() {
                 notifyCount={notifyList.length}
                 botCount={autoCount}
                 rpaCount={rpaCount}
-                onOpenAlerts={() => setSchedulePanel("alerts")}
-                onOpenNotify={() => setSchedulePanel("outreach")}
+                onOpenAlerts={() => { setSchedulePanel("alerts"); setPrevPanel(null); }}
+                onOpenNotify={() => { setSchedulePanel("outreach"); setPrevPanel(null); }}
+                onOpenAutoVerified={() => { setSchedulePanel("autoverified"); setPrevPanel(null); }}
               />
 
               {/* Kanban: skeleton while loading, real cards when ready */}
@@ -4301,7 +4521,7 @@ export default function LevelAI() {
                   phaseInfo={selected ? phases[selected.id] : null} onVerify={verify}
                   triage={selected ? triageMap[selected.id] : null} showToast={showToast}
                   onBack={prevPanel ? () => { setSchedulePanel(prevPanel); setPrevPanel(null); } : null}
-                  backLabel={prevPanel === "alerts" ? "Back to Needs Attention" : prevPanel === "outreach" ? "Back to Outreach" : null} />
+                  backLabel={prevPanel === "alerts" ? "Back to Needs Attention" : prevPanel === "outreach" ? "Back to Outreach" : prevPanel === "autoverified" ? "Back to Auto-Verified" : null} />
               )}
               {schedulePanel === "alerts" && (
                 <AlertsPanel list={blockedList} agentLog={agentLog}
@@ -4316,6 +4536,13 @@ export default function LevelAI() {
                   onClose={() => setSchedulePanel("benefits")}
                   onSelect={(p) => { setSelected(p); setPrevPanel("outreach"); setSchedulePanel("benefits"); }}
                   showToast={showToast} />
+              )}
+              {schedulePanel === "autoverified" && (
+                <AutoVerifiedPanel
+                  list={autoVerifiedList}
+                  onClose={() => setSchedulePanel("benefits")}
+                  onSelect={(p) => { setSelected(p); setPrevPanel("autoverified"); setSchedulePanel("benefits"); }}
+                />
               )}
             </div>
           </div>
