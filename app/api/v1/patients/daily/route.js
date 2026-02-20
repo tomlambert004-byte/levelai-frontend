@@ -3,10 +3,10 @@
  *
  * Priority:
  *   1. Postgres — query Patient rows for this practice + date (from OD sync or CSV import)
- *   2. Open Dental API — pull directly from OD demo if DB is empty / unavailable
- *   3. Fixture fallback — hardcoded demo schedule (last resort if OD API also fails)
+ *   2. Demo mode — merge fixture roster + Open Dental API results for a rich schedule
+ *      (fixtures always included; OD patients layered on top, deduplicated by name)
  *
- * Auth: Clerk userId → Practice.id lookup. Unauthenticated or practice-less → OD / fixture.
+ * Auth: Clerk userId → Practice.id lookup. Unauthenticated or practice-less → demo mode.
  */
 
 import { auth } from "@clerk/nextjs/server";
@@ -154,17 +154,34 @@ export async function GET(request) {
     }
   }
 
-  // ── 2. Try Open Dental API directly — no DB required ──
+  // ── 2. Merge Open Dental API results + Fixtures for a rich demo ──────────
+  // In demo mode the OD API may return only 1-2 patients from its date remap.
+  // We always include the fixture roster and layer OD results on top so the
+  // schedule is never sparse.  In production (Postgres path above), this is
+  // never reached — it exits at tier 1.
+  const fixtures = fixtureForDate(date);
+
+  let odResults = [];
   try {
-    const odResults = await odDirectForDate(date);
-    if (odResults.length > 0) {
-      return Response.json(odResults);
-    }
-    // OD returned 0 patients for this date — fall through to fixture
+    odResults = await odDirectForDate(date);
   } catch (odErr) {
-    console.warn("[daily] OD API direct call failed, falling to fixture:", odErr.message);
+    console.warn("[daily] OD API direct call failed, using fixtures only:", odErr.message);
   }
 
-  // ── 3. Fixture fallback — demo mode, always works ──
-  return Response.json(fixtureForDate(date));
+  // Merge: fixture patients first, then any OD patients whose name isn't
+  // already in the fixture set (avoids duplicates).
+  const fixtureNames = new Set(fixtures.map(p => p.name.toLowerCase()));
+  const merged = [
+    ...fixtures,
+    ...odResults.filter(p => !fixtureNames.has(p.name.toLowerCase())),
+  ];
+
+  // Sort by appointment time
+  merged.sort((a, b) => {
+    const ta = parseTime(a.appointmentTime || "12:00 PM");
+    const tb = parseTime(b.appointmentTime || "12:00 PM");
+    return (ta.hours * 60 + ta.minutes) - (tb.hours * 60 + tb.minutes);
+  });
+
+  return Response.json(merged);
 }
