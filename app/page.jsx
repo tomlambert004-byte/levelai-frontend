@@ -1991,6 +1991,7 @@ function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, onOpenAl
 
 function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, isRPA, onSelect, colColor }) {
   const loading = phaseInfo && phaseInfo.phase !== "complete" && phaseInfo.phase !== "error";
+  const isOON = patient.isOON || result?.in_network === false || result?.oon_estimate != null;
   return (
     <div onClick={onSelect}
       style={{ background:T.bgCard, borderRadius:10, padding:"12px 13px", cursor:"pointer", border:"1.5px solid " + (isSelected?colColor:T.border), boxShadow:isSelected?"0 0 0 3px "+colColor+"22":"0 1px 3px rgba(0,0,0,0.04)", transition:"all 0.15s", display: "flex", flexDirection: "column" }}
@@ -1998,6 +1999,7 @@ function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, i
       onMouseLeave={e=>{ if(!isSelected){ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"; }}}>
       <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:5, flexWrap:"wrap" }}>
         <span style={{ color:T.text, fontSize:13, fontWeight:800, flex:1 }}>{patient.name}</span>
+        {isOON  && <Badge label="OON"  color="#9a3412" bg="#fff7ed" border="#fed7aa" />}
         {isAuto && <Badge label="AUTO" color={T.indigo} bg={T.indigoLight} border={T.indigoBorder} icon="Bot" />}
         {isRPA  && <Badge label="RPA"  color={T.rpaDark} bg={T.rpaLight}   border={T.rpaBorder}   icon="Bot" />}
       </div>
@@ -2287,59 +2289,29 @@ function CalendarView({ patients, results, triageMap, onSelectDay, currentDayLoc
 
 // ── Week Ahead ────────────────────────────────────────────────────────────────
 function WeekAhead({ patients, results, triageMap, agentLog, showToast, onSelectPatient, onVerify }) {
-  const [expandedId, setExpandedId] = useState(null);
+  const [modalCategory, setModalCategory] = useState(null);
+  const [focusedPatient, setFocusedPatient] = useState(null);
 
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
 
-  // All upcoming patients (today + future), sorted by date then time
-  const allUpcoming = patients
-    .filter(p => p.appointmentDate >= todayStr)
-    .sort((a, b) => {
-      const cmp = a.appointmentDate.localeCompare(b.appointmentDate);
-      return cmp !== 0 ? cmp : (a.appointmentTime || "").localeCompare(b.appointmentTime || "");
-    });
+  const allUpcoming = patients.filter(p => p.appointmentDate >= todayStr);
 
-  // Verification status helpers
   const isVerified = (id) => results[id]?.verification_status === "active";
-  const isInactive = (id) => results[id]?.verification_status === "inactive";
   const isPending  = (id) => !results[id];
 
   const critical = allUpcoming.filter(p => { const t = triageMap[p.id]; return t && t.block.length > 0; });
   const headsUp  = allUpcoming.filter(p => { const t = triageMap[p.id]; return t && t.block.length === 0 && t.notify.length > 0; });
+  const clear    = allUpcoming.filter(p => { const t = triageMap[p.id]; return !t || (t.block.length === 0 && t.notify.length === 0); });
 
-  // Group patients by date for section headers
-  const byDate = allUpcoming.reduce((acc, p) => {
-    if (!acc[p.appointmentDate]) acc[p.appointmentDate] = [];
-    acc[p.appointmentDate].push(p);
-    return acc;
-  }, {});
-
-  const formatDateLabel = (dateStr) => {
-    const d = new Date(dateStr + "T12:00:00");
-    if (dateStr === todayStr) return "Today";
-    const diff = Math.round((d - today) / (1000 * 60 * 60 * 24));
-    if (diff === 1) return "Tomorrow";
-    return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  const categoryPatients = { critical, headsUp, clear };
+  const categoryConfig = {
+    critical: { label: "Critical",  color: T.red,      bg: T.redLight,   border: T.redBorder,   count: critical.length },
+    headsUp:  { label: "Heads Up",  color: T.amberDark,bg: T.amberLight, border: T.amberBorder, count: headsUp.length  },
+    clear:    { label: "Clear",     color: T.limeDark, bg: T.limeLight,  border: T.limeBorder,  count: clear.length    },
   };
 
-  const getStatusChip = (p) => {
-    const t = triageMap[p.id];
-    if (t && t.block.length > 0)   return { label: "⚠ Issue", color: T.red,      bg: T.redLight,   border: T.redBorder };
-    if (t && t.notify.length > 0)  return { label: "! Flag",  color: T.amberDark, bg: T.amberLight, border: T.amberBorder };
-    if (isVerified(p.id))          return { label: "✓ Clear",  color: T.limeDark,  bg: T.limeLight,  border: T.limeBorder };
-    if (isInactive(p.id))          return { label: "Inactive", color: T.red,      bg: T.redLight,   border: T.redBorder };
-    return { label: "Pending",     color: T.slate,    bg: T.slateLight,  border: T.border };
-  };
-
-  const hoursLabel = (p) => {
-    const h = p.hoursUntil;
-    if (h == null) return "";
-    if (h < 0) return "Passed";
-    if (h < 1) return "< 1 hr";
-    if (h < 24) return `${Math.round(h)}h away`;
-    return `${Math.round(h / 24)}d away`;
-  };
+  const closeModal = () => { setModalCategory(null); setFocusedPatient(null); };
 
   return (
     <div style={{ padding: 24, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -2352,120 +2324,116 @@ function WeekAhead({ patients, results, triageMap, agentLog, showToast, onSelect
         </div>
       </div>
 
-      {/* Summary Pills */}
+      {/* Summary pills — text only, no icons */}
       {allUpcoming.length > 0 && (
-        <div style={{ display: "flex", gap: 10, marginBottom: 18, flexShrink: 0, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 20, flexShrink: 0, flexWrap: "wrap" }}>
           {critical.length > 0 && (
-            <div style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 14px",
-              borderRadius:20, background:T.redLight, border:"1px solid "+T.redBorder,
-              fontSize:12, fontWeight:800, color:T.red }}>
-              ⚠ {critical.length} Critical
+            <div style={{ padding:"5px 14px", borderRadius:20, background:T.redLight,
+              border:"1px solid "+T.redBorder, fontSize:12, fontWeight:800, color:T.red }}>
+              {critical.length} Critical
             </div>
           )}
           {headsUp.length > 0 && (
-            <div style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 14px",
-              borderRadius:20, background:T.amberLight, border:"1px solid "+T.amberBorder,
-              fontSize:12, fontWeight:800, color:T.amberDark }}>
-              ! {headsUp.length} Heads Up
+            <div style={{ padding:"5px 14px", borderRadius:20, background:T.amberLight,
+              border:"1px solid "+T.amberBorder, fontSize:12, fontWeight:800, color:T.amberDark }}>
+              {headsUp.length} Heads Up
             </div>
           )}
-          <div style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 14px",
-            borderRadius:20, background:T.limeLight, border:"1px solid "+T.limeBorder,
-            fontSize:12, fontWeight:800, color:T.limeDark }}>
-            ✓ {allUpcoming.filter(p => isVerified(p.id) && !triageMap[p.id]?.block.length).length} Verified
+          <div style={{ padding:"5px 14px", borderRadius:20, background:T.limeLight,
+            border:"1px solid "+T.limeBorder, fontSize:12, fontWeight:800, color:T.limeDark }}>
+            {allUpcoming.filter(p => isVerified(p.id) && !triageMap[p.id]?.block.length).length} Verified
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:6, padding:"6px 14px",
-            borderRadius:20, background:T.slateLight, border:"1px solid "+T.border,
-            fontSize:12, fontWeight:800, color:T.slate }}>
-            ◌ {allUpcoming.filter(p => isPending(p.id)).length} Pending Verification
+          <div style={{ padding:"5px 14px", borderRadius:20, background:T.slateLight,
+            border:"1px solid "+T.border, fontSize:12, fontWeight:800, color:T.slate }}>
+            {allUpcoming.filter(p => isPending(p.id)).length} Pending
           </div>
         </div>
       )}
 
-      {/* Appointment Queue — grouped by date */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
-        {allUpcoming.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px 0", color: T.textSoft }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
-            <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>No upcoming appointments</div>
-            <div style={{ fontSize: 13 }}>Appointments within the next 7 days will appear here.</div>
-          </div>
-        ) : (
-          Object.entries(byDate).map(([dateStr, pts]) => (
-            <div key={dateStr} style={{ marginBottom: 20 }}>
-              {/* Date section header */}
-              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
-                <div style={{ fontSize:12, fontWeight:900, color:dateStr === todayStr ? T.indigoDark : T.textMid,
-                  textTransform:"uppercase", letterSpacing:"0.06em" }}>
-                  {formatDateLabel(dateStr)}
-                </div>
-                <div style={{ flex:1, height:1, background:T.border }} />
-                <div style={{ fontSize:11, color:T.textSoft }}>{pts.length} pt{pts.length !== 1?"s":""}</div>
+      {/* 3 Dynamic Category Boxes */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, flex: 1, minHeight: 0 }}>
+        {["critical", "headsUp", "clear"].map(cat => {
+          const cfg = categoryConfig[cat];
+          return (
+            <div key={cat} onClick={() => setModalCategory(cat)}
+              style={{ background: cfg.bg, border: `2px solid ${cfg.border}`, borderRadius: 16,
+                padding: 24, cursor: "pointer", display: "flex", flexDirection: "column",
+                justifyContent: "center", alignItems: "center", transition: "all 0.2s",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.04)" }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 12px 24px rgba(0,0,0,0.08)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.04)"; }}>
+              <div style={{ fontSize: 48, fontWeight: 900, color: cfg.color, marginBottom: 8 }}>
+                {cfg.count}
               </div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: cfg.color }}>
+                {cfg.label}
+              </div>
+              <div style={{ fontSize: 12, color: T.textSoft, marginTop: 8 }}>
+                {cfg.count} patient{cfg.count !== 1 ? "s" : ""}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-              {/* Patient rows for this date */}
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                {pts.map(p => {
-                  const chip = getStatusChip(p);
-                  const t    = triageMap[p.id];
-                  const reasons = t ? [...t.block, ...t.notify] : [];
-                  const isOpen = expandedId === p.id + "_" + dateStr;
-                  const autoVerified = agentLog.some(e => e.patientId === p.id && e.trigger !== "manual");
+      {/* Modal */}
+      {modalCategory && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999,
+          display: "flex", alignItems: "center", justifyContent: "center" }} onClick={closeModal}>
+          <div style={{ background: T.bgCard, width: "90%", maxWidth: 620, borderRadius: 16,
+            overflow: "hidden", maxHeight: "88vh", display: "flex", flexDirection: "column" }}
+            onClick={e => e.stopPropagation()}>
 
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid " + T.border,
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              background: categoryConfig[modalCategory].bg }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: categoryConfig[modalCategory].color }}>
+                {categoryConfig[modalCategory].label} Patients
+              </div>
+              <button onClick={closeModal}
+                style={{ fontSize: 24, color: T.textSoft, background: "none", border: "none", cursor: "pointer" }}>✕</button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 12 }}>
+              {categoryPatients[modalCategory].length === 0 ? (
+                <div style={{ textAlign: "center", color: T.textSoft, padding: 40 }}>No patients in this category.</div>
+              ) : (
+                categoryPatients[modalCategory].map(p => {
+                  const t = triageMap[p.id];
+                  const reasons = t ? (t.block.length > 0 ? t.block : t.notify) : [];
+                  const isOpen = focusedPatient?.id === p.id;
                   return (
-                    <div key={p.id + dateStr}
-                      style={{ border:"1px solid "+(isOpen ? T.indigo : chip.border), borderRadius:12,
-                        background: isOpen ? T.indigoLight : T.bgCard, transition:"0.15s",
-                        boxShadow: isOpen ? "0 0 0 2px "+T.indigoBorder : "0 1px 3px rgba(0,0,0,0.04)" }}>
-
-                      {/* Row header — always visible */}
-                      <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", cursor:"pointer" }}
-                        onClick={() => setExpandedId(isOpen ? null : p.id + "_" + dateStr)}>
-
-                        {/* Time */}
-                        <div style={{ minWidth:58, fontSize:12, fontWeight:800, color:T.textMid, flexShrink:0 }}>
-                          {p.appointmentTime || "—"}
-                        </div>
-
-                        {/* Name + procedure */}
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontWeight:800, fontSize:14, color:T.text, display:"flex", alignItems:"center", gap:6 }}>
-                            {p.name}
-                            {autoVerified && <span style={{ fontSize:10, background:"#dbeafe", color:"#1d4ed8", padding:"2px 6px", borderRadius:4, fontWeight:800 }}>AI</span>}
-                          </div>
-                          <div style={{ fontSize:11, color:T.textSoft, marginTop:1, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                            {p.procedure} · {p.insurance}
+                    <div key={p.id}
+                      style={{ border: "1px solid " + (isOpen ? T.indigo : T.border), borderRadius: 12,
+                        padding: 16, cursor: "pointer", background: isOpen ? T.indigoLight : T.bg, transition: "0.15s" }}
+                      onClick={() => setFocusedPatient(isOpen ? null : p)}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontWeight: 800, fontSize: 16 }}>{p.name}</div>
+                          <div style={{ fontSize: 12, color: T.textMid, marginTop: 2 }}>
+                            {p.appointmentDate} · {p.appointmentTime} · {p.procedure}
                           </div>
                         </div>
-
-                        {/* Hours until */}
-                        <div style={{ fontSize:11, color:T.textSoft, flexShrink:0, minWidth:55, textAlign:"right" }}>
-                          {hoursLabel(p)}
+                        <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                          <div style={{ fontSize: 11, color: T.textSoft }}>{p.insurance}</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: T.indigoDark }}>
+                            {isOpen ? "▲ Hide details" : "▼ View details"}
+                          </div>
                         </div>
-
-                        {/* Status chip */}
-                        <div style={{ padding:"3px 10px", borderRadius:10, fontSize:11, fontWeight:800,
-                          color:chip.color, background:chip.bg, border:"1px solid "+chip.border, flexShrink:0 }}>
-                          {chip.label}
-                        </div>
-
-                        {/* Expand chevron */}
-                        <div style={{ fontSize:11, color:T.textSoft, flexShrink:0 }}>{isOpen ? "▲" : "▼"}</div>
                       </div>
 
-                      {/* Expanded panel */}
+                      {reasons.length > 0 && (
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: T.textSoft, marginBottom: 6 }}>WHY THEY ARE HERE</div>
+                          {reasons.map((r, i) => (
+                            <div key={i} style={{ fontSize: 12, color: T.textMid, padding: "4px 0" }}>• {r}</div>
+                          ))}
+                        </div>
+                      )}
+
                       {isOpen && (
-                        <div style={{ borderTop:"1px solid "+T.indigoBorder, padding:"14px 14px" }}
+                        <div style={{ marginTop: 14, borderTop: "1px solid " + T.indigoBorder, paddingTop: 14 }}
                           onClick={e => e.stopPropagation()}>
-                          {reasons.length > 0 && (
-                            <div style={{ marginBottom:12 }}>
-                              {reasons.map((r, i) => (
-                                <div key={i} style={{ fontSize:12, color:T.red, padding:"3px 0", display:"flex", alignItems:"flex-start", gap:5 }}>
-                                  <span>⚠</span><span>{r}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
                           <BenefitsPanel
                             patient={p}
                             result={results?.[p.id] || null}
@@ -2474,23 +2442,22 @@ function WeekAhead({ patients, results, triageMap, agentLog, showToast, onSelect
                             triage={triageMap?.[p.id] || null}
                             showToast={showToast}
                           />
-                          <button
-                            onClick={() => onSelectPatient(p)}
-                            style={{ marginTop:10, width:"100%", padding:"9px", borderRadius:8,
-                              border:"1px solid "+T.indigoBorder, background:T.indigoLight,
-                              color:T.indigoDark, fontWeight:800, fontSize:12, cursor:"pointer" }}>
+                          <button onClick={() => { onSelectPatient(p); closeModal(); }}
+                            style={{ marginTop: 12, width: "100%", padding: "10px", borderRadius: 8,
+                              border: "1px solid " + T.indigoBorder, background: T.indigoLight,
+                              color: T.indigoDark, fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
                             Open in Daily Schedule →
                           </button>
                         </div>
                       )}
                     </div>
                   );
-                })}
-              </div>
+                })
+              )}
             </div>
-          ))
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
