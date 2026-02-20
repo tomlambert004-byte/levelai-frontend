@@ -5076,17 +5076,25 @@ export default function LevelAI() {
     setAgentLog(log => [...newEntries.reverse(), ...log]);
   }, [isLoading, setPhase, showToast]);
 
-  // ── Auto-verify: fires for 24h and 7d windows once patients load ─────────────
+  // ── Auto-verify: fires on schedule load for today, 24h, and 7d windows ───────
   useEffect(() => {
+    const todayISO = new Date().toISOString().split("T")[0];
     patients.forEach((patient, idx) => {
       const h = patient.hoursUntil;
       if (h == null) return;
-      const in24h = h <= 24 && h > 0;
-      const in7d  = h <= 168 && h > 24;
+
+      // Today's patients always auto-verify (even if appointment time has passed)
+      const isToday = patient.appointmentDate === todayISO;
+      const in24h   = h <= 24 && h > 0;
+      const in7d    = h <= 168 && h > 24;
 
       // Medicaid patients get immediate verification regardless of time window
       const isMedicaid = isMedicaidPatient(patient);
-      const trigger = isMedicaid ? "medicaid_auto" : in24h ? "24h_auto" : in7d ? "7d_auto" : null;
+      const trigger = isMedicaid ? "medicaid_auto"
+        : isToday ? "24h_auto"
+        : in24h   ? "24h_auto"
+        : in7d    ? "7d_auto"
+        : null;
       if (!trigger) return;
 
       // Include appointmentDate in key so the same patient on different days
@@ -5095,7 +5103,7 @@ export default function LevelAI() {
       if (autoQueued.current.has(key)) return;
       autoQueued.current.add(key);
       // Medicaid patients verify with tighter stagger (immediate priority)
-      const delay = isMedicaid ? (300 + idx * 200) : (in24h ? 600 : 1200) + Math.random() * 400;
+      const delay = isMedicaid ? (300 + idx * 200) : (in24h || isToday ? 600 : 1200) + Math.random() * 400;
       setTimeout(() => verify(patient, trigger), delay);
     });
   }, [patients, verify]);
