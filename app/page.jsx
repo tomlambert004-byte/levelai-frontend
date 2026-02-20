@@ -3721,15 +3721,18 @@ function Settings({ showToast }) {
         body: JSON.stringify({ date: new Date().toISOString().split("T")[0] }),
       });
       const data = await res.json();
+      // Treat as success if we got synced patients, even if the response
+      // includes a non-error message (e.g. "DB persistence skipped")
+      const hasError = data.error || (!res.ok && !data.synced);
       setSyncResult(data);
-      setSyncStatus(data.error ? "error" : "done");
+      setSyncStatus(hasError ? "error" : "done");
       if (data.synced > 0) {
-        showToast(`✅ Synced ${data.synced} patients from ${pmsSystem}`);
+        showToast(`✅ ${data.synced} patient${data.synced !== 1 ? "s" : ""} pulled from ${pmsSystem}`);
         // Refresh the schedule so the new OD data shows up immediately
         const todayStr = new Date().toISOString().split("T")[0];
         loadWeekSchedule(todayStr);
       }
-      else if (!data.error) showToast("No appointments found for today in Open Dental");
+      else if (!hasError) showToast("No appointments found for today in Open Dental");
     } catch (err) {
       setSyncResult({ error: err.message });
       setSyncStatus("error");
