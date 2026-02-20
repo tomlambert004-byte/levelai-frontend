@@ -4125,10 +4125,11 @@ function Settings({ showToast }) {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 15, fontWeight: 900, color: T.text }}>{pmsSystem}</div>
-                      <div style={{ fontSize: 12, color: T.textSoft, marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: T.limeDark, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.limeDark, display: "inline-block", animation: "pulse 2s infinite" }} />
                         {syncStatus === "done" && syncResult && !syncResult.error
-                          ? `Last synced: ${syncResult.synced} patients · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                          : "Pull today's schedule from Open Dental"}
+                          ? `Synced ${syncResult.synced} patients · Auto-sync every 3 min`
+                          : "Auto-sync active · Polling every 3 minutes"}
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -4774,6 +4775,29 @@ export default function LevelAI() {
     loadWeekSchedule(todayStr);
     loadCalendar(monthStr);
   }, [isMounted, loadWeekSchedule, loadCalendar]);
+
+  // ── Auto-sync: poll PMS every 3 minutes ────────────────────────────────────
+  // Keeps the schedule in sync with the PMS as appointments change throughout
+  // the day (cancellations, add-ons, reschedules, walk-ins).
+  const lastSyncRef = useRef(null);
+  useEffect(() => {
+    if (!isMounted) return;
+    const SYNC_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
+
+    const runAutoSync = async () => {
+      const todayStr = new Date().toISOString().split("T")[0];
+      try {
+        // Silently refresh the schedule from the daily API (which pulls from OD)
+        await loadWeekSchedule(todayStr);
+        lastSyncRef.current = new Date();
+      } catch {
+        // Non-fatal — will retry on next interval
+      }
+    };
+
+    const intervalId = setInterval(runAutoSync, SYNC_INTERVAL_MS);
+    return () => clearInterval(intervalId);
+  }, [isMounted, loadWeekSchedule]);
 
   // ── Verify: calls real API — same phase logic, no setTimeout ────────────────
   const verify = useCallback(async (patient, trigger = "manual") => {
