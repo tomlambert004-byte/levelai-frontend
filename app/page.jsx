@@ -2,18 +2,47 @@
 export const dynamic = "force-dynamic";
 import { SignedIn, SignedOut, useAuth, useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
 import { useState, useCallback, useEffect, useRef } from "react";
-// Theme
-const T = {
-  bg:"#F5F5F0", bgCard:"#FFFFFF", border:"#E2E2DC", borderStrong:"#C8C8C0",
-  lime:"#84CC16", limeLight:"#F0FDF0", limeBorder:"#BBF7B0", limeDark:"#3F6212",
-  text:"#1A1A18", textMid:"#52525A", textSoft:"#A0A09A",
-  amber:"#D97706", amberLight:"#FFFBEB", amberBorder:"#FCD34D", amberDark:"#B45309",
-  red:"#DC2626", redLight:"#FEF2F2", redBorder:"#FECACA",
-  slate:"#64748B", slateLight:"#F8FAFC",
-  indigo:"#6366F1", indigoLight:"#EEF2FF", indigoBorder:"#C7D2FE",
-  indigoDark:"#4F46E5",
-  rpa:"#0EA5E9", rpaLight:"#F0F9FF", rpaBorder:"#BAE6FD", rpaDark:"#0369A1",
+// Theme — dual palettes for light/dark mode
+const themes = {
+  light: {
+    bg:"#F5F5F0", bgCard:"#FFFFFF", border:"#E2E2DC", borderStrong:"#C8C8C0",
+    lime:"#84CC16", limeLight:"#F0FDF0", limeBorder:"#BBF7B0", limeDark:"#3F6212",
+    text:"#1A1A18", textMid:"#52525A", textSoft:"#A0A09A",
+    amber:"#D97706", amberLight:"#FFFBEB", amberBorder:"#FCD34D", amberDark:"#B45309",
+    red:"#DC2626", redLight:"#FEF2F2", redBorder:"#FECACA",
+    slate:"#64748B", slateLight:"#F8FAFC",
+    indigo:"#6366F1", indigoLight:"#EEF2FF", indigoBorder:"#C7D2FE",
+    indigoDark:"#4F46E5",
+    rpa:"#0EA5E9", rpaLight:"#F0F9FF", rpaBorder:"#BAE6FD", rpaDark:"#0369A1",
+    shadow:"rgba(0,0,0,0.04)", shadowStrong:"rgba(0,0,0,0.08)",
+  },
+  dark: {
+    bg:"#0F0F17", bgCard:"#1A1A2E", border:"#2A2A3E", borderStrong:"#3A3A50",
+    lime:"#84CC16", limeLight:"#1A2E1A", limeBorder:"#2D5A1E", limeDark:"#A3E635",
+    text:"#F0F0F0", textMid:"#B0B0BA", textSoft:"#6A6A78",
+    amber:"#FBBF24", amberLight:"#2E2A1A", amberBorder:"#7C5B1A", amberDark:"#FCD34D",
+    red:"#EF4444", redLight:"#2E1A1A", redBorder:"#7C1A1A",
+    slate:"#94A3B8", slateLight:"#1E293B",
+    indigo:"#818CF8", indigoLight:"#1E1E3E", indigoBorder:"#4338CA",
+    indigoDark:"#A5B4FC",
+    rpa:"#38BDF8", rpaLight:"#1A2E3E", rpaBorder:"#0C4A6E", rpaDark:"#7DD3FC",
+    shadow:"rgba(0,0,0,0.3)", shadowStrong:"rgba(0,0,0,0.5)",
+  },
 };
+let T = themes.light;
+
+function useTheme() {
+  const [mode, setMode] = useState(() => {
+    if (typeof window === "undefined") return "light";
+    return localStorage.getItem("levelai_theme") || "light";
+  });
+  useEffect(() => {
+    localStorage.setItem("levelai_theme", mode);
+    document.documentElement.setAttribute("data-theme", mode);
+  }, [mode]);
+  const toggle = useCallback(() => setMode(p => p === "light" ? "dark" : "light"), []);
+  return { mode, toggle, T: themes[mode] };
+}
 
 const dollars = (c) => c != null ? "$" + (Number(c)/100).toLocaleString("en-US",{minimumFractionDigits:0}) : "--";
 const wholeDollars = (c) => c != null ? "$" + Math.round(Number(c)).toLocaleString("en-US") : "--";
@@ -253,7 +282,7 @@ function Skeleton({ w = "100%", h = 14, r = 6, style: extra = {} }) {
   return (
     <div style={{
       width: w, height: h, borderRadius: r, flexShrink: 0,
-      background: "linear-gradient(90deg,#EAEAE6 25%,#F4F4F0 50%,#EAEAE6 75%)",
+      background: `linear-gradient(90deg,${T.border} 25%,${T.bg} 50%,${T.border} 75%)`,
       backgroundSize: "400% 100%", animation: "skshimmer 1.5s ease infinite",
       ...extra,
     }} />
@@ -847,7 +876,7 @@ function OnboardingWizard({ onComplete, showToast }) {
 
       {/* ── Right white panel ── */}
       <div style={{
-        flex: 1, background: "white", overflowY: "auto",
+        flex: 1, background: T.bgCard, overflowY: "auto",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: "48px 64px",
       }}>
@@ -924,7 +953,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                     </label>
                     <select value={pmsSystem} onChange={e => setPmsSystem(e.target.value)}
                       style={{ padding:"13px 16px", border:"1px solid #c8c8c0", borderRadius:10, fontSize:14,
-                        outline:"none", cursor:"pointer", background:"white",
+                        outline:"none", cursor:"pointer", background:T.bgCard,
                         color: pmsSystem ? "#1a1a18" : "#a0a09a", fontFamily:"inherit" }}>
                       <option value="">Select your PMS…</option>
                       {PMS_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
@@ -957,7 +986,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                   <div style={{ display:"flex", gap:10 }}>
                     <button onClick={() => advance("profile")}
                       style={{ flex:"0 0 auto", padding:"15px 20px", borderRadius:10, border:"1px solid #e2e2dc",
-                        background:"white", color:"#52525a", fontWeight:700, cursor:"pointer", fontSize:14 }}>
+                        background:T.bgCard, color:T.textMid, fontWeight:700, cursor:"pointer", fontSize:14 }}>
                       ← Back
                     </button>
                     <div style={{ flex:1 }}>
@@ -1111,7 +1140,7 @@ function OnboardingWizard({ onComplete, showToast }) {
               <div style={{ display:"flex", gap:10 }}>
                 <button onClick={() => advance("pms")}
                   style={{ flex:"0 0 auto", padding:"15px 20px", borderRadius:10, border:"1px solid #e2e2dc",
-                    background:"white", color:"#52525a", fontWeight:700, cursor:"pointer", fontSize:14 }}>
+                    background:T.bgCard, color:T.textMid, fontWeight:700, cursor:"pointer", fontSize:14 }}>
                   ← Back
                 </button>
                 <div style={{ flex:1 }}>
@@ -1162,7 +1191,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                           setInvites(next);
                         }}
                         style={{ padding:"13px 12px", border:"1px solid #c8c8c0", borderRadius:10,
-                          fontSize:13, outline:"none", background:"white", fontFamily:"inherit",
+                          fontSize:13, outline:"none", background:T.bgCard, fontFamily:"inherit",
                           color:"#1a1a18", width:"100%", cursor:"pointer" }}>
                         <option>Front Desk</option>
                         <option>Biller</option>
@@ -1208,7 +1237,7 @@ function OnboardingWizard({ onComplete, showToast }) {
               <div style={{ display:"flex", gap:10 }}>
                 <button onClick={() => advance("rpa")}
                   style={{ flex:"0 0 auto", padding:"15px 20px", borderRadius:10, border:"1px solid #e2e2dc",
-                    background:"white", color:"#52525a", fontWeight:700, cursor:"pointer", fontSize:14 }}>
+                    background:T.bgCard, color:T.textMid, fontWeight:700, cursor:"pointer", fontSize:14 }}>
                   ← Back
                 </button>
                 <button
@@ -1549,7 +1578,7 @@ function PreauthWidget({ patient, result, triage, showToast }) {
           rows={14}
           style={{ width:"100%", padding:"10px 12px", border:"1px solid "+T.border, borderRadius:7,
             fontSize:11, lineHeight:1.7, color:T.text, fontFamily:"Georgia, serif",
-            background:"white", outline:"none", resize:"vertical", whiteSpace:"pre-wrap" }}
+            background:T.bgCard, outline:"none", resize:"vertical", whiteSpace:"pre-wrap" }}
         />
       </div>
 
@@ -1658,13 +1687,13 @@ function OONEstimatorWidget({ oon, patient, showToast }) {
 
         {/* ── Fee comparison row ── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <div style={{ background: "white", border: "1px solid #fed7aa", borderRadius: 8, padding: "10px 12px" }}>
+          <div style={{ background: T.bgCard, border: "1px solid " + T.amberBorder, borderRadius: 8, padding: "10px 12px" }}>
             <div style={{ fontSize: 10, fontWeight: 800, color: "#9a3412", textTransform: "uppercase",
               letterSpacing: "0.05em", marginBottom: 3 }}>Office Fee</div>
             <div style={{ fontSize: 20, fontWeight: 900, color: "#1c1917" }}>{officeFee}</div>
             <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>Billed charge</div>
           </div>
-          <div style={{ background: "white", border: "1px solid #fed7aa", borderRadius: 8, padding: "10px 12px" }}>
+          <div style={{ background: T.bgCard, border: "1px solid " + T.amberBorder, borderRadius: 8, padding: "10px 12px" }}>
             <div style={{ fontSize: 10, fontWeight: 800, color: "#9a3412", textTransform: "uppercase",
               letterSpacing: "0.05em", marginBottom: 3 }}>OON Allowable</div>
             <div style={{ fontSize: 20, fontWeight: 900, color: "#ea580c" }}>{allowable}</div>
@@ -1673,7 +1702,7 @@ function OONEstimatorWidget({ oon, patient, showToast }) {
         </div>
 
         {/* ── Math breakdown ── */}
-        <div style={{ background: "white", border: "1px solid #fed7aa", borderRadius: 10, padding: "12px 14px" }}>
+        <div style={{ background: T.bgCard, border: "1px solid " + T.amberBorder, borderRadius: 10, padding: "12px 14px" }}>
           <div style={{ fontSize: 11, fontWeight: 900, color: "#9a3412", marginBottom: 10,
             textTransform: "uppercase", letterSpacing: "0.05em" }}>
             📐 Financial Breakdown
@@ -1732,7 +1761,7 @@ function OONEstimatorWidget({ oon, patient, showToast }) {
         </button>
 
         {expanded && (
-          <div style={{ background: "white", border: "1px solid #fed7aa", borderRadius: 10,
+          <div style={{ background: T.bgCard, border: "1px solid " + T.amberBorder, borderRadius: 10,
             overflow: "hidden", animation: "fadeIn 0.2s ease-out" }}>
             {(oon.waterfall_steps || []).map((s, i) => (
               <div key={i} style={{ display: "flex", gap: 12, padding: "10px 14px",
@@ -1815,7 +1844,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
         </div>
         <div style={{ marginTop:8, display:"flex", gap:6, flexWrap:"wrap" }}>
           {isRPA && <Badge label="RPA Verified" color={T.rpaDark} bg={T.rpaLight} border={T.rpaBorder} icon="🤖" />}
-          {isOON && <Badge label="Out-of-Network" color="#9a3412" bg="#fff7ed" border="#fed7aa" icon="⚠" />}
+          {isOON && <Badge label="Out-of-Network" color={T.amberDark} bg={T.amberLight} border={T.amberBorder} icon="⚠" />}
         </div>
       </div>
 
@@ -2241,12 +2270,12 @@ function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, i
   const isOON = patient.isOON || result?.in_network === false || result?.oon_estimate != null;
   return (
     <div onClick={onSelect}
-      style={{ background:T.bgCard, borderRadius:10, padding:"12px 13px", cursor:"pointer", border:"1.5px solid " + (isSelected?colColor:T.border), boxShadow:isSelected?"0 0 0 3px "+colColor+"22":"0 1px 3px rgba(0,0,0,0.04)", transition:"all 0.15s", display: "flex", flexDirection: "column" }}
-      onMouseEnter={e=>{ if(!isSelected){ e.currentTarget.style.borderColor=colColor; e.currentTarget.style.boxShadow="0 0 0 3px "+colColor+"15"; }}}
-      onMouseLeave={e=>{ if(!isSelected){ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.boxShadow="0 1px 3px rgba(0,0,0,0.04)"; }}}>
+      style={{ background:T.bgCard, borderRadius:10, padding:"12px 13px", cursor:"pointer", border:"1.5px solid " + (isSelected?colColor:T.border), boxShadow:isSelected?"0 0 0 3px "+colColor+"22":"0 1px 3px "+T.shadow, transition:"all 0.15s", display: "flex", flexDirection: "column" }}
+      onMouseEnter={e=>{ if(!isSelected){ e.currentTarget.style.borderColor=colColor; e.currentTarget.style.boxShadow="0 4px 12px "+colColor+"20"; e.currentTarget.style.transform="translateY(-2px)"; }}}
+      onMouseLeave={e=>{ if(!isSelected){ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.boxShadow="0 1px 3px "+T.shadow; e.currentTarget.style.transform="translateY(0)"; }}}>
       <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:5, flexWrap:"wrap" }}>
         <span style={{ color:T.text, fontSize:13, fontWeight:800, flex:1 }}>{patient.name}</span>
-        {isOON  && <Badge label="OON"  color="#9a3412" bg="#fff7ed" border="#fed7aa" />}
+        {isOON  && <Badge label="OON"  color={T.amberDark} bg={T.amberLight} border={T.amberBorder} />}
         {isAuto && <Badge label="AUTO" color={T.indigo} bg={T.indigoLight} border={T.indigoBorder} icon="Bot" />}
         {isRPA  && <Badge label="RPA"  color={T.rpaDark} bg={T.rpaLight}   border={T.rpaBorder}   icon="Bot" />}
       </div>
@@ -3863,7 +3892,7 @@ function Settings({ showToast }) {
           }} />
         <span style={{ position: "absolute", cursor: "pointer", top: 0, left: 0, right: 0, bottom: 0,
           background: defaultChecked ? T.lime : T.borderStrong, transition: "0.3s", borderRadius: 24 }}>
-          <span style={{ position: "absolute", height: 18, width: 18, left: 3, bottom: 3, background: "white",
+          <span style={{ position: "absolute", height: 18, width: 18, left: 3, bottom: 3, background: T.bgCard,
             transition: "0.3s", borderRadius: "50%", transform: defaultChecked ? "translateX(20px)" : "translateX(0)" }} />
         </span>
       </label>
@@ -4499,24 +4528,31 @@ function Settings({ showToast }) {
 //   ✓  Error/retry UI on the schedule kanban
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared toast bar — used in both auth and dashboard contexts
-function ToastBar({ msg }) {
+function ToastBar({ msg, fading }) {
   return (
-    <div style={{ position:"absolute", bottom:40, right:40, background:T.text, color:"white",
-      padding:"16px 24px", borderRadius:8, fontWeight:800, fontSize:13,
-      boxShadow:"0 8px 24px rgba(0,0,0,0.15)", zIndex:9999,
-      display:"flex", alignItems:"center", gap:12, animation:"slideIn 0.3s ease-out" }}>
+    <div style={{ position:"absolute", top:24, right:24, background:T.text, color:T.bgCard,
+      padding:"16px 24px", borderRadius:10, fontWeight:800, fontSize:13,
+      boxShadow:"0 8px 24px " + T.shadowStrong, zIndex:9999,
+      display:"flex", alignItems:"center", gap:12,
+      animation: fading ? "toastOut 0.4s ease-out forwards" : "toastIn 0.3s ease-out" }}>
       <span style={{ color:T.limeDark, background:T.limeLight, borderRadius:"50%", width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>✓</span>
       {msg}
     </div>
   );
 }
 export default function LevelAI() {
+  const { mode, toggle: toggleTheme, T: currentTheme } = useTheme();
+  T = currentTheme;
+
   const { isSignedIn, isLoaded } = useAuth();
   const { signOut } = useClerk();
   const [toastMsg, setToastMsg] = useState("");
+  const [toastFading, setToastFading] = useState(false);
   const showToast = useCallback((msg) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(""), 3500);
+    setToastFading(false);
+    setTimeout(() => setToastFading(true), 3000);
+    setTimeout(() => { setToastMsg(""); setToastFading(false); }, 3500);
   }, []);
 
   // ── Onboarding wizard (new-practice signup) ───────────────────────────────────
@@ -4562,7 +4598,15 @@ export default function LevelAI() {
 
   // ── Core data state ──────────────────────────────────────────────────────────
   const [isMounted, setIsMounted]         = useState(false);
-  const [tab, setTab]                     = useState("schedule");
+  const [tab, setTab]                     = useState("week");
+  const [sidebarOpen, setSidebarOpen]     = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("levelai_sidebar") !== "collapsed";
+  });
+  useEffect(() => {
+    localStorage.setItem("levelai_sidebar", sidebarOpen ? "expanded" : "collapsed");
+  }, [sidebarOpen]);
+  const SIDEBAR_W = sidebarOpen ? 240 : 68;
 
   // patients: the flat list for today's Kanban + DayCardPanel.
   // CalendarView now only needs per-day summary counts (calendarSummary),
@@ -4924,57 +4968,90 @@ export default function LevelAI() {
     return (
       <div style={{ position: "relative", height: "100vh", overflow: "hidden" }}>
         <AuthFlow onComplete={() => {}} showToast={showToast} />
-        {toastMsg && <ToastBar msg={toastMsg} />}
+        {toastMsg && <ToastBar msg={toastMsg} fading={toastFading} />}
       </div>
     );
   }
 
   // ── Dashboard ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ height:"100vh", background:T.bg, fontFamily:"'Nunito',sans-serif", display:"flex", flexDirection:"column", overflow:"hidden", position:"relative" }}>
+    <div style={{ height:"100vh", background:T.bg, fontFamily:"'Nunito',sans-serif", display:"flex", flexDirection:"row", overflow:"hidden", position:"relative" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
-        ::-webkit-scrollbar{width:5px;} ::-webkit-scrollbar-thumb{background:#C8C8C0;border-radius:4px;}
+        ::-webkit-scrollbar{width:5px;}
+        ::-webkit-scrollbar-thumb{background:${T.borderStrong};border-radius:4px;}
+        ::-webkit-scrollbar-track{background:${T.bg};}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
         @keyframes skshimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
         @keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
         @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
         @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        @keyframes toastIn{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+        @keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateX(20px)}}
+        button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid ${T.indigo};outline-offset:2px;}
       `}</style>
 
-      {/* ── Nav bar ─────────────────────────────────────────────────────── */}
-      <div style={{ background:T.bgCard, borderBottom:"1px solid " + T.border, padding:"0 24px", height:60, display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
+      {/* ── Sidebar ────────────────────────────────────────────────────── */}
+      <div style={{
+        width:SIDEBAR_W, minWidth:SIDEBAR_W, height:"100vh",
+        background:T.bgCard, borderRight:"1px solid " + T.border,
+        display:"flex", flexDirection:"column",
+        transition:"width 0.25s cubic-bezier(0.4,0,0.2,1), min-width 0.25s cubic-bezier(0.4,0,0.2,1)",
+        overflow:"hidden", flexShrink:0,
+      }}>
 
-        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-          <div style={{ fontSize:24 }}>&#x1F9B7;</div>
-          <div>
-            <div style={{ color:T.lime, fontSize:20, fontWeight:900 }}>level<span style={{ color:"#334155" }}>ai</span></div>
-            <div style={{ color:T.indigo, fontSize:9, fontWeight:800, letterSpacing:"0.1em" }}>insurance made easy</div>
-          </div>
+        {/* Logo */}
+        <div style={{ padding: sidebarOpen ? "20px 20px 16px" : "20px 0 16px",
+          borderBottom:"1px solid " + T.border, display:"flex", alignItems:"center",
+          gap:10, justifyContent: sidebarOpen ? "flex-start" : "center",
+          transition:"padding 0.25s" }}>
+          <div style={{ fontSize:24, flexShrink:0 }}>&#x1F9B7;</div>
+          {sidebarOpen && (
+            <div style={{ overflow:"hidden", whiteSpace:"nowrap" }}>
+              <div style={{ color:T.lime, fontSize:18, fontWeight:900 }}>level<span style={{ color:T.textMid }}>ai</span></div>
+              <div style={{ color:T.indigo, fontSize:8, fontWeight:800, letterSpacing:"0.1em" }}>insurance made easy</div>
+            </div>
+          )}
         </div>
 
-        <div style={{ display:"flex", gap:4 }}>
+        {/* Nav items */}
+        <div style={{ flex:1, padding:"12px 8px", display:"flex", flexDirection:"column", gap:2 }}>
           {[
-            { id:"schedule",  label:"Daily Schedule" },
-            { id:"week",      label:"Week Ahead", badge: agentLog.filter(e=>e.awaitingApproval).length },
-            { id:"agent",     label:"AI Workflow" },
-            { id:"analytics", label:"Analytics" },
-            { id:"settings",  label:"Settings" },
+            { id:"schedule",  label:"Daily Schedule", emoji:"\uD83D\uDCCB" },
+            { id:"week",      label:"Week Ahead",     emoji:"\uD83D\uDCC5", badge: agentLog.filter(e=>e.awaitingApproval).length },
+            { id:"agent",     label:"AI Workflow",     emoji:"\uD83E\uDD16" },
+            { id:"analytics", label:"Analytics",       emoji:"\uD83D\uDCCA" },
+            { id:"settings",  label:"Settings",        emoji:"\u2699\uFE0F" },
           ].map(tItem => (
             <button key={tItem.id}
               onClick={() => { setTab(tItem.id); setSelectedDayDate(null); }}
-              style={{ padding:"8px 14px", borderRadius:8, border:"none",
+              style={{
+                display:"flex", alignItems:"center", gap:10,
+                padding: sidebarOpen ? "10px 14px" : "10px 0",
+                justifyContent: sidebarOpen ? "flex-start" : "center",
+                borderRadius:10, border:"none", width:"100%",
                 background: tab===tItem.id ? T.limeLight : "transparent",
                 color: tab===tItem.id ? T.limeDark : T.textMid,
-                fontWeight: tab===tItem.id ? 800 : 600, cursor:"pointer",
-                position:"relative", transition:"all 0.2s" }}>
-              {tItem.label}
+                fontWeight: tab===tItem.id ? 800 : 600,
+                fontSize:13, cursor:"pointer", position:"relative",
+                transition:"all 0.2s",
+              }}
+              onMouseEnter={e => { if(tab !== tItem.id) e.currentTarget.style.background = T.bg; }}
+              onMouseLeave={e => { if(tab !== tItem.id) e.currentTarget.style.background = "transparent"; }}
+            >
+              <span style={{ fontSize:18, flexShrink:0 }}>{tItem.emoji}</span>
+              {sidebarOpen && <span style={{ overflow:"hidden", whiteSpace:"nowrap" }}>{tItem.label}</span>}
               {tItem.badge > 0 && (
-                <span style={{ position:"absolute", top:2, right:2, minWidth:16, height:16,
-                  borderRadius:8, background:T.red, border:"2px solid " + T.bgCard,
+                <span style={{
+                  position: sidebarOpen ? "relative" : "absolute",
+                  top: sidebarOpen ? "auto" : 4, right: sidebarOpen ? "auto" : 8,
+                  minWidth:18, height:18, borderRadius:9,
+                  background:T.red, border:"2px solid " + T.bgCard,
                   fontSize:9, fontWeight:900, color:"#fff",
-                  display:"flex", alignItems:"center", justifyContent:"center", padding:"0 3px" }}>
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                  padding:"0 4px", marginLeft: sidebarOpen ? "auto" : 0,
+                }}>
                   {tItem.badge}
                 </span>
               )}
@@ -4982,18 +5059,74 @@ export default function LevelAI() {
           ))}
         </div>
 
-        {/* Nav status pills — skeleton while today's data is loading */}
-        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-          <div style={{ color:T.textSoft, fontSize:11 }}>
-            {isMounted ? new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}) : ""}
-          </div>
+        {/* Bottom section */}
+        <div style={{ borderTop:"1px solid " + T.border, padding:"12px 8px" }}>
+          {/* Dark mode toggle */}
           <button
-            onClick={() => signOut()}
-            style={{ marginLeft:4, padding:"4px 12px", borderRadius:20, border:"1px solid " + T.border,
-              background:T.bgCard, color:T.textMid, fontSize:11, fontWeight:700, cursor:"pointer",
-              display:"flex", alignItems:"center", gap:5 }}>
-            <span>🚪</span> Log out
+            onClick={toggleTheme}
+            style={{
+              display:"flex", alignItems:"center", gap:8, width:"100%",
+              padding:"8px 14px", borderRadius:8, border:"none",
+              background:"transparent", color:T.textMid, cursor:"pointer",
+              fontSize:12, fontWeight:700, justifyContent: sidebarOpen ? "flex-start" : "center",
+              transition:"all 0.2s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = T.bg}
+            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+          >
+            <span style={{ fontSize:16 }}>{mode === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"}</span>
+            {sidebarOpen && <span>{mode === "dark" ? "Light Mode" : "Dark Mode"}</span>}
           </button>
+
+          {/* Collapse toggle */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            style={{
+              display:"flex", alignItems:"center", gap:8, width:"100%",
+              padding:"8px 14px", borderRadius:8, border:"none",
+              background:"transparent", color:T.textMid, cursor:"pointer",
+              fontSize:12, fontWeight:700, justifyContent: sidebarOpen ? "flex-start" : "center",
+              transition:"all 0.2s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = T.bg}
+            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+          >
+            <span style={{ fontSize:14, transform: sidebarOpen ? "none" : "rotate(180deg)", transition:"transform 0.25s", display:"inline-block" }}>{"\u25C0"}</span>
+            {sidebarOpen && <span>Collapse</span>}
+          </button>
+
+          {/* Date + Log out */}
+          <div style={{ marginTop:8, padding:"0 6px", display:"flex", flexDirection:"column", gap:4 }}>
+            {sidebarOpen && (
+              <div style={{ color:T.textSoft, fontSize:10, padding:"4px 8px" }}>
+                {isMounted ? new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}) : ""}
+              </div>
+            )}
+            <button
+              onClick={() => signOut()}
+              style={{
+                display:"flex", alignItems:"center", gap:6,
+                padding:"8px 14px", borderRadius:8, border:"1px solid " + T.border,
+                background:T.bgCard, color:T.textMid, fontSize:11, fontWeight:700,
+                cursor:"pointer", width:"100%",
+                justifyContent: sidebarOpen ? "flex-start" : "center",
+                transition:"all 0.2s",
+              }}>
+              <span>{"\uD83D\uDEAA"}</span> {sidebarOpen && "Log out"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Content area ───────────────────────────────────────────────── */}
+      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+
+        {/* Status pills bar */}
+        <div style={{
+          height:44, background:T.bgCard, borderBottom:"1px solid " + T.border,
+          display:"flex", alignItems:"center", justifyContent:"flex-end",
+          padding:"0 20px", gap:6, flexShrink:0,
+        }}>
           {dailyLoading ? <NavCountSkeleton /> : (
             <>
               {[
@@ -5002,29 +5135,29 @@ export default function LevelAI() {
                 { label:"Inactive",  count:inactiveCount, color:T.red,      bg:T.redLight,   border:T.redBorder   },
                 { label:"Pending",   count:pendingCount,  color:T.slate,    bg:T.slateLight, border:T.border      },
               ].map(({label,count,color,bg,border}) => (
-                <div key={label} style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px",
+                <div key={label} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px",
                   borderRadius:20, background:bg, border:"1px solid " + border, color, fontSize:11, fontWeight:800 }}>
-                  <span style={{ fontSize:14, fontWeight:900, lineHeight:1 }}>{count}</span>
+                  <span style={{ fontSize:13, fontWeight:900, lineHeight:1 }}>{count}</span>
                   <span>{label}</span>
                 </div>
               ))}
               {rpaCount > 0 && (
-                <div style={{ display:"flex", alignItems:"center", gap:5, padding:"4px 10px",
+                <div style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px",
                   borderRadius:20, background:T.rpaLight, border:"1px solid " + T.rpaBorder,
                   color:T.rpaDark, fontSize:11, fontWeight:800 }}>
-                  <span style={{ fontSize:14, fontWeight:900, lineHeight:1 }}>{rpaCount}</span>
+                  <span style={{ fontSize:13, fontWeight:900, lineHeight:1 }}>{rpaCount}</span>
                   <span>RPA</span>
                 </div>
               )}
             </>
           )}
         </div>
-      </div>
 
-      {/* ── Tab content ──────────────────────────────────────────────────── */}
-      <div style={{ flex:1, overflow:"hidden", display:"flex", flexDirection:"column" }}>
+        {/* ── Tab content ──────────────────────────────────────────────── */}
+        <div style={{ flex:1, overflow:"hidden", display:"flex", flexDirection:"column" }}>
 
         {tab === "agent" && (
+          <div key="agent" style={{ animation:"fadeIn 0.3s ease-out", height:"100%", display:"flex", flexDirection:"column" }}>
           <AIWorkflow log={agentLog} showToast={showToast}
             results={results} triageMap={triageMap}
             onSelectPatient={p => {
@@ -5032,16 +5165,24 @@ export default function LevelAI() {
               if (pt) { setSelected(pt); setTab("schedule"); }
             }}
             onApprove={handleApprove} onDismiss={handleDismiss} />
+          </div>
         )}
 
         {tab === "analytics" && (
+          <div key="analytics" style={{ animation:"fadeIn 0.3s ease-out", height:"100%", display:"flex", flexDirection:"column" }}>
           <Analytics patients={patients} results={results} agentLog={agentLog} />
+          </div>
         )}
 
-        {tab === "settings" && <Settings showToast={showToast} />}
+        {tab === "settings" && (
+          <div key="settings" style={{ animation:"fadeIn 0.3s ease-out", height:"100%", display:"flex", flexDirection:"column" }}>
+          <Settings showToast={showToast} />
+          </div>
+        )}
 
         {/* ── Week Ahead tab ────────────────────────────────────────────── */}
         {tab === "week" && (
+          <div key="week" style={{ animation:"fadeIn 0.3s ease-out", height:"100%", display:"flex", flexDirection:"column" }}>
           <WeekAhead
             patients={patients}
             agentLog={agentLog}
@@ -5054,11 +5195,12 @@ export default function LevelAI() {
             onVerify={verify}
             isMounted={isMounted}
           />
+          </div>
         )}
 
         {/* ── Daily Schedule tab ───────────────────────────────────────── */}
         {tab === "schedule" && (
-          <div style={{ padding:24, display:"grid", gridTemplateColumns:"1fr 400px", gap:20, height:"100%", overflow:"hidden" }}>
+          <div key="schedule" style={{ animation:"fadeIn 0.3s ease-out", padding:24, display:"grid", gridTemplateColumns:"1fr 400px", gap:20, height:"100%", overflow:"hidden" }}>
             <div style={{ display:"flex", flexDirection:"column", overflowY:"auto", paddingRight:8, height:"100%", minHeight:0 }}>
 
               {/* Header row */}
@@ -5074,7 +5216,9 @@ export default function LevelAI() {
                 <div style={{ display:"flex", gap:8 }}>
                   <button
                     onClick={() => handleAddPatientClick()}
-                    style={{ background:T.bgCard, color:T.text, border:"1px solid " + T.border, padding:"8px 16px", borderRadius:8, fontWeight:800, cursor:"pointer", fontSize:12 }}>
+                    style={{ background:T.bgCard, color:T.text, border:"1px solid " + T.border, padding:"8px 16px", borderRadius:8, fontWeight:800, cursor:"pointer", fontSize:12, transition:"all 0.15s" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = T.bg; e.currentTarget.style.borderColor = T.borderStrong; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = T.bgCard; e.currentTarget.style.borderColor = T.border; }}>
                     + New Patient
                   </button>
                   <button
@@ -5082,7 +5226,9 @@ export default function LevelAI() {
                     onClick={() => {
                       if (!dailyLoading) patients.forEach((p, i) => { if (!isLoading(p.id)) setTimeout(() => verify(p, "manual"), i * 300); });
                     }}
-                    style={{ background: dailyLoading ? T.borderStrong : T.lime, color:"#fff", border:"none", padding:"8px 18px", borderRadius:8, fontWeight:800, cursor: dailyLoading ? "not-allowed" : "pointer", fontSize:12, transition:"0.2s" }}>
+                    style={{ background: dailyLoading ? T.borderStrong : T.lime, color:"#fff", border:"none", padding:"8px 18px", borderRadius:8, fontWeight:800, cursor: dailyLoading ? "not-allowed" : "pointer", fontSize:12, transition:"all 0.2s" }}
+                    onMouseEnter={e => { if(!dailyLoading) e.currentTarget.style.transform = "scale(1.03)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}>
                     {dailyLoading ? "Loading…" : "Verify All"}
                   </button>
                 </div>
@@ -5125,7 +5271,7 @@ export default function LevelAI() {
                       <div key={col.key} style={{ display:"flex", flexDirection:"column", overflow:"hidden", borderRadius:12, border:"1px solid " + col.border, background:col.bg }}>
                         <div style={{ padding:"10px 12px", borderBottom:"1px solid " + col.border, display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
                           <span style={{ fontSize:11, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", color:col.color }}>{col.label}</span>
-                          <span style={{ fontSize:11, fontWeight:900, color:col.color, background:"white", width:20, height:20, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 0 0 1px " + col.border }}>
+                          <span style={{ fontSize:11, fontWeight:900, color:col.color, background:T.bgCard, width:20, height:20, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 0 0 1px " + col.border }}>
                             {colPts.length}
                           </span>
                         </div>
@@ -5190,6 +5336,7 @@ export default function LevelAI() {
           </div>
         )}
       </div>
+      </div>{/* end content area */}
 
       {/* ── Directory modal ───────────────────────────────────────────────── */}
       {showDirectoryModal && (
@@ -5204,7 +5351,7 @@ export default function LevelAI() {
         />
       )}
 
-      {toastMsg && <ToastBar msg={toastMsg} />}
+      {toastMsg && <ToastBar msg={toastMsg} fading={toastFading} />}
 
       {/* ── Onboarding wizard overlay (new practices) ───────────────────── */}
       {showWizard && (
