@@ -9,7 +9,7 @@
  */
 
 import { auth } from "@clerk/nextjs/server";
-import { prisma } from "../../../../lib/prisma.js";
+import { prisma } from "../../../../../lib/prisma.js";
 
 // ── Fixture data (demo fallback) ──────────────────────────────────────────────
 const ALL_PATIENTS = [
