@@ -2103,7 +2103,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
             <SectionLabel>Plan Status</SectionLabel>
             <div style={{ background:T.bg, borderRadius:10, border:"1px solid " + T.border }}>
               {[
-                { label:"Status", value:result.plan_status === "terminated" ? "Inactive / Terminated" : result.verification_status?.replace(/_/g," "), warn: result.plan_status === "terminated" },
+                { label:"Status", value:result.plan_status === "terminated" ? "Inactive / Terminated" : result.verification_status?.replace(/_/g," "), warn: result.plan_status === "terminated" || result.verification_status === "action_required" },
                 { label:"Payer", value:result.payer_name },
                 { label:"Annual Max", value:result.annual_maximum_cents != null ? dollars(result.annual_maximum_cents) : "No Limit" },
                 { label:"Remaining", value:result.annual_remaining_cents != null ? dollars(result.annual_remaining_cents) : "N/A", warn:result.annual_remaining_cents != null && result.annual_remaining_cents < 30000 },
@@ -2117,6 +2117,53 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
                 </div>
               ))}
             </div>
+
+            {/* ── Action Required Explanation ─────────────────────────────────────── */}
+            {result.verification_status === "action_required" && (() => {
+              const FLAG_EXPLANATIONS = {
+                plan_inactive:        { icon: "🚫", text: "Insurance plan is inactive or terminated", next: "Contact patient to confirm current coverage before appointment" },
+                missing_tooth_clause: { icon: "🦷", text: "Missing Tooth Clause applies to this plan", next: "Pre-auth required for implant, bridge, or denture — submit before scheduling" },
+                pre_auth_required:    { icon: "📋", text: "Pre-authorization required for planned procedure", next: "Generate and submit PA letter before appointment date" },
+                frequency_limit:      { icon: "⏱️", text: "Preventive frequency limit reached — cleanings fully used this period", next: "Today's prophy will not be covered. Inform patient of out-of-pocket cost or reschedule" },
+                annual_max_exhausted: { icon: "💰", text: "Annual maximum fully exhausted — $0 remaining", next: "Patient is responsible for 100% of today's fee. Discuss payment before treatment" },
+                annual_max_low:       { icon: "⚠️", text: "Annual maximum is running low (" + (result.annual_remaining_cents != null ? dollars(result.annual_remaining_cents) : "limited") + " remaining)", next: "Verify patient understands potential out-of-pocket costs if treatment exceeds remaining benefits" },
+                composite_downgrade:  { icon: "🔄", text: "Posterior composite will be downgraded to amalgam reimbursement rate", next: "Patient will owe the difference between composite and amalgam fee. Discuss before treatment" },
+                waiting_period_active:{ icon: "⏳", text: "Major restorative waiting period is still active", next: "Crowns, bridges, and major work may not be covered yet. Confirm eligibility date with payer" },
+              };
+              const flags = (result.action_flags || []).filter(f => f !== "thin_data");
+              const items = flags.map(f => FLAG_EXPLANATIONS[f]).filter(Boolean);
+              // Also include triage block/notify if available — they are more context-specific
+              const triageItems = [];
+              if (triage) {
+                triage.block.forEach(r => triageItems.push({ icon: "🔴", text: r, next: null }));
+                triage.notify.forEach(r => triageItems.push({ icon: "🟡", text: r, next: null }));
+              }
+              // Deduplicate: if triage already covered the topic, skip the generic flag version
+              const triageText = new Set(triageItems.map(t => t.text.toLowerCase()));
+              const dedupedFlags = items.filter(item => !triageText.has(item.text.toLowerCase()));
+              const allItems = [...triageItems, ...dedupedFlags];
+              if (allItems.length === 0) return null;
+              return (
+                <div style={{ background:"#2a2218", border:"1px solid " + T.amberBorder, borderRadius:10, padding:"14px 16px", marginTop:10 }}>
+                  <div style={{ color:T.amber, fontSize:11, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10, display:"flex", alignItems:"center", gap:6 }}>
+                    <span style={{ fontSize:14 }}>⚡</span> Action Required — Here's What to Do
+                  </div>
+                  {allItems.map((item, i) => (
+                    <div key={i} style={{ marginBottom: i < allItems.length - 1 ? 10 : 0, paddingBottom: i < allItems.length - 1 ? 10 : 0, borderBottom: i < allItems.length - 1 ? "1px solid rgba(255,180,50,0.15)" : "none" }}>
+                      <div style={{ color:T.text, fontSize:13, fontWeight:700, lineHeight:"1.4", display:"flex", gap:6 }}>
+                        <span>{item.icon}</span>
+                        <span>{item.text}</span>
+                      </div>
+                      {item.next && (
+                        <div style={{ color:T.amberDark, fontSize:11, fontWeight:600, marginTop:4, paddingLeft:22, lineHeight:"1.4" }}>
+                          → {item.next}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
 
             {result.preventive && (
               <>
@@ -2212,16 +2259,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
               </>
             )}
 
-            {(result.action_flags||[]).filter(f=>f!=="thin_data").length > 0 && (
-              <>
-                <SectionLabel>Flags</SectionLabel>
-                <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                  {result.action_flags.filter(f=>f!=="thin_data").map((f,i)=>(
-                    <Badge key={i} label={f.replace(/_/g," ")} color={T.amber} bg={T.amberLight} border={T.amberBorder} />
-                  ))}
-                </div>
-              </>
-            )}
+            {/* Action flags are now shown in the Action Required panel above with full explanations */}
 
             {/* Download Benefit PDF */}
             <div style={{ marginTop:20, paddingTop:16, borderTop:"1px solid " + T.border }}>
