@@ -5202,24 +5202,40 @@ export default function LevelAI() {
   });
 
   // ── Skeleton layouts for loading states ──────────────────────────────────────
+  // ── Loading messages that rotate while schedule fetches ──────────────────────
+  const LOADING_MESSAGES = [
+    "Pulling today's schedule from your PMS...",
+    "Cross-referencing insurance records...",
+    "Checking eligibility windows for each patient...",
+    "Matching CDT codes to payer rules...",
+    "Almost there — preparing your verification queue...",
+  ];
+  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
+  useEffect(() => {
+    if (!dailyLoading) return;
+    setLoadingMsgIdx(0);
+    const iv = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MESSAGES.length), 4000);
+    return () => clearInterval(iv);
+  }, [dailyLoading]);
+
   const KanbanSkeleton = () => (
-    <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(200px, 1fr))", gap:10, minHeight:600 }}>
-      {[0,1,2,3].map(col => (
-        <div key={col} style={{ borderRadius:12, border:"1px solid " + T.border, background:T.bg, overflow:"hidden" }}>
-          <div style={{ padding:"10px 12px", borderBottom:"1px solid " + T.border }}>
-            <Skeleton w={70} h={10} />
-          </div>
-          <div style={{ padding:"8px 6px", display:"flex", flexDirection:"column", gap:6 }}>
-            {[0,1,2,3,4].map(row => (
-              <div key={row} style={{ background:T.bgCard, borderRadius:10, padding:"12px 13px", display:"flex", flexDirection:"column", gap:7 }}>
-                <Skeleton w="65%" h={12} />
-                <Skeleton w="45%" h={10} />
-                <Skeleton w="85%" h={10} />
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
+    <div style={{ minHeight:500, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:20, padding:"60px 20px" }}>
+      {/* Pulsing tooth icon */}
+      <div style={{ fontSize:52, animation:"pulse 2s ease-in-out infinite" }}>🦷</div>
+      {/* Rotating status message */}
+      <div style={{ fontSize:15, fontWeight:700, color:T.text, textAlign:"center", transition:"opacity 0.5s", minHeight:24 }}>
+        {LOADING_MESSAGES[loadingMsgIdx]}
+      </div>
+      {/* Progress bar animation */}
+      <div style={{ width:280, height:6, borderRadius:3, background:T.border, overflow:"hidden" }}>
+        <div style={{ height:"100%", borderRadius:3, background:`linear-gradient(90deg, ${T.lime}, ${T.indigo})`, animation:"loadbar 3s ease-in-out infinite" }} />
+      </div>
+      <div style={{ fontSize:11, color:T.textSoft, fontWeight:600 }}>This usually takes 10–20 seconds on first load</div>
+      {/* Inject keyframes */}
+      <style>{`
+        @keyframes pulse { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.15); opacity:0.7; } }
+        @keyframes loadbar { 0% { width:5%; } 50% { width:85%; } 100% { width:5%; } }
+      `}</style>
     </div>
   );
 
