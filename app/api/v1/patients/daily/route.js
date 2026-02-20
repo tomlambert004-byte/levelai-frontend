@@ -1,10 +1,15 @@
 /**
  * GET /api/v1/patients/daily?date=YYYY-MM-DD
  *
- * Returns a realistic daily schedule: 5-8 patients per day, different
- * subsets on different days, with real appointment times spread across
- * the workday. Uses the date to deterministically pick which patients
- * are scheduled so the same date always returns the same list.
+ * Returns a realistic daily schedule for a dental office.
+ * Each weekday has a curated, fixed patient list (3-6 patients) with
+ * real appointment times. The same date always returns the same list.
+ *
+ * All 6 patients map to p1-p6 so the Python verify endpoint can
+ * look them up in FIXTURE_MAP.
+ *
+ * hoursUntil is computed relative to NOW so the auto-verify
+ * (24h and 7d windows) triggers correctly in the UI.
  */
 
 const ALL_PATIENTS = [
@@ -82,50 +87,76 @@ const ALL_PATIENTS = [
   },
 ];
 
-// Appointment time slots across a typical dental workday
-const TIME_SLOTS = [
-  "8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM",
-  "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
-  "1:00 PM", "1:30 PM", "2:00 PM", "2:30 PM",
-  "3:00 PM", "3:30 PM", "4:00 PM",
-];
+// Curated weekly schedule by day-of-week (0=Sun,1=Mon,…,5=Fri,6=Sat).
+// Each entry: [patientId, "H:MM AM/PM"]
+// Weekends are empty — the calendar route skips them too.
+const WEEKLY_SCHEDULE = {
+  1: [ // Monday — light day: 4 patients
+    ["p3", "8:30 AM"],
+    ["p1", "10:00 AM"],
+    ["p5", "1:00 PM"],
+    ["p6", "3:00 PM"],
+  ],
+  2: [ // Tuesday — busy day: 5 patients
+    ["p2", "8:00 AM"],
+    ["p4", "9:30 AM"],
+    ["p1", "11:00 AM"],
+    ["p3", "1:30 PM"],
+    ["p5", "3:30 PM"],
+  ],
+  3: [ // Wednesday — medium: 4 patients
+    ["p6", "8:30 AM"],
+    ["p2", "10:00 AM"],
+    ["p4", "1:00 PM"],
+    ["p1", "3:00 PM"],
+  ],
+  4: [ // Thursday — busy day: 5 patients
+    ["p5", "8:00 AM"],
+    ["p3", "9:30 AM"],
+    ["p6", "11:00 AM"],
+    ["p2", "1:30 PM"],
+    ["p4", "3:30 PM"],
+  ],
+  5: [ // Friday — short day: 3 patients
+    ["p1", "8:30 AM"],
+    ["p3", "10:00 AM"],
+    ["p5", "11:30 AM"],
+  ],
+};
 
-// Simple deterministic hash of a string → integer
-function hashStr(str) {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
+// Parse "H:MM AM/PM" → { hours, minutes } in 24h
+function parseTime(timeStr) {
+  const [time, meridiem] = timeStr.split(" ");
+  let [hours, minutes] = time.split(":").map(Number);
+  if (meridiem === "PM" && hours !== 12) hours += 12;
+  if (meridiem === "AM" && hours === 12) hours = 0;
+  return { hours, minutes };
 }
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
-  // Use the date as a seed so the same date always returns the same patients
-  const seed = hashStr(date);
+  // Day of week for the requested date (use noon to avoid DST edge cases)
+  const dow = new Date(date + "T12:00:00").getDay();
+  const slots = WEEKLY_SCHEDULE[dow] || [];
 
-  // Pick 5–7 patients for this day (deterministic)
-  const count = 5 + (seed % 3); // 5, 6, or 7
-  const shuffled = [...ALL_PATIENTS].sort((a, b) => {
-    return hashStr(date + a.id) - hashStr(date + b.id);
-  });
-  const todaysPatients = shuffled.slice(0, count);
+  const patientMap = Object.fromEntries(ALL_PATIENTS.map(p => [p.id, p]));
+  const nowMs = Date.now();
 
-  // Assign appointment times in order
-  const timeOffset = seed % 3; // shifts which slots we start from
-  const patients = todaysPatients.map((p, i) => {
-    const timeSlot = TIME_SLOTS[(i * 2 + timeOffset) % TIME_SLOTS.length];
-    const apptMs = new Date(`${date}T09:00:00`).getTime();
-    const nowMs = Date.now();
-    const hoursUntil = Math.round((apptMs - nowMs) / (1000 * 60 * 60)) + i * 0.5;
+  const patients = slots.map(([id, timeStr]) => {
+    const base = patientMap[id];
+    const { hours, minutes } = parseTime(timeStr);
+
+    // Build appointment datetime in local time
+    const apptDate = new Date(`${date}T${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:00`);
+    const hoursUntil = (apptDate.getTime() - nowMs) / (1000 * 60 * 60);
 
     return {
-      ...p,
+      ...base,
       appointmentDate: date,
-      appointmentTime: timeSlot,
-      hoursUntil: Math.round(hoursUntil),
+      appointmentTime: timeStr,
+      hoursUntil: Math.round(hoursUntil * 10) / 10, // one decimal, keeps auto-verify logic accurate
     };
   });
 
