@@ -383,9 +383,28 @@ try {
   // lib not available in this worktree path — will fall through to fixture
 }
 
+// ── Hardening imports ─────────────────────────────────────────────────────────
+let logAudit, getClientIp, checkRateLimit, rateLimitResponse;
+try {
+  const auditMod = await import("../../../../lib/audit.js");
+  logAudit = auditMod.logAudit;
+  getClientIp = auditMod.getClientIp;
+  const rlMod = await import("../../../../lib/rateLimit.js");
+  checkRateLimit = rlMod.checkRateLimit;
+  rateLimitResponse = rlMod.rateLimitResponse;
+} catch (_) { /* graceful degradation */ }
+
 // ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(request) {
   try {
+    // Rate limit: 20 req/min per IP
+    if (checkRateLimit && rateLimitResponse) {
+      const ip = getClientIp(request);
+      const rl = checkRateLimit(`verify:${ip}`, { maxRequests: 20, windowMs: 60_000 });
+      const blocked = rateLimitResponse(rl);
+      if (blocked) return blocked;
+    }
+
     const body = await request.json();
     const {
       patient_id,
@@ -473,6 +492,16 @@ export async function POST(request) {
           // DB write is non-blocking — don't fail the request
         }
 
+        if (logAudit) logAudit({
+          practiceId: practiceId !== "demo" ? practiceId : null,
+          userId: userId || null,
+          action: "verify.eligibility",
+          resourceType: "Patient",
+          resourceId: patient_id,
+          ipAddress: getClientIp(request),
+          metadata: { source: "stedi", status: normalized.verification_status },
+        });
+
         return Response.json({ ...normalized, _source: "stedi" });
       } catch (stediErr) {
         console.warn("[verify] Stedi call failed, falling back to fixture:", stediErr.message);
@@ -499,6 +528,17 @@ export async function POST(request) {
     }
 
     const result = normalize271(fixture);
+
+    if (logAudit) logAudit({
+      practiceId: null,
+      userId: null,
+      action: "verify.eligibility",
+      resourceType: "Patient",
+      resourceId: patient_id,
+      ipAddress: getClientIp(request),
+      metadata: { source: "fixture", status: result.verification_status },
+    });
+
     return Response.json({ ...result, _source: canUseStedi ? "stedi_fallback_fixture" : "fixture" });
 
   } catch (err) {

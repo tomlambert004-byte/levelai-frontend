@@ -10,9 +10,16 @@
  * Auth: Webhook signature validation via X-Webhook-Signature header.
  */
 import { prisma } from "../../../../../lib/prisma.js";
+import { logAudit, getClientIp } from "../../../../../lib/audit.js";
+import { checkRateLimit, rateLimitResponse } from "../../../../../lib/rateLimit.js";
 
 export async function POST(request) {
   try {
+    const ip = getClientIp(request);
+    const rl = checkRateLimit(`webhook:${ip}`, { maxRequests: 60, windowMs: 60_000 });
+    const blocked = rateLimitResponse(rl);
+    if (blocked) return blocked;
+
     // Validate webhook signature
     const signature = request.headers.get("x-webhook-signature");
     const webhookSecret = process.env.PMS_WEBHOOK_SECRET;
@@ -116,7 +123,16 @@ export async function POST(request) {
         });
       }
 
-      console.log(`[pms/webhook] ${event_type}: ${first_name} ${last_name} → practice ${practice_id}`);
+      console.log(`[pms/webhook] ${event_type} processed for practice ${practice_id}`);
+      logAudit({
+        practiceId: practice_id,
+        userId: "webhook",
+        action: "pms.webhook.received",
+        resourceType: "Patient",
+        resourceId: patient.id,
+        ipAddress: ip,
+        metadata: { event_type, pms_source },
+      });
       return Response.json({ received: true, event_type, patient_id: patient.id });
     }
 

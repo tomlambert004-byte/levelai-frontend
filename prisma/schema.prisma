@@ -25,6 +25,7 @@ model Practice {
   patients            Patient[]
   verificationResults VerificationResult[]
   smsQueue            SmsQueue[]
+  auditLogs           AuditLog[]
 }
 
 // ── A patient record belonging to a practice ─────────────────────────────────
@@ -103,4 +104,22 @@ model SmsQueue {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ── Audit log for PHI access and sensitive operations ─────────────────────────
+model AuditLog {
+  id           String   @id @default(cuid())
+  practiceId   String?
+  practice     Practice? @relation(fields: [practiceId], references: [id])
+  userId       String?               // Clerk userId or "webhook"
+  action       String                // e.g. "verify.eligibility", "patient.import"
+  resourceType String?               // e.g. "Patient", "SmsQueue"
+  resourceId   String?               // ID of the accessed resource
+  ipAddress    String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([practiceId])
+  @@index([action])
+  @@index([createdAt])
 }

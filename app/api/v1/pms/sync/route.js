@@ -14,6 +14,7 @@
  */
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "../../../../../lib/prisma.js";
+import { logAudit, getClientIp } from "../../../../../lib/audit.js";
 import { syncDailySchedule } from "../../../../../lib/opendental.js";
 import { syncDailySchedule as dentrixSync } from "../../../../../lib/dentrix.js";
 import { syncDailySchedule as eaglesoftSync } from "../../../../../lib/eaglesoft.js";
@@ -116,7 +117,7 @@ export async function POST(request) {
             }
             synced++;
           } catch (err) {
-            console.error(`[pms/sync] Failed to upsert patient ${p.firstName} ${p.lastName}:`, err.message);
+            console.error(`[pms/sync] Patient upsert failed (externalId: ${p.externalId || "none"}):`, err.message);
             skipped++;
           }
         }
@@ -132,6 +133,15 @@ export async function POST(request) {
       synced = patients.filter(p => p.firstName && p.lastName).length;
       skipped = patients.length - synced;
     }
+
+    logAudit({
+      practiceId: practice?.id,
+      userId,
+      action: "pms.sync",
+      resourceType: "Patient",
+      ipAddress: getClientIp(request),
+      metadata: { synced, skipped, date, pms_source: practice?.pmsSystem || "Open Dental" },
+    });
 
     return Response.json({
       synced,

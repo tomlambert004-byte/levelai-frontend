@@ -17,6 +17,7 @@
  */
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "../../../../../lib/prisma.js";
+import { logAudit, getClientIp } from "../../../../../lib/audit.js";
 
 export async function POST(request) {
   try {
@@ -74,9 +75,18 @@ export async function POST(request) {
         imported++;
       } catch (err) {
         skipped++;
-        errors.push(`Row error (${firstName} ${lastName}): ${err.message}`);
+        errors.push(`Row ${patients.indexOf(row) + 1} error: ${err.message}`);
       }
     }
+
+    logAudit({
+      practiceId: practice.id,
+      userId,
+      action: "patient.import",
+      resourceType: "Patient",
+      ipAddress: getClientIp(request),
+      metadata: { imported, skipped, total: patients.length },
+    });
 
     return Response.json({ imported, skipped, errors: errors.slice(0, 20) });
   } catch (err) {

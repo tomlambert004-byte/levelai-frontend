@@ -7,11 +7,18 @@
  */
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "../../../../../lib/prisma.js";
+import { logAudit, getClientIp } from "../../../../../lib/audit.js";
+import { checkRateLimit, rateLimitResponse } from "../../../../../lib/rateLimit.js";
 
 export async function POST(request) {
   try {
     const { userId } = await auth();
     if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+    // Rate limit: 10 SMS sends per minute per user
+    const rl = checkRateLimit(`sms:${userId}`, { maxRequests: 10, windowMs: 60_000 });
+    const blocked = rateLimitResponse(rl);
+    if (blocked) return blocked;
 
     const practice = await prisma.practice.findUnique({ where: { clerkUserId: userId } });
     if (!practice) return Response.json({ error: "Practice not found" }, { status: 404 });
@@ -62,6 +69,15 @@ export async function POST(request) {
               approvedBy: userId,
               approvedAt: new Date(),
             },
+          });
+          logAudit({
+            practiceId: practice.id,
+            userId,
+            action: "sms.send",
+            resourceType: "SmsQueue",
+            resourceId: smsQueueId,
+            ipAddress: getClientIp(request),
+            metadata: { status: "sent", twilioSid: twilioData.sid },
           });
           return Response.json({ sent: true, twilioSid: twilioData.sid });
         } else {

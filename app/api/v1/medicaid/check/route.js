@@ -10,9 +10,17 @@
 
 import { runMedicaidCheck, getStateRules, getSupportedStates } from "../../../../../lib/medicaidRules.js";
 import { getMedicaidProgramName } from "../../../../../lib/medicaidDetect.js";
+import { checkRateLimit, rateLimitResponse } from "../../../../../lib/rateLimit.js";
+import { getClientIp } from "../../../../../lib/audit.js";
 
 export async function POST(request) {
   try {
+    // Rate limit: 30 req/min per IP
+    const ip = getClientIp(request);
+    const rl = checkRateLimit(`medicaid:${ip}`, { maxRequests: 30, windowMs: 60_000 });
+    const blocked = rateLimitResponse(rl);
+    if (blocked) return blocked;
+
     const body = await request.json().catch(() => ({}));
     const { cdt_codes, state, patient_age } = body;
 
