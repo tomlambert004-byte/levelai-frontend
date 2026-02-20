@@ -31,6 +31,8 @@ export async function POST(request) {
     if (body.npi)         updateData.npi         = body.npi;
     if (body.taxId)       updateData.taxId       = body.taxId;
     if (body.accountMode) updateData.accountMode = body.accountMode;
+    if (body.address)     updateData.address     = body.address;
+    if (body.phone)       updateData.phone       = body.phone;
     if (body.pmsSystem)   updateData.pmsSystem   = body.pmsSystem;
     if (body.pmsSyncKey)  updateData.pmsSyncKey  = body.pmsSyncKey;
 
@@ -43,6 +45,8 @@ export async function POST(request) {
         npi:         body.npi         || null,
         taxId:       body.taxId       || null,
         accountMode: body.accountMode || "sandbox",
+        address:     body.address     || null,
+        phone:       body.phone       || null,
         pmsSystem:   body.pmsSystem   || null,
         pmsSyncKey:  body.pmsSyncKey  || null,
       },

@@ -15,6 +15,14 @@
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "../../../../../lib/prisma.js";
 import { syncDailySchedule } from "../../../../../lib/opendental.js";
+import { syncDailySchedule as dentrixSync } from "../../../../../lib/dentrix.js";
+import { syncDailySchedule as eaglesoftSync } from "../../../../../lib/eaglesoft.js";
+
+const PMS_ADAPTERS = {
+  "Open Dental": syncDailySchedule,
+  "Dentrix": dentrixSync,
+  "Eaglesoft": eaglesoftSync,
+};
 
 export async function POST(request) {
   try {
@@ -31,8 +39,30 @@ export async function POST(request) {
       return Response.json({ error: "Invalid date format — use YYYY-MM-DD" }, { status: 400 });
     }
 
-    // Pull from Open Dental
-    const patients = await syncDailySchedule(date);
+    // Try to persist to DB if DATABASE_URL is available
+    let synced  = 0;
+    let skipped = 0;
+    let dbPersisted = false;
+    let practice = null;
+
+    if (process.env.DATABASE_URL) {
+      try {
+        // Get or create the practice record
+        practice = await prisma.practice.upsert({
+          where:  { clerkUserId: userId },
+          update: {},
+          create: { clerkUserId: userId, name: "My Practice" },
+        });
+      } catch (dbErr) {
+        console.warn("[pms/sync] DB practice lookup failed:", dbErr.message);
+      }
+    }
+
+    // Determine the adapter based on practice PMS system
+    const adapter = PMS_ADAPTERS[practice?.pmsSystem] || syncDailySchedule;
+
+    // Pull from the selected PMS adapter
+    const patients = await adapter(date);
 
     if (patients.length === 0) {
       return Response.json({
@@ -40,24 +70,13 @@ export async function POST(request) {
         skipped: 0,
         date,
         source:  "opendental",
-        message: "No scheduled appointments found for this date in Open Dental",
+        pms_source: practice?.pmsSystem || "Open Dental",
+        message: "No scheduled appointments found for this date",
       });
     }
 
-    // Try to persist to DB if DATABASE_URL is available
-    let synced  = 0;
-    let skipped = 0;
-    let dbPersisted = false;
-
-    if (process.env.DATABASE_URL) {
+    if (process.env.DATABASE_URL && practice) {
       try {
-        // Get or create the practice record
-        const practice = await prisma.practice.upsert({
-          where:  { clerkUserId: userId },
-          update: {},
-          create: { clerkUserId: userId, name: "My Practice" },
-        });
-
         for (const p of patients) {
           if (!p.firstName || !p.lastName) { skipped++; continue; }
 
@@ -103,13 +122,13 @@ export async function POST(request) {
         }
         dbPersisted = true;
       } catch (dbErr) {
-        console.warn("[pms/sync] DB upsert failed, returning OD data without persistence:", dbErr.message);
+        console.warn("[pms/sync] DB upsert failed, returning data without persistence:", dbErr.message);
         // Count all valid patients as synced even without DB
         synced = patients.filter(p => p.firstName && p.lastName).length;
         skipped = patients.length - synced;
       }
     } else {
-      // No DB — just count the patients from OD
+      // No DB — just count the patients
       synced = patients.filter(p => p.firstName && p.lastName).length;
       skipped = patients.length - synced;
     }
@@ -119,10 +138,11 @@ export async function POST(request) {
       skipped,
       date,
       source: "opendental",
+      pms_source: practice?.pmsSystem || "Open Dental",
       persisted: dbPersisted,
       message: dbPersisted
         ? undefined
-        : "Patients pulled from Open Dental (DB persistence skipped — DATABASE_URL not configured)",
+        : "Patients pulled from PMS (DB persistence skipped — DATABASE_URL not configured)",
     });
 
   } catch (err) {

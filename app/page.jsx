@@ -179,6 +179,12 @@ const MEDICAID_PA_CONTACTS = {
   WA: { name: "Apple Health Dental",          email: "dental@hca.wa.gov",            fax: "1-360-725-1000", label: "WA Apple Health" },
   AZ: { name: "AHCCCS Dental",               email: "dental@azahcccs.gov",          fax: "1-602-256-6756", label: "AZ AHCCCS" },
   MA: { name: "MassHealth Dental",            email: "dental@mass.gov",              fax: "1-617-988-8974", label: "MassHealth" },
+  CO: { name: "Health First Colorado Dental", email: "dental@hcpf.colorado.gov",     fax: "1-303-866-4411", label: "CO Health First" },
+  TN: { name: "TennCare Dental Services",    email: "dental@tn.gov",                fax: "1-615-507-6446", label: "TennCare" },
+  IN: { name: "Hoosier Healthwise Dental",   email: "dental@fssa.in.gov",           fax: "1-317-232-7979", label: "IN Hoosier Healthwise" },
+  MO: { name: "Missouri HealthNet Dental",   email: "dental@dss.mo.gov",            fax: "1-573-526-5592", label: "MO HealthNet" },
+  WI: { name: "BadgerCare Plus Dental",      email: "dental@dhs.wisconsin.gov",     fax: "1-608-266-1935", label: "WI BadgerCare Plus" },
+  SC: { name: "SC Healthy Connections Dental",email: "dental@scdhhs.gov",            fax: "1-803-255-8291", label: "SC Healthy Connections" },
 };
 
 const COMMERCIAL_PA_CONTACTS = {
@@ -212,6 +218,39 @@ function resolvePreAuthContact(patient, result) {
   if (payerName.includes("humana"))   return COMMERCIAL_PA_CONTACTS.HUMANA;
   // 4. Unknown payer — leave email blank so user fills it in
   return { name: result?.payer_name || patient?.insurance || "Insurance PA Dept", email: "", fax: "", label: result?.payer_name || patient?.insurance || "Insurance" };
+}
+
+// ── CDT Code Reference Dictionary ────────────────────────────────────────────
+const CDT_DESC = {
+  D0120:"Periodic Exam", D0150:"Comprehensive Exam", D0210:"Full Mouth X-rays", D0272:"BWX (2 films)", D0274:"BWX (4 films)",
+  D1110:"Prophylaxis (Adult)", D1120:"Prophylaxis (Child)", D1206:"Fluoride Varnish", D1351:"Sealant",
+  D2140:"Amalgam, 1 surface", D2330:"Composite, 1s Anterior", D2391:"Composite, 1s Posterior", D2392:"Composite, 2s Posterior",
+  D2750:"Crown, Porcelain/Metal (PFM)", D2751:"Crown, Porcelain", D2940:"Protective Restoration", D2950:"Core Buildup",
+  D3310:"Root Canal, Anterior", D3320:"Root Canal, Premolar", D3330:"Root Canal, Molar",
+  D4341:"SRP (per quadrant)", D4342:"SRP (1-3 teeth)", D4910:"Periodontal Maintenance",
+  D5110:"Complete Denture, Upper", D5120:"Complete Denture, Lower", D5213:"Partial Denture, Upper", D5214:"Partial Denture, Lower",
+  D6010:"Implant Body", D6065:"Implant Crown",
+  D7140:"Extraction, Erupted", D7210:"Surgical Extraction", D7220:"Impacted Tooth (Soft Tissue)", D7230:"Impacted Tooth (Partial Bony)", D7240:"Impacted Tooth (Full Bony)",
+};
+
+// ── ICD-10-CM Diagnosis Code Map (CDT → ICD-10) ─────────────────────────────
+const ICD10_MAP = {
+  D0120:["Z01.20"], D0150:["Z01.20"], D0210:["Z01.20"], D0272:["Z01.20"], D0274:["Z01.20"],
+  D1110:["Z01.20"], D1120:["Z01.20"], D1206:["Z01.20"], D1351:["Z01.20"],
+  D2140:["K02.9"], D2330:["K02.9"], D2391:["K02.9"], D2392:["K02.9"],
+  D2750:["K02.9"], D2751:["K02.9"], D2940:["K02.9"], D2950:["K02.9"],
+  D3310:["K04.0","K04.1"], D3320:["K04.0","K04.1"], D3330:["K04.0","K04.1"],
+  D4341:["K05.31"], D4342:["K05.31"], D4910:["K05.31"],
+  D5110:["K08.1"], D5120:["K08.1"], D5213:["K08.1"], D5214:["K08.1"],
+  D6010:["K08.1"], D6065:["K08.1"],
+  D7140:["K04.7"], D7210:["K01.1"], D7220:["K01.1"], D7230:["K01.1"], D7240:["K01.1"],
+};
+
+// ── Tooth # / Surface Parser ─────────────────────────────────────────────────
+function parseToothAndSurface(proc) {
+  const tooth = proc?.match(/#(\d{1,2})/)?.[0] || null;
+  const surf = proc?.match(/\b([MOIDBLF]{2,5})\b/i)?.[1]?.toUpperCase() || null;
+  return { tooth, surfaces: surf };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1401,7 +1440,7 @@ function OnboardingWizard({ onComplete, showToast }) {
 // LLM-powered Letter of Medical Necessity generator.
 // Calls /api/v1/preauth/generate → Next.js proxy → Python FastAPI + Anthropic Claude.
 // Falls back to a realistic mock when the Python service is unavailable.
-function PreauthWidget({ patient, result, triage, showToast }) {
+function PreauthWidget({ patient, result, triage, showToast, prefetched }) {
   const [status, setStatus]         = useState("idle");    // idle|loading|done|error
   const [loadStage, setLoadStage]   = useState(0);         // 0–3 progressive steps
   const [letter, setLetter]         = useState("");         // editable letter text
@@ -1412,6 +1451,16 @@ function PreauthWidget({ patient, result, triage, showToast }) {
   const stageTimer = useRef(null);
 
   useEffect(() => () => clearInterval(stageTimer.current), []);
+
+  // Auto-load prefetched pre-auth letter (Module 5 auto-drafter)
+  useEffect(() => {
+    if (prefetched?.letter && status === "idle") {
+      setLetter(prefetched.letter);
+      setAttachments(prefetched.attached_files || []);
+      setSummary(prefetched.clinical_summary || null);
+      setStatus("done");
+    }
+  }, [prefetched]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derive the procedure code from the patient's procedure string (e.g. "Crown, Porcelain (D2750)" → "D2750")
   const deriveProcedureCode = () => {
@@ -1540,7 +1589,7 @@ function PreauthWidget({ patient, result, triage, showToast }) {
       <ul style="list-style:none;padding:0">${attachments.map(f=>`<li>• <strong>${f.filename}</strong> — ${f.description}</li>`).join("")}</ul>
     </div>` : ""}
     <div class="footer">
-      <span>Generated by Level AI · ${new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})}</span>
+      <span>Generated by LevelFlow &mdash; a product of Level AI · ${new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})}</span>
       <span>Confidential — for insurance submission only</span>
     </div>
   </div>
@@ -1582,7 +1631,7 @@ function PreauthWidget({ patient, result, triage, showToast }) {
       ? `\n\nATTACHMENTS REQUIRED:\n${attachments.map(f=>`• ${f.filename} — ${f.description}`).join("\n")}`
       : "";
     const body = encodeURIComponent(
-      `Please see the pre-authorization letter below:\n\n${letter}${attachNote}\n\n---\nGenerated by Level AI`
+      `Please see the pre-authorization letter below:\n\n${letter}${attachNote}\n\n---\nGenerated by LevelFlow — a product of Level AI`
     );
     // mailto has a ~2000 char URL limit — truncate gracefully
     const mailtoUrl = `mailto:?subject=${subject}&body=${body}`.slice(0, 2000);
@@ -1763,7 +1812,7 @@ function PreauthWidget({ patient, result, triage, showToast }) {
 // ── OON Estimator Widget ──────────────────────────────────────────────────────
 // Renders the Out-of-Network financial breakdown inside BenefitsPanel.
 // Props: oon (OONEstimateResult object), patient, showToast
-function OONEstimatorWidget({ oon, patient, showToast }) {
+function OONEstimatorWidget({ oon, patient, result, practice, showToast }) {
   const [expanded, setExpanded] = useState(false);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
 
@@ -1775,45 +1824,120 @@ function OONEstimatorWidget({ oon, patient, showToast }) {
   const buildSuperbillHtml = () => {
     const pName = patient?.name || "Patient";
     const pDob = patient?.dob || "";
+    const pGender = patient?.gender || "";
     const proc = patient?.procedure || "";
-    const ins = patient?.insurance || "";
+    const ins = result?.payer_name || patient?.insurance || "";
+    const memberId = patient?.memberId || "";
+    const groupNum = patient?.groupNumber || "";
+    const providerName = patient?.provider || "";
+    const pracName = practice?.name || "Georgetown Dental Associates";
+    const pracAddr = practice?.address || "1234 Dental Way, Suite 100, Georgetown, TX 78626";
+    const pracNpi = practice?.npi || "1234567890";
+    const pracTaxId = practice?.taxId || "74-1234567";
+    const pracPhone = practice?.phone || "(555) 555-0100";
     const offFee = oon.office_fee_cents != null ? fmt(oon.office_fee_cents) : fmtD(oon.office_fee);
-    const allow = oon.allowable_amount_cents != null ? fmt(oon.allowable_amount_cents) : fmtD(oon.allowable_amount);
     const estPay = oon.estimated_insurance_payment_cents != null ? fmt(oon.estimated_insurance_payment_cents) : fmtD(oon.estimated_insurance_payment);
     const patResp = oon.patient_responsibility_cents != null ? fmt(oon.patient_responsibility_cents) : fmtD(oon.patient_responsibility);
     const today = new Date().toLocaleDateString("en-US", { year:"numeric", month:"long", day:"numeric" });
+    const dosDate = patient?.appointmentDate ? new Date(patient.appointmentDate + "T12:00:00").toLocaleDateString("en-US", { year:"numeric", month:"2-digit", day:"2-digit" }) : new Date().toLocaleDateString("en-US", { year:"numeric", month:"2-digit", day:"2-digit" });
+    // Extract CDT code, tooth #, surface, ICD-10
+    const cdtCode = (proc.match(/D\d{4}/g) || [])[0] || "";
+    const cdtDesc = CDT_DESC[cdtCode] || proc;
+    const { tooth, surfaces } = parseToothAndSurface(proc);
+    const icd10 = ICD10_MAP[cdtCode] || [];
+    const toothSurf = [tooth, surfaces].filter(Boolean).join(" ") || "";
     return `<!DOCTYPE html><html><head><title>Superbill - ${pName}</title>
-      <style>body{font-family:Helvetica,Arial,sans-serif;margin:40px;color:#1c1917}
-      h1{font-size:22px;margin-bottom:4px}h2{font-size:14px;color:#6b7280;margin-top:0}
-      .header{border-bottom:2px solid #ea580c;padding-bottom:16px;margin-bottom:24px}
-      .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
-      .box{border:1px solid #e5e7eb;border-radius:8px;padding:12px}
-      .label{font-size:10px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
-      .value{font-size:18px;font-weight:900}
-      .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f3f4f6}
-      .total{background:#1c1917;color:#f97316;border-radius:8px;padding:16px;margin-top:16px;display:flex;justify-content:space-between;align-items:center}
-      .total .label{color:#f97316}.total .value{font-size:24px;font-weight:900;color:#f97316}
-      .footer{margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center}
-      @media print{body{margin:20px}}</style></head><body>
-      <div class="header"><h1>📄 Digital Superbill</h1><h2>For Out-of-Network Reimbursement</h2></div>
-      <div class="grid"><div class="box"><div class="label">Patient</div><div style="font-weight:800">${pName}</div>
-      <div style="font-size:11px;color:#6b7280">DOB: ${pDob}</div></div>
-      <div class="box"><div class="label">Date of Service</div><div style="font-weight:800">${today}</div>
-      <div style="font-size:11px;color:#6b7280">${ins}</div></div></div>
-      <div class="box" style="margin:16px 0"><div class="label">Procedure</div>
-      <div style="font-weight:800;font-size:14px">${proc}</div></div>
-      <div style="border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin:16px 0">
-      <div class="label" style="margin-bottom:12px">📐 Financial Breakdown</div>
-      <div class="row"><span>Office Fee (Billed)</span><span style="font-weight:700">${offFee}</span></div>
-      <div class="row"><span>OON Allowable Amount</span><span style="font-weight:700">${allow}</span></div>
-      <div class="row"><span>OON Coverage Rate</span><span style="font-weight:700">${oon.oon_coverage_pct ?? 50}%</span></div>
-      <div class="row"><span style="font-weight:800;color:#16a34a">Est. Insurance Payment</span><span style="font-weight:900;color:#16a34a">${estPay}</span></div>
-      </div>
-      <div class="total"><div><div class="label">Total Patient Responsibility</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.5)">Office fee minus est. insurance payment</div></div>
-      <div class="value">${patResp}</div></div>
-      <div class="footer">Generated by Level AI • ${today} • This is not a claim — submit to your insurance for reimbursement.</div>
-      </body></html>`;
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,Helvetica,sans-serif;margin:0.5in;color:#1a1a18;font-size:11px;line-height:1.4}
+h1{font-size:18px;font-weight:900;margin-bottom:2px;color:#1a1a18}
+.subtitle{font-size:11px;color:#374151;font-weight:600;margin-bottom:0}
+.header{border-bottom:2px solid #1a1a18;padding-bottom:12px;margin-bottom:16px}
+.header-grid{display:flex;justify-content:space-between;margin-top:8px}
+.header-item{font-size:10px;color:#374151}
+.header-item b{color:#1a1a18}
+.section{margin-bottom:14px}
+.section-title{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.08em;color:#374151;border-bottom:1px solid #374151;padding-bottom:3px;margin-bottom:8px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.field{margin-bottom:5px}
+.field-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280}
+.field-value{font-size:11px;font-weight:700;color:#1a1a18}
+table{width:100%;border-collapse:collapse;margin:8px 0}
+th{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:0.06em;color:#374151;text-align:left;padding:6px 8px;border:1px solid #374151;background:#f3f4f6}
+td{font-size:11px;padding:6px 8px;border:1px solid #e5e7eb;color:#1a1a18}
+.fin-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #e5e7eb}
+.fin-row.total{border-bottom:2px solid #1a1a18;font-weight:900;font-size:13px;padding:8px 0}
+.sig-line{margin-top:24px;display:flex;align-items:flex-end;gap:16px}
+.sig-line .line{border-bottom:1px solid #374151;flex:1;height:24px}
+.sig-line .label{font-size:9px;color:#6b7280;text-transform:uppercase;white-space:nowrap}
+.footer{margin-top:28px;padding-top:10px;border-top:1px solid #e5e7eb;font-size:9px;color:#6b7280;text-align:center}
+@media print{body{margin:0.4in}@page{margin:0.4in}}
+</style></head><body>
+
+<div class="header">
+  <h1>${pracName}</h1>
+  <div class="subtitle">${pracAddr}</div>
+  <div class="header-grid">
+    <span class="header-item"><b>NPI:</b> ${pracNpi}</span>
+    <span class="header-item"><b>Tax ID:</b> ${pracTaxId}</span>
+    <span class="header-item"><b>Phone:</b> ${pracPhone}</span>
+  </div>
+</div>
+
+<div style="text-align:center;margin-bottom:16px">
+  <div style="font-size:14px;font-weight:900;letter-spacing:0.1em;text-transform:uppercase;color:#1a1a18">SUPERBILL / CLAIM FORM</div>
+  <div style="font-size:10px;color:#6b7280">For Out-of-Network Insurance Reimbursement</div>
+</div>
+
+<div class="two-col section">
+  <div>
+    <div class="section-title">Provider Information</div>
+    <div class="field"><div class="field-label">Rendering Provider</div><div class="field-value">${providerName}</div></div>
+    <div class="field"><div class="field-label">Provider NPI</div><div class="field-value">${pracNpi}</div></div>
+    <div class="field"><div class="field-label">Place of Service</div><div class="field-value">11 — Office</div></div>
+  </div>
+  <div>
+    <div class="section-title">Patient Information</div>
+    <div class="field"><div class="field-label">Patient Name</div><div class="field-value">${pName}</div></div>
+    <div class="field"><div class="field-label">DOB / Gender</div><div class="field-value">${pDob}${pGender ? " / " + pGender : ""}</div></div>
+    <div class="field"><div class="field-label">Member ID</div><div class="field-value">${memberId || "—"}</div></div>
+    <div class="field"><div class="field-label">Group #</div><div class="field-value">${groupNum || "—"}</div></div>
+    <div class="field"><div class="field-label">Insurance Carrier</div><div class="field-value">${ins || "—"}</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Service Line Items</div>
+  <table>
+    <thead><tr>
+      <th>Date of Service</th><th>CDT Code</th><th>Tooth / Surface</th><th>ICD-10-CM</th><th>Description</th><th style="text-align:right">Fee</th>
+    </tr></thead>
+    <tbody><tr>
+      <td>${dosDate}</td>
+      <td style="font-weight:800">${cdtCode || "—"}</td>
+      <td>${toothSurf || "—"}</td>
+      <td>${icd10.length > 0 ? icd10.join(", ") : "—"}</td>
+      <td>${cdtDesc}</td>
+      <td style="text-align:right;font-weight:700">${offFee}</td>
+    </tr></tbody>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-title">Financial Summary</div>
+  <div class="fin-row"><span>Total Charges</span><span style="font-weight:700">${offFee}</span></div>
+  <div class="fin-row"><span>Est. Insurance Payment</span><span style="font-weight:700">${estPay}</span></div>
+  <div class="fin-row total"><span>Patient Responsibility</span><span>${patResp}</span></div>
+</div>
+
+<div class="sig-line">
+  <div class="label">Provider Certification Signature</div><div class="line"></div>
+  <div class="label">Date</div><div class="line" style="max-width:120px"></div>
+</div>
+
+<div class="footer">Generated by LevelFlow &mdash; a product of Level AI &bull; ${today} &bull; This is not a claim &mdash; submit to your insurance carrier for reimbursement.</div>
+
+</body></html>`;
   };
 
   const handleDownloadPDF = () => {
@@ -1835,6 +1959,15 @@ function OONEstimatorWidget({ oon, patient, showToast }) {
     const patResp = oon.patient_responsibility_cents != null ? fmt(oon.patient_responsibility_cents) : fmtD(oon.patient_responsibility);
     const text = `Superbill — ${pName}\nProcedure: ${patient?.procedure || ""}\nOffice Fee: ${offFee}\nEst. Patient Responsibility: ${patResp}\nGenerated: ${new Date().toLocaleDateString()}`;
     navigator.clipboard.writeText(text).then(() => showToast("📋 Superbill summary copied!")).catch(() => showToast("Could not copy"));
+  };
+
+  const handleFaxToCarrier = () => {
+    const contact = resolvePreAuthContact(patient, result);
+    if (contact.fax) {
+      showToast(`📠 Fax superbill to ${contact.label}: ${contact.fax} — fax integration coming soon. Use Download PDF for manual fax.`);
+    } else {
+      showToast("📠 No carrier fax on file. Use Download PDF and fax manually.");
+    }
   };
 
   const isOON   = oon.network_status === "out_of_network";
@@ -1973,15 +2106,14 @@ function OONEstimatorWidget({ oon, patient, showToast }) {
           </div>
         )}
 
-        {/* ── Superbill Actions ── */}
-        <PDFActionBar
+        {/* ── Superbill Actions (3-button: Download, Fax to Carrier, Email to Patient) ── */}
+        <SuperbillActionBar
           onDownloadPDF={handleDownloadPDF}
-          onEmailPDF={() => setEmailModalOpen(true)}
-          onFaxPDF={() => showToast("📠 Fax integration coming soon — use Download PDF + manual fax for now.")}
-          onCopy={handleCopy}
+          onFaxToCarrier={handleFaxToCarrier}
+          onEmailToPatient={() => setEmailModalOpen(true)}
         />
-        <div style={{ fontSize: 10, color: "#9a3412", textAlign: "center", marginTop: -4 }}>
-          Generate secure superbill for direct insurance reimbursement
+        <div style={{ fontSize: 10, color: T.textSoft, textAlign: "center", marginTop: 4 }}>
+          Claim-ready superbill for direct insurance reimbursement
         </div>
         <EmailPDFModal
           isOpen={emailModalOpen}
@@ -2009,15 +2141,7 @@ function MedicaidCoveragePanel({ patient, result }) {
   const state = mInfo.state || result._medicaid_state || detectMedicaidStateClient(patient);
   const program = mInfo.program_name || result._medicaid_program || "Medicaid";
 
-  // CDT descriptions for display
-  const CDT_DESC = {
-    D0120:"Periodic Exam", D0150:"Comprehensive Exam", D0210:"Full Mouth X-rays", D0272:"BWX (2)", D0274:"BWX (4)",
-    D1110:"Prophy (Adult)", D1120:"Prophy (Child)", D1206:"Fluoride Varnish", D1351:"Sealant",
-    D2140:"Amalgam 1s", D2330:"Composite 1s Ant", D2391:"Composite 1s Post", D2392:"Composite 2s Post",
-    D2750:"Crown PFM", D2751:"Crown Porcelain", D3310:"RCT Anterior", D3320:"RCT Premolar", D3330:"RCT Molar",
-    D4341:"SRP (quad)", D4342:"SRP (1-3 teeth)", D5110:"Denture Upper", D5120:"Denture Lower",
-    D6010:"Implant Body", D6065:"Implant Crown", D7140:"Extraction", D7210:"Surgical Extraction",
-  };
+  // CDT_DESC is now at module scope (line ~218)
 
   return (
     <div style={{ background:"#f5f3ff", border:"1px solid #ddd6fe", borderRadius:10, marginBottom:14, overflow:"hidden" }}>
@@ -2113,7 +2237,7 @@ function MedicaidCoveragePanel({ patient, result }) {
 }
 
 // ── Benefits Panel ────────────────────────────────────────────────────────────
-function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast, onBack, backLabel }) {
+function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast, onBack, backLabel, practice, preauthCache }) {
   if (!patient) return (
     <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100%", color:T.textSoft, gap:8 }}>
       <div style={{ fontSize:32 }}>👈</div>
@@ -2173,6 +2297,8 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
               <OONEstimatorWidget
                 oon={result.oon_estimate}
                 patient={patient}
+                result={result}
+                practice={practice}
                 showToast={showToast}
               />
             )}
@@ -2206,7 +2332,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
                     <div style={{ color:T.red, fontSize:12, fontWeight:900, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.05em" }}>Block Issues Detected</div>
                     {triage.block.map((r,i)=><div key={i} style={{ color:T.red, fontSize:13, fontWeight:600, marginBottom:i<triage.block.length-1?4:0, lineHeight: "1.4" }}>{"- " + r}</div>)}
 
-                    <PreauthWidget patient={patient} result={result} triage={triage} showToast={showToast} />
+                    <PreauthWidget patient={patient} result={result} triage={triage} showToast={showToast} prefetched={preauthCache?.[patient?.id]} />
                   </div>
                 )}
                 {triage.notify.length > 0 && (
@@ -2218,7 +2344,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
                 {/* Show PreauthWidget for Medicaid PA even without block issues */}
                 {triage.block.length === 0 && (isMedicaidPatient(patient) || result?._is_medicaid) &&
                   result?.medicaid_info?.prior_auth_required?.some(c => (patient.procedure || "").match(/D\d{4}/g)?.includes(c)) && (
-                  <PreauthWidget patient={patient} result={result} triage={triage} showToast={showToast} />
+                  <PreauthWidget patient={patient} result={result} triage={triage} showToast={showToast} prefetched={preauthCache?.[patient?.id]} />
                 )}
               </div>
             )}
@@ -2449,7 +2575,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
                     lines.push(result.ai_summary);
                     lines.push(``);
                   }
-                  lines.push(`Source: ${result._source || "verified"} · Generated by Level AI`);
+                  lines.push(`Source: ${result._source || "verified"} · Generated by LevelFlow`);
                   const content = lines.join("\n");
                   const win = window.open("", "_blank");
                   win.document.write(`<html><head><title>Benefit Report — ${patient.name}</title><style>body{font-family:monospace;white-space:pre;padding:32px;font-size:13px;line-height:1.6;color:#111;}@media print{body{padding:16px}}</style></head><body>${content.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</body></html>`);
@@ -2688,11 +2814,11 @@ function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, i
 
 // ── Directory Modal — Schedule + Pre-Verify ───────────────────────────────────
 const MOCK_DIRECTORY = [
-  { id: "dir_1", name: "Amanda Lewis",   dob: "1985-04-12", procedure: "Implant Consult",  insurance: "MetLife",       phone: "(512) 555-1111", provider: "Dr. Patel",     fee: 25000,  memberId: "MET88899", fixtureId: "p1" },
-  { id: "dir_2", name: "David Chen",     dob: "1992-10-30", procedure: "Prophy + BWX",     insurance: "Delta Dental",  phone: "(512) 555-2222", provider: "Dr. Chen",      fee: 18500,  memberId: "DD77733",  fixtureId: "p2" },
-  { id: "dir_3", name: "Sarah Jenkins",  dob: "1970-02-14", procedure: "Crown Prep #18",   insurance: "Cigna",         phone: "(512) 555-3333", provider: "Dr. Kim",       fee: 145000, memberId: "CIG44422", fixtureId: "p3" },
-  { id: "dir_4", name: "Michael Vance",  dob: "2001-08-05", procedure: "Root Canal",       insurance: "Guardian",      phone: "(512) 555-4444", provider: "Dr. Rodriguez", fee: 115000, memberId: "GRD11100", fixtureId: "p5" },
-  { id: "dir_5", name: "Jessica Taylor", dob: "1998-12-22", procedure: "Composite Fill",   insurance: "Aetna DMO",     phone: "(512) 555-5555", provider: "Dr. Patel",     fee: 25000,  memberId: "AET9900",  fixtureId: "p1" },
+  { id: "dir_1", name: "Amanda Lewis",   gender:"F", dob: "1985-04-12", procedure: "Implant Consult",  insurance: "MetLife",       phone: "(512) 555-1111", provider: "Dr. Patel",     fee: 25000,  memberId: "MET88899", fixtureId: "p1" },
+  { id: "dir_2", name: "David Chen",     gender:"M", dob: "1992-10-30", procedure: "Prophy + BWX",     insurance: "Delta Dental",  phone: "(512) 555-2222", provider: "Dr. Chen",      fee: 18500,  memberId: "DD77733",  fixtureId: "p2" },
+  { id: "dir_3", name: "Sarah Jenkins",  gender:"F", dob: "1970-02-14", procedure: "Crown Prep #18",   insurance: "Cigna",         phone: "(512) 555-3333", provider: "Dr. Kim",       fee: 145000, memberId: "CIG44422", fixtureId: "p3" },
+  { id: "dir_4", name: "Michael Vance",  gender:"M", dob: "2001-08-05", procedure: "Root Canal",       insurance: "Guardian",      phone: "(512) 555-4444", provider: "Dr. Rodriguez", fee: 115000, memberId: "GRD11100", fixtureId: "p5" },
+  { id: "dir_5", name: "Jessica Taylor", gender:"F", dob: "1998-12-22", procedure: "Composite Fill",   insurance: "Aetna DMO",     phone: "(512) 555-5555", provider: "Dr. Patel",     fee: 25000,  memberId: "AET9900",  fixtureId: "p1" },
 ];
 
 const TIME_SLOTS = ["8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM"];
@@ -3040,6 +3166,26 @@ function EmailPDFModal({ isOpen, onClose, defaultEmail = "", patientName = "", d
 }
 
 // ── PDF Action Bar ───────────────────────────────────────────────────────────
+// Superbill 3-button action bar: Download PDF, Fax to Carrier, Email to Patient.
+// Used exclusively by OONEstimatorWidget for claim-ready superbill actions.
+function SuperbillActionBar({ onDownloadPDF, onFaxToCarrier, onEmailToPatient }) {
+  const btnStyle = {
+    display:"flex", alignItems:"center", gap:6, flex:1, justifyContent:"center",
+    padding:"10px 16px", borderRadius:8, border:"1px solid " + T.border,
+    background:T.bgCard, color:T.textMid, fontSize:12, fontWeight:700,
+    cursor:"pointer", transition:"all 0.15s", whiteSpace:"nowrap",
+  };
+  const hoverIn = e => { e.currentTarget.style.borderColor = T.indigo; e.currentTarget.style.color = T.indigo; };
+  const hoverOut = e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.color = T.textMid; };
+  return (
+    <div style={{ display:"flex", gap:8 }}>
+      <button style={btnStyle} onClick={onDownloadPDF} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>📥 Download PDF</button>
+      <button style={btnStyle} onClick={onFaxToCarrier} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>📠 Fax to Carrier</button>
+      <button style={btnStyle} onClick={onEmailToPatient} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>📧 Email to Patient</button>
+    </div>
+  );
+}
+
 // Universal 4-button action bar: Download PDF, Email PDF, Fax PDF, Copy.
 // Props: onDownloadPDF, onEmailPDF, onFaxPDF, onCopy, compact
 function PDFActionBar({ onDownloadPDF, onEmailPDF, onFaxPDF, onCopy, compact = false }) {
@@ -5167,6 +5313,12 @@ export default function LevelAI() {
   const [dismissedAlerts, setDismissedAlerts] = useState({ blocked: false, notify: false });
   const [showDirectoryModal, setShowDirectoryModal] = useState(false);
 
+  // ── Practice data (for superbill NPI/TaxID/address) ──────────────────────────
+  const [practice, setPractice] = useState(null);
+
+  // ── Pre-auth auto-drafter cache (Module 5) ─────────────────────────────────
+  const [preauthCache, setPreauthCache] = useState({});
+
   // Track which patients have had auto-verify queued this session
   const autoQueued = useRef(new Set());
 
@@ -5177,7 +5329,10 @@ export default function LevelAI() {
     // Skip in sandbox mode — no Clerk session, API would 401
     if (isSignedIn) {
       fetch("/api/v1/practice", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
-        .then(r => r.json()).then(d => { if (d.practice?.accountMode) setAccountMode(d.practice.accountMode); })
+        .then(r => r.json()).then(d => {
+          if (d.practice?.accountMode) setAccountMode(d.practice.accountMode);
+          if (d.practice) setPractice(d.practice);
+        })
         .catch(() => {}); // non-blocking — fail silently if DB not reachable
     }
   }, [isSignedIn]);
@@ -5395,6 +5550,25 @@ export default function LevelAI() {
     else if (triage.notify.length > 0) newEntries.push(buildOutreachEntry(patient, triage));
     setAgentLog(log => [...newEntries.reverse(), ...log]);
 
+    // ── Module 5: Auto-trigger pre-auth letter when PA is required ─────────
+    const needsPA = triage.block.some(b => /pre-auth|missing.*tooth/i.test(b)) ||
+      (finalResult?._is_medicaid && finalResult?.medicaid_info?.prior_auth_required?.some(
+        c => (patient.procedure || "").match(/D\d{4}/g)?.includes(c)
+      ));
+    if (needsPA && !preauthCache[patient.id]) {
+      const procCode = (patient.procedure || "").match(/D\d{4}/)?.[0] || "D6010";
+      fetch("/api/v1/preauth/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patient_id: patient.id, procedure_code: procCode }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data?.letter) setPreauthCache(prev => ({ ...prev, [patient.id]: data }));
+        })
+        .catch(() => {}); // non-blocking
+    }
+
     // ── Module 3: Create SMS draft for block/notify patients ────────────────
     if ((triage.block.length > 0 || triage.notify.length > 0) && patient.phone && !sandboxMode) {
       const smsMessage = triage.block.length > 0
@@ -5421,7 +5595,7 @@ export default function LevelAI() {
         }
       }).catch(() => {}); // non-blocking
     }
-  }, [isLoading, setPhase, showToast, sandboxMode]);
+  }, [isLoading, setPhase, showToast, sandboxMode, preauthCache]);
 
   // ── Auto-verify: fires on schedule load for today, 24h, and 7d windows ───────
   useEffect(() => {
@@ -5979,6 +6153,7 @@ export default function LevelAI() {
                 <BenefitsPanel patient={selected} result={selected ? results[selected.id] : null}
                   phaseInfo={selected ? phases[selected.id] : null} onVerify={verify}
                   triage={selected ? triageMap[selected.id] : null} showToast={showToast}
+                  practice={practice} preauthCache={preauthCache}
                   onBack={prevPanel ? () => { setSchedulePanel(prevPanel); setPrevPanel(null); } : null}
                   backLabel={prevPanel === "alerts" ? "Back to Needs Attention" : prevPanel === "outreach" ? "Back to Outreach" : prevPanel === "autoverified" ? "Back to Auto-Verified" : null} />
               )}

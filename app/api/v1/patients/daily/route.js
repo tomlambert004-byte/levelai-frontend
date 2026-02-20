@@ -18,14 +18,14 @@ export const dynamic = "force-dynamic";
 
 // ── Fixture data (last-resort fallback) ──────────────────────────────────────
 const ALL_PATIENTS = [
-  { id:"p1", name:"Sarah Mitchell",  dob:"1985-03-14", memberId:"UHC-884-221-09",  insurance:"UnitedHealthcare",       procedure:"Composite Restoration (D2391)",       provider:"Dr. Patel", fee:42000,  phone:"555-210-4832", email:"sarah.mitchell@email.com" },
-  { id:"p2", name:"James Thornton",  dob:"1972-07-28", memberId:"DL-99032-TH",     insurance:"Delta Dental",           procedure:"Posterior Composite (D2392)",         provider:"Dr. Patel", fee:38000,  phone:"555-384-9201", email:"jthornton@email.com" },
-  { id:"p3", name:"Maria Gonzalez",  dob:"1990-11-02", memberId:"BCBS-771-009-44", insurance:"Blue Cross Blue Shield", procedure:"Prophylaxis + Exam (D1110/D0120)",   provider:"Dr. Chen",  fee:22000,  phone:"555-601-7743", email:"mgonzalez@email.com" },
-  { id:"p4", name:"Robert Kim",      dob:"1968-05-19", memberId:"CIG-44823-RK",    insurance:"Cigna",                  procedure:"Implant Crown (D6065)",               provider:"Dr. Patel", fee:185000, phone:"555-928-3310", email:"robert.kim@email.com" },
-  { id:"p5", name:"Emily Watkins",   dob:"1995-09-30", memberId:"MET-229-884-EW",  insurance:"MetLife",                procedure:"Prophylaxis + X-rays (D1110/D0274)", provider:"Dr. Chen",  fee:28000,  phone:"555-473-6621", email:"ewatkins@email.com" },
-  { id:"p6", name:"David Okafor",    dob:"1980-01-15", memberId:"AET-55901-DO",    insurance:"Aetna",                  procedure:"Scaling & Root Planing (D4341)",     provider:"Dr. Patel", fee:75000,  phone:"555-119-8847", email:"dokafor@email.com" },
-  { id:"p7", name:"Lisa Chen",       dob:"1987-06-12", memberId:"HUM-334-227-LC",  insurance:"Humana Dental",          procedure:"Crown, Porcelain (D2750)",           provider:"Dr. Patel", fee:145000, phone:"555-302-8819", email:"lisa.chen@email.com", isOON:true },
-  { id:"p8", name:"Marvin Medicaid",  dob:"1978-08-22", memberId:"TMHP-990-221-08", insurance:"Texas Medicaid (TMHP)",  procedure:"Crown, PFM (D2750)",                 provider:"Dr. Patel", fee:75000,  phone:"555-888-4401", email:"marvin.m@email.com",   payerId:"77037" },
+  { id:"p1", name:"Sarah Mitchell",  gender:"F", dob:"1985-03-14", memberId:"UHC-884-221-09",  insurance:"UnitedHealthcare",       procedure:"Composite Restoration (D2391)",       provider:"Dr. Patel", fee:42000,  phone:"555-210-4832", email:"sarah.mitchell@email.com" },
+  { id:"p2", name:"James Thornton",  gender:"M", dob:"1972-07-28", memberId:"DL-99032-TH",     insurance:"Delta Dental",           procedure:"Posterior Composite (D2392)",         provider:"Dr. Patel", fee:38000,  phone:"555-384-9201", email:"jthornton@email.com" },
+  { id:"p3", name:"Maria Gonzalez",  gender:"F", dob:"1990-11-02", memberId:"BCBS-771-009-44", insurance:"Blue Cross Blue Shield", procedure:"Prophylaxis + Exam (D1110/D0120)",   provider:"Dr. Chen",  fee:22000,  phone:"555-601-7743", email:"mgonzalez@email.com" },
+  { id:"p4", name:"Robert Kim",      gender:"M", dob:"1968-05-19", memberId:"CIG-44823-RK",    insurance:"Cigna",                  procedure:"Implant Crown (D6065)",               provider:"Dr. Patel", fee:185000, phone:"555-928-3310", email:"robert.kim@email.com" },
+  { id:"p5", name:"Emily Watkins",   gender:"F", dob:"1995-09-30", memberId:"MET-229-884-EW",  insurance:"MetLife",                procedure:"Prophylaxis + X-rays (D1110/D0274)", provider:"Dr. Chen",  fee:28000,  phone:"555-473-6621", email:"ewatkins@email.com" },
+  { id:"p6", name:"David Okafor",    gender:"M", dob:"1980-01-15", memberId:"AET-55901-DO",    insurance:"Aetna",                  procedure:"Scaling & Root Planing (D4341)",     provider:"Dr. Patel", fee:75000,  phone:"555-119-8847", email:"dokafor@email.com" },
+  { id:"p7", name:"Lisa Chen",       gender:"F", dob:"1987-06-12", memberId:"HUM-334-227-LC",  insurance:"Humana Dental",          procedure:"Crown, Porcelain (D2750)",           provider:"Dr. Patel", fee:145000, phone:"555-302-8819", email:"lisa.chen@email.com", isOON:true },
+  { id:"p8", name:"Marvin Medicaid", gender:"M", dob:"1978-08-22", memberId:"TMHP-990-221-08", insurance:"Texas Medicaid (TMHP)",  procedure:"Crown, PFM (D2750)",                 provider:"Dr. Patel", fee:75000,  phone:"555-888-4401", email:"marvin.m@email.com",   payerId:"77037" },
 ];
 
 const WEEKLY_SCHEDULE = {
