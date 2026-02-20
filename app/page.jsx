@@ -648,11 +648,33 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
         if (typeof window !== "undefined") localStorage.setItem("pulp_needs_onboarding", "1");
         await setSignUpActive({ session: res.createdSessionId });
         // isSignedIn flips → LevelAI renders → OnboardingWizard overlay shows
+      } else if (res.status === "missing_requirements") {
+        // Email verified but Clerk needs more (e.g. phone). Complete if session exists.
+        if (res.createdSessionId) {
+          if (typeof window !== "undefined") localStorage.setItem("pulp_needs_onboarding", "1");
+          await setSignUpActive({ session: res.createdSessionId });
+        } else {
+          setAuthErr("Additional verification required. Please contact support.");
+        }
       } else {
-        setAuthErr("Verification incomplete. Please try again.");
+        setAuthErr(`Verification status: ${res.status}. Please try again.`);
       }
     } catch (err) {
-      setAuthErr(err.errors?.[0]?.message || "Invalid code. Please try again.");
+      const msg = err.errors?.[0]?.message || "";
+      const errCode = err.errors?.[0]?.code || "";
+      // Handle "already verified" — complete the sign-up if possible
+      if (errCode === "form_code_already_verified" || msg.toLowerCase().includes("already verified")) {
+        try {
+          if (signUp.status === "complete" && signUp.createdSessionId) {
+            if (typeof window !== "undefined") localStorage.setItem("pulp_needs_onboarding", "1");
+            await setSignUpActive({ session: signUp.createdSessionId });
+            return;
+          }
+        } catch {}
+        setAuthErr("Email already verified. Please go back and sign in instead.");
+        return;
+      }
+      setAuthErr(msg || "Invalid code. Please try again.");
     }
   };
 
@@ -827,6 +849,26 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
                 {authErr && <div style={{ color: T.red, fontSize: 13, fontWeight: 700, padding: "10px 14px", background: T.redLight, borderRadius: 8, border: "1px solid " + T.redBorder }}>{authErr}</div>}
                 <NextBtn type="submit" label="Verify Email →" disabled={verifyCode.join("").length !== 6} />
               </form>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 20 }}>
+                <button onClick={async () => {
+                  try {
+                    await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+                    showToast("New code sent!");
+                    setVerifyCode(["","","","","",""]);
+                    setAuthErr("");
+                    document.getElementById("vc-0")?.focus();
+                  } catch {
+                    setAuthErr("Could not resend code. Try again.");
+                  }
+                }}
+                  style={{ background: "none", border: "none", color: T.indigoDark, fontSize: 13, fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>
+                  Didn&apos;t get the code? Resend
+                </button>
+                <button onClick={() => { setStep("login"); setAuthErr(""); }}
+                  style={{ background: "none", border: "none", color: T.textSoft, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>
+                  ← Back to Sign In
+                </button>
+              </div>
             </div>
           )}
 
