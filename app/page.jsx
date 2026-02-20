@@ -3695,7 +3695,7 @@ const SInput = ({ label, type = "text", placeholder, value, onChange, validate, 
   );
 };
 
-function Settings({ showToast }) {
+function Settings({ showToast, onSyncComplete }) {
   const [activeTab, setActiveTab]   = useState("general");
 
   // General
@@ -3729,8 +3729,7 @@ function Settings({ showToast }) {
       if (data.synced > 0) {
         showToast(`✅ ${data.synced} patient${data.synced !== 1 ? "s" : ""} pulled from ${pmsSystem}`);
         // Refresh the schedule so the new OD data shows up immediately
-        const todayStr = new Date().toISOString().split("T")[0];
-        loadWeekSchedule(todayStr);
+        if (onSyncComplete) onSyncComplete();
       }
       else if (!hasError) showToast("No appointments found for today in Open Dental");
     } catch (err) {
@@ -5214,7 +5213,7 @@ export default function LevelAI() {
 
         {tab === "settings" && (
           <div key="settings" style={{ animation:"fadeIn 0.3s ease-out", height:"100%", display:"flex", flexDirection:"column" }}>
-          <Settings showToast={showToast} />
+          <Settings showToast={showToast} onSyncComplete={() => loadWeekSchedule(new Date().toISOString().split("T")[0])} />
           </div>
         )}
 
