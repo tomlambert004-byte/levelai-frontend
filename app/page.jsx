@@ -1229,180 +1229,299 @@ function OnboardingWizard({ onComplete, showToast }) {
 }
 
 // ── Preauth Widget ────────────────────────────────────────────────────────────
+// LLM-powered Letter of Medical Necessity generator.
+// Calls /api/v1/preauth/generate → Next.js proxy → Python FastAPI + Anthropic Claude.
+// Falls back to a realistic mock when the Python service is unavailable.
 function PreauthWidget({ patient, result, triage, showToast }) {
-  const [status, setStatus]       = useState("idle");
-  const [preauthId, setPreauthId] = useState(null);
-  const [letter, setLetter]       = useState(null);
-  const [errorMsg, setErrorMsg]   = useState(null);
-  const [elapsed, setElapsed]     = useState(0);
-  const pollRef  = useRef(null);
-  const timerRef = useRef(null);
+  const [status, setStatus]         = useState("idle");    // idle|loading|done|error
+  const [loadStage, setLoadStage]   = useState(0);         // 0–3 progressive steps
+  const [letter, setLetter]         = useState("");         // editable letter text
+  const [attachments, setAttachments] = useState([]);
+  const [summary, setSummary]       = useState(null);
+  const [errorMsg, setErrorMsg]     = useState(null);
+  const stageTimer = useRef(null);
 
-  useEffect(() => () => {
-    clearInterval(pollRef.current);
-    clearInterval(timerRef.current);
-  }, []);
+  useEffect(() => () => clearInterval(stageTimer.current), []);
 
-  const startElapsedTimer = () => {
-    setElapsed(0);
-    timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000);
+  // Derive the procedure code from the patient's procedure string (e.g. "Crown, Porcelain (D2750)" → "D2750")
+  const deriveProcedureCode = () => {
+    const match = (patient.procedure || "").match(/\b(D\d{4})\b/);
+    if (match) return match[1];
+    // Fallback mapping by procedure keyword
+    if (/implant/i.test(patient.procedure))  return "D6010";
+    if (/root canal|endodontic/i.test(patient.procedure)) return "D3310";
+    if (/scaling|perio|srp/i.test(patient.procedure))    return "D4342";
+    return "D6010"; // default to implant demo
   };
 
-  const stopTimers = () => {
-    clearInterval(pollRef.current);
-    clearInterval(timerRef.current);
-  };
+  const LOAD_STAGES = [
+    "Fetching clinical notes from PMS…",
+    "Reviewing coverage rules & triage flags…",
+    "AI drafting medical necessity narrative…",
+    "Formatting pre-authorization letter…",
+  ];
 
-  const handleSubmit = async () => {
-    setStatus("submitting");
+  const handleGenerate = async () => {
+    setStatus("loading");
+    setLoadStage(0);
     setErrorMsg(null);
-    setLetter(null);
-    startElapsedTimer();
+    setLetter("");
+    setAttachments([]);
+    setSummary(null);
+
+    // Advance loading stages every ~1.5s for UX
+    let stage = 0;
+    stageTimer.current = setInterval(() => {
+      stage = Math.min(stage + 1, LOAD_STAGES.length - 1);
+      setLoadStage(stage);
+    }, 1500);
 
     try {
-      const payload = {
-        patient_name:           patient.name,
-        patient_dob:            patient.dob,
-        member_id:              patient.memberId,
-        insurance:              patient.insurance,
-        procedure:              patient.procedure,
-        provider:               patient.provider,
-        appointment_date:       patient.appointmentDate,
-        block_reasons:          triage.block,
-        affected_teeth:         result?.missing_tooth_clause?.affected_teeth || [],
-        annual_remaining_cents: result?.annual_remaining_cents,
-      };
-
-      const res = await fetch("http://localhost:8000/api/preauth/submit", {
+      const res = await fetch("/api/v1/preauth/generate", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify(payload),
+        body:    JSON.stringify({
+          patient_id:     patient.id,
+          procedure_code: deriveProcedureCode(),
+        }),
       });
 
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      clearInterval(stageTimer.current);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Server error ${res.status}`);
+      }
+
       const data = await res.json();
-      setPreauthId(data.id);
-      setStatus("polling");
-
-      pollRef.current = setInterval(async () => {
-        try {
-          const poll = await fetch(`http://localhost:8000/api/preauth/${data.id}/status`);
-          if (!poll.ok) return;
-          const pollData = await poll.json();
-
-          if (pollData.status === "SUBMITTED") {
-            stopTimers();
-            setLetter(pollData.letter);
-            setStatus("done");
-            showToast("Pre-authorization letter generated! ✓");
-          } else if (pollData.status === "ERROR" || pollData.status === "FAILED") {
-            stopTimers();
-            setErrorMsg(pollData.error || "Generation failed — please try again.");
-            setStatus("error");
-          }
-        } catch (e) {
-          console.warn("Poll error:", e);
-        }
-      }, 2500);
+      setLetter(data.letter || "");
+      setAttachments(data.attached_files || []);
+      setSummary(data.clinical_summary || null);
+      setStatus("done");
+      showToast("Pre-auth letter generated by Claude ✓");
 
     } catch (e) {
-      stopTimers();
-      setErrorMsg(e.message || "Could not reach the server.");
+      clearInterval(stageTimer.current);
+      setErrorMsg(e.message || "Generation failed — please try again.");
       setStatus("error");
     }
   };
 
   const handleReset = () => {
-    stopTimers();
+    clearInterval(stageTimer.current);
     setStatus("idle");
-    setLetter(null);
+    setLetter("");
+    setAttachments([]);
+    setSummary(null);
     setErrorMsg(null);
-    setElapsed(0);
+    setLoadStage(0);
   };
 
+  const handleDownloadPDF = () => {
+    const safeName = (patient.name || "Patient").replace(/\s+/g, "_");
+    const date     = patient.appointmentDate || new Date().toISOString().split("T")[0];
+    const filename = `PreAuth_${safeName}_${date}.pdf`;
+
+    const attachList = attachments.map(f => `  • ${f.filename} — ${f.description}`).join("\n");
+
+    const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Pre-Authorization Letter — ${patient.name}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Georgia, "Times New Roman", serif; font-size: 12pt; line-height: 1.7; color: #1a1a18; padding: 0; }
+    @page { margin: 1in; }
+    @media print { body { padding: 0; } }
+    .header { border-bottom: 2px solid #1a1a18; padding-bottom: 12px; margin-bottom: 24px; }
+    .header h1 { font-size: 10pt; letter-spacing: 0.1em; text-transform: uppercase; color: #555; font-family: Arial, sans-serif; }
+    .header h2 { font-size: 18pt; font-weight: bold; margin-top: 4px; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin-bottom: 20px; font-size: 10pt; font-family: Arial, sans-serif; }
+    .meta-grid .label { font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+    .letter-body { white-space: pre-wrap; font-size: 11pt; line-height: 1.75; }
+    .attachments { margin-top: 24px; padding: 16px; background: #f8f8f6; border: 1px solid #ddd; border-radius: 4px; }
+    .attachments h3 { font-size: 10pt; font-family: Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+    .attachments ul { list-style: none; padding: 0; }
+    .attachments li { font-size: 10pt; padding: 3px 0; font-family: Arial, sans-serif; }
+    .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #ccc; font-size: 9pt; color: #888; font-family: Arial, sans-serif; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Georgetown Dental Associates — Pre-Authorization Request</h1>
+    <h2>Letter of Medical Necessity</h2>
+  </div>
+  <div class="meta-grid">
+    <div><span class="label">Patient:</span> ${patient.name}</div>
+    <div><span class="label">DOB:</span> ${patient.dob || "—"}</div>
+    <div><span class="label">Member ID:</span> ${patient.memberId || "—"}</div>
+    <div><span class="label">Insurance:</span> ${patient.insurance || "—"}</div>
+    <div><span class="label">Procedure:</span> ${patient.procedure || "—"}</div>
+    <div><span class="label">Date of Service:</span> ${patient.appointmentDate || "—"}</div>
+  </div>
+  <div class="letter-body">${letter.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+  ${attachments.length > 0 ? `
+  <div class="attachments">
+    <h3>Supporting Documents</h3>
+    <ul>${attachments.map(f => `<li>• <strong>${f.filename}</strong> — ${f.description}</li>`).join("")}</ul>
+  </div>` : ""}
+  <div class="footer">Generated by Level AI · ${new Date().toLocaleDateString("en-US", { year:"numeric", month:"long", day:"numeric" })} · Confidential — for insurance submission only</div>
+</body>
+</html>`;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;width:0;height:0;border:0;opacity:0;";
+    document.body.appendChild(iframe);
+    iframe.contentDocument.write(htmlContent);
+    iframe.contentDocument.close();
+    iframe.contentWindow.document.title = filename;
+    setTimeout(() => {
+      iframe.contentWindow.print();
+      setTimeout(() => document.body.removeChild(iframe), 1000);
+    }, 300);
+    showToast("Print dialog opened — choose 'Save as PDF' ↓");
+  };
+
+  // ── IDLE ──────────────────────────────────────────────────────────────────
   if (status === "idle") return (
-    <button onClick={handleSubmit}
-      style={{ marginTop: 12, background: T.indigoDark, color: "white", padding: "10px 16px", borderRadius: 8, fontWeight: 800, cursor: "pointer", border: "none", width: "100%", display: "flex", justifyContent: "center", alignItems: "center", gap: 8, transition: "0.2s" }}
-      onMouseEnter={e => e.currentTarget.style.opacity = 0.9}
-      onMouseLeave={e => e.currentTarget.style.opacity = 1}>
-      <span style={{ fontSize: 16 }}>⚡</span> Automate Pre-Authorization
+    <button onClick={handleGenerate}
+      style={{ marginTop:12, background:T.indigoDark, color:"white", padding:"10px 16px", borderRadius:8,
+        fontWeight:800, cursor:"pointer", border:"none", width:"100%", display:"flex",
+        justifyContent:"center", alignItems:"center", gap:8, transition:"0.2s" }}
+      onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
+      onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+      <span style={{ fontSize:16 }}>⚡</span> Generate Pre-Authorization Letter
     </button>
   );
 
-  if (status === "submitting" || status === "polling") return (
-    <div style={{ marginTop: 12, background: T.indigoLight, border: "1px solid " + T.indigoBorder, borderRadius: 8, padding: "14px 16px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-        <span style={{ width: 10, height: 10, borderRadius: "50%", background: T.indigo, animation: "pulse 1.5s infinite", flexShrink: 0 }} />
-        <span style={{ color: T.indigoDark, fontSize: 13, fontWeight: 800 }}>
-          {status === "submitting" ? "Submitting to AI engine…" : "Generating pre-auth letter…"}
+  // ── LOADING ───────────────────────────────────────────────────────────────
+  if (status === "loading") return (
+    <div style={{ marginTop:12, background:T.indigoLight, border:"1px solid "+T.indigoBorder,
+      borderRadius:10, padding:"16px 18px" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+        <span style={{ width:10, height:10, borderRadius:"50%", background:T.indigo,
+          animation:"pulse 1.2s ease-in-out infinite", flexShrink:0 }} />
+        <span style={{ color:T.indigoDark, fontSize:13, fontWeight:800 }}>
+          Generating Letter of Medical Necessity…
         </span>
-        <span style={{ marginLeft: "auto", color: T.indigo, fontSize: 11, fontWeight: 700 }}>{elapsed}s</span>
       </div>
-      {status === "polling" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {[
-            { label: "Reviewing coverage rules",        done: true           },
-            { label: "Drafting clinical justification", done: elapsed > 4   },
-            { label: "Formatting payer letter",         done: elapsed > 9   },
-            { label: "Finalizing & submitting",         done: elapsed > 14  },
-          ].map(step => (
-            <div key={step.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ width: 16, height: 16, borderRadius: "50%", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, background: step.done ? T.limeDark : T.borderStrong, color: step.done ? "white" : T.textSoft, flexShrink: 0 }}>
-                {step.done ? "✓" : "·"}
+      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        {LOAD_STAGES.map((label, i) => {
+          const done    = i < loadStage;
+          const active  = i === loadStage;
+          return (
+            <div key={label} style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ width:22, height:22, borderRadius:"50%", flexShrink:0,
+                display:"flex", alignItems:"center", justifyContent:"center", fontSize:10,
+                fontWeight:900, transition:"0.3s",
+                background: done ? T.limeDark : active ? T.indigo : T.borderStrong,
+                color: done || active ? "white" : T.textSoft }}>
+                {done ? "✓" : active ? "…" : i + 1}
+              </div>
+              <span style={{ fontSize:12, fontWeight:700,
+                color: done ? T.limeDark : active ? T.indigoDark : T.textSoft }}>
+                {label}
               </span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: step.done ? T.limeDark : T.textSoft }}>{step.label}</span>
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 
+  // ── ERROR ─────────────────────────────────────────────────────────────────
   if (status === "error") return (
-    <div style={{ marginTop: 12, background: T.redLight, border: "1px solid " + T.redBorder, borderRadius: 8, padding: "12px 14px" }}>
-      <div style={{ color: T.red, fontSize: 12, fontWeight: 800, marginBottom: 6 }}>Pre-Auth Failed</div>
-      <div style={{ color: T.red, fontSize: 12, marginBottom: 10 }}>{errorMsg}</div>
-      <button onClick={handleReset} style={{ background: T.red, color: "white", border: "none", borderRadius: 6, padding: "8px 14px", fontWeight: 800, cursor: "pointer", fontSize: 12 }}>
+    <div style={{ marginTop:12, background:T.redLight, border:"1px solid "+T.redBorder,
+      borderRadius:8, padding:"12px 14px" }}>
+      <div style={{ color:T.red, fontSize:13, fontWeight:800, marginBottom:6 }}>Pre-Auth Generation Failed</div>
+      <div style={{ color:T.red, fontSize:12, marginBottom:12, lineHeight:1.5 }}>{errorMsg}</div>
+      <button onClick={handleReset} style={{ background:T.red, color:"white", border:"none",
+        borderRadius:6, padding:"8px 16px", fontWeight:800, cursor:"pointer", fontSize:12 }}>
         Try Again
       </button>
     </div>
   );
 
-  if (status === "done" && letter) return (
-    <div style={{ marginTop: 12, background: T.limeLight, border: "1px solid " + T.limeBorder, borderRadius: 8, overflow: "hidden" }}>
-      <div style={{ padding: "10px 14px", background: T.limeDark, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ color: "white", fontSize: 12, fontWeight: 900 }}>✓ Pre-Auth Letter Generated</span>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => { navigator.clipboard.writeText(letter); showToast("Letter copied to clipboard!"); }}
-            style={{ background: "rgba(255,255,255,0.2)", color: "white", border: "none", borderRadius: 6, padding: "5px 10px", fontWeight: 800, cursor: "pointer", fontSize: 11 }}>
+  // ── DONE ──────────────────────────────────────────────────────────────────
+  if (status === "done") return (
+    <div style={{ marginTop:12, border:"1px solid "+T.limeBorder, borderRadius:10, overflow:"hidden" }}>
+
+      {/* Header bar */}
+      <div style={{ padding:"10px 16px", background:T.limeDark, display:"flex",
+        justifyContent:"space-between", alignItems:"center" }}>
+        <span style={{ color:"white", fontSize:12, fontWeight:900 }}>
+          ✓ Letter of Medical Necessity — Ready
+        </span>
+        <div style={{ display:"flex", gap:6 }}>
+          <button onClick={() => { navigator.clipboard.writeText(letter); showToast("Copied to clipboard!"); }}
+            style={{ background:"rgba(255,255,255,0.2)", color:"white", border:"none",
+              borderRadius:5, padding:"4px 10px", fontWeight:800, cursor:"pointer", fontSize:11 }}>
             Copy
           </button>
           <button onClick={handleReset}
-            style={{ background: "transparent", color: "rgba(255,255,255,0.7)", border: "none", borderRadius: 6, padding: "5px 10px", fontWeight: 800, cursor: "pointer", fontSize: 11 }}>
+            style={{ background:"transparent", color:"rgba(255,255,255,0.7)", border:"none",
+              borderRadius:5, padding:"4px 8px", fontWeight:800, cursor:"pointer", fontSize:13 }}>
             ✕
           </button>
         </div>
       </div>
-      <div style={{ padding: "14px 16px", maxHeight: 280, overflowY: "auto", fontSize: 12, lineHeight: "1.7", color: T.textMid, whiteSpace: "pre-wrap", fontFamily: "Georgia, serif" }}>
-        {letter}
+
+      {/* Attached files list */}
+      {attachments.length > 0 && (
+        <div style={{ padding:"10px 16px", background:"#f0fdf4", borderBottom:"1px solid "+T.limeBorder }}>
+          <div style={{ fontSize:10, fontWeight:900, color:T.limeDark, textTransform:"uppercase",
+            letterSpacing:"0.06em", marginBottom:6 }}>
+            Supporting Documents ({attachments.length})
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+            {attachments.map((f, i) => (
+              <div key={i} style={{ display:"flex", alignItems:"center", gap:8, fontSize:11, color:T.textMid }}>
+                <span style={{ fontSize:13 }}>
+                  {f.file_type === "xray" ? "🦷" : f.file_type === "chart" ? "📋" : "📄"}
+                </span>
+                <span style={{ fontWeight:700, color:T.text }}>{f.filename}</span>
+                <span style={{ color:T.textSoft }}>— {f.description}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Editable letter textarea */}
+      <div style={{ padding:"12px 16px", background:T.bgCard }}>
+        <div style={{ fontSize:10, fontWeight:900, color:T.textMid, textTransform:"uppercase",
+          letterSpacing:"0.06em", marginBottom:6 }}>
+          Letter — Edit before downloading
+        </div>
+        <textarea
+          value={letter}
+          onChange={e => setLetter(e.target.value)}
+          rows={14}
+          style={{ width:"100%", padding:"10px 12px", border:"1px solid "+T.border, borderRadius:7,
+            fontSize:11, lineHeight:1.7, color:T.text, fontFamily:"Georgia, serif",
+            background:"white", outline:"none", resize:"vertical", whiteSpace:"pre-wrap" }}
+        />
       </div>
-      <div style={{ padding: "10px 14px", borderTop: "1px solid " + T.limeBorder, display: "flex", gap: 8 }}>
-        <button onClick={() => {
-          const blob = new Blob([letter], { type: "text/plain" });
-          const url  = URL.createObjectURL(blob);
-          const a    = document.createElement("a");
-          a.href     = url;
-          a.download = `preauth_${patient.name.replace(/ /g, "_")}_${patient.appointmentDate}.txt`;
-          a.click();
-          URL.revokeObjectURL(url);
-          showToast("Letter downloaded!");
-        }}
-          style={{ flex: 1, background: T.indigoDark, color: "white", border: "none", borderRadius: 6, padding: "9px", fontWeight: 800, cursor: "pointer", fontSize: 12 }}>
-          ↓ Download Letter
+
+      {/* Action buttons */}
+      <div style={{ padding:"10px 16px", borderTop:"1px solid "+T.limeBorder,
+        display:"flex", gap:8, background:"#f0fdf4" }}>
+        <button onClick={handleDownloadPDF}
+          style={{ flex:2, background:T.indigoDark, color:"white", border:"none", borderRadius:7,
+            padding:"10px", fontWeight:800, cursor:"pointer", fontSize:12, display:"flex",
+            alignItems:"center", justifyContent:"center", gap:6 }}>
+          📄 Download Pre-Auth PDF
+        </button>
+        <button onClick={() => { navigator.clipboard.writeText(letter); showToast("Letter copied!"); }}
+          style={{ flex:1, background:T.bgCard, color:T.indigoDark, border:"1px solid "+T.indigoBorder,
+            borderRadius:7, padding:"10px", fontWeight:800, cursor:"pointer", fontSize:12 }}>
+          Copy Text
         </button>
         <button onClick={() => showToast("Fax queued to " + patient.insurance + "!")}
-          style={{ flex: 1, background: T.bgCard, color: T.indigoDark, border: "1px solid " + T.indigoBorder, borderRadius: 6, padding: "9px", fontWeight: 800, cursor: "pointer", fontSize: 12 }}>
-          📠 Fax to Payer
+          style={{ flex:1, background:T.bgCard, color:T.textMid, border:"1px solid "+T.border,
+            borderRadius:7, padding:"10px", fontWeight:800, cursor:"pointer", fontSize:12 }}>
+          📠 Fax
         </button>
       </div>
     </div>
