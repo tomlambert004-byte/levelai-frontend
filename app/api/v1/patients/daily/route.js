@@ -3,15 +3,17 @@
  *
  * Priority:
  *   1. Postgres — query Patient rows for this practice + date (from OD sync or CSV import)
- *   2. Fixture fallback — hardcoded demo schedule (weekday rotation, always available)
+ *   2. Open Dental API — pull directly from OD demo if DB is empty / unavailable
+ *   3. Fixture fallback — hardcoded demo schedule (last resort if OD API also fails)
  *
- * Auth: Clerk userId → Practice.id lookup. Unauthenticated or practice-less → fixture.
+ * Auth: Clerk userId → Practice.id lookup. Unauthenticated or practice-less → OD / fixture.
  */
 
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "../../../../../lib/prisma.js";
+import { syncDailySchedule } from "../../../../../lib/opendental.js";
 
-// ── Fixture data (demo fallback) ──────────────────────────────────────────────
+// ── Fixture data (last-resort fallback) ──────────────────────────────────────
 const ALL_PATIENTS = [
   { id:"p1", name:"Sarah Mitchell",  dob:"1985-03-14", memberId:"UHC-884-221-09",  insurance:"UnitedHealthcare",       procedure:"Composite Restoration (D2391)",       provider:"Dr. Patel", fee:42000,  phone:"555-210-4832", email:"sarah.mitchell@email.com" },
   { id:"p2", name:"James Thornton",  dob:"1972-07-28", memberId:"DL-99032-TH",     insurance:"Delta Dental",           procedure:"Posterior Composite (D2392)",         provider:"Dr. Patel", fee:38000,  phone:"555-384-9201", email:"jthornton@email.com" },
@@ -49,7 +51,44 @@ function fixtureForDate(date) {
     const { hours, minutes } = parseTime(timeStr);
     const apptDate = new Date(`${date}T${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:00`);
     const hoursUntil = Math.round(((apptDate.getTime() - nowMs) / 3600000) * 10) / 10;
-    return { ...base, appointmentDate: date, appointmentTime: timeStr, hoursUntil };
+    return { ...base, appointmentDate: date, appointmentTime: timeStr, hoursUntil, _source: "fixture" };
+  });
+}
+
+/**
+ * Pull from Open Dental API directly and normalize to our patient shape.
+ * This uses the same syncDailySchedule function but skips the DB entirely.
+ */
+async function odDirectForDate(date) {
+  const odPatients = await syncDailySchedule(date);
+  if (!odPatients || odPatients.length === 0) return [];
+
+  const nowMs = Date.now();
+  return odPatients.map((p, idx) => {
+    let hoursUntil = 0;
+    try {
+      const { hours, minutes } = parseTime(p.appointmentTime || "12:00 PM");
+      const apptDate = new Date(`${date}T${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:00`);
+      hoursUntil = Math.round(((apptDate.getTime() - nowMs) / 3600000) * 10) / 10;
+    } catch { /* leave 0 */ }
+
+    return {
+      id:              p.externalId || `od_${idx}`,
+      name:            `${p.firstName} ${p.lastName}`.trim(),
+      dob:             p.dateOfBirth   || "",
+      memberId:        p.memberId      || "",
+      insurance:       p.insuranceName || "",
+      procedure:       p.procedure     || "",
+      provider:        p.provider      || "",
+      phone:           p.phone         || "",
+      email:           p.email         || "",
+      fee:             null,
+      isOON:           false,
+      appointmentDate: p.appointmentDate || date,
+      appointmentTime: p.appointmentTime || "",
+      hoursUntil,
+      _source:         "opendental",
+    };
   });
 }
 
@@ -57,55 +96,68 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
-  // Try Postgres first — requires auth + a practice record
-  try {
-    const { userId } = await auth();
+  // ── 1. Try Postgres first — requires auth + a practice record + DATABASE_URL ──
+  if (process.env.DATABASE_URL) {
+    try {
+      const { userId } = await auth();
 
-    if (userId) {
-      const practice = await prisma.practice.findUnique({ where: { clerkUserId: userId } });
+      if (userId) {
+        const practice = await prisma.practice.findUnique({ where: { clerkUserId: userId } });
 
-      if (practice) {
-        const dbPatients = await prisma.patient.findMany({
-          where:   { practiceId: practice.id, appointmentDate: date },
-          orderBy: { appointmentTime: "asc" },
-        });
-
-        if (dbPatients.length > 0) {
-          const nowMs = Date.now();
-          const mapped = dbPatients.map(p => {
-            let hoursUntil = 0;
-            try {
-              const { hours, minutes } = parseTime(p.appointmentTime || "12:00 PM");
-              const apptDate = new Date(`${date}T${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:00`);
-              hoursUntil = Math.round(((apptDate.getTime() - nowMs) / 3600000) * 10) / 10;
-            } catch { /* leave 0 */ }
-
-            return {
-              id:              p.id,
-              name:            `${p.firstName} ${p.lastName}`,
-              dob:             p.dateOfBirth   || "",
-              memberId:        p.memberId      || "",
-              insurance:       p.insuranceName || "",
-              procedure:       p.procedure     || "",
-              provider:        p.provider      || "",
-              phone:           p.phone         || "",
-              email:           p.email         || "",
-              fee:             null,
-              isOON:           p.isOON         || false,
-              appointmentDate: p.appointmentDate || date,
-              appointmentTime: p.appointmentTime || "",
-              hoursUntil,
-              _source:         "postgres",
-            };
+        if (practice) {
+          const dbPatients = await prisma.patient.findMany({
+            where:   { practiceId: practice.id, appointmentDate: date },
+            orderBy: { appointmentTime: "asc" },
           });
-          return Response.json(mapped);
+
+          if (dbPatients.length > 0) {
+            const nowMs = Date.now();
+            const mapped = dbPatients.map(p => {
+              let hoursUntil = 0;
+              try {
+                const { hours, minutes } = parseTime(p.appointmentTime || "12:00 PM");
+                const apptDate = new Date(`${date}T${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:00`);
+                hoursUntil = Math.round(((apptDate.getTime() - nowMs) / 3600000) * 10) / 10;
+              } catch { /* leave 0 */ }
+
+              return {
+                id:              p.id,
+                name:            `${p.firstName} ${p.lastName}`,
+                dob:             p.dateOfBirth   || "",
+                memberId:        p.memberId      || "",
+                insurance:       p.insuranceName || "",
+                procedure:       p.procedure     || "",
+                provider:        p.provider      || "",
+                phone:           p.phone         || "",
+                email:           p.email         || "",
+                fee:             null,
+                isOON:           p.isOON         || false,
+                appointmentDate: p.appointmentDate || date,
+                appointmentTime: p.appointmentTime || "",
+                hoursUntil,
+                _source:         "postgres",
+              };
+            });
+            return Response.json(mapped);
+          }
         }
       }
+    } catch (_err) {
+      console.warn("[daily] DB lookup failed, falling through to OD API:", _err.message);
     }
-  } catch (_err) {
-    // Auth or DB unavailable — fall through to fixture
   }
 
-  // Fixture fallback — demo mode, always works
+  // ── 2. Try Open Dental API directly — no DB required ──
+  try {
+    const odResults = await odDirectForDate(date);
+    if (odResults.length > 0) {
+      return Response.json(odResults);
+    }
+    // OD returned 0 patients for this date — fall through to fixture
+  } catch (odErr) {
+    console.warn("[daily] OD API direct call failed, falling to fixture:", odErr.message);
+  }
+
+  // ── 3. Fixture fallback — demo mode, always works ──
   return Response.json(fixtureForDate(date));
 }

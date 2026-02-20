@@ -3723,7 +3723,12 @@ function Settings({ showToast }) {
       const data = await res.json();
       setSyncResult(data);
       setSyncStatus(data.error ? "error" : "done");
-      if (data.synced > 0) showToast(`✅ Synced ${data.synced} patients from ${pmsSystem}`);
+      if (data.synced > 0) {
+        showToast(`✅ Synced ${data.synced} patients from ${pmsSystem}`);
+        // Refresh the schedule so the new OD data shows up immediately
+        const todayStr = new Date().toISOString().split("T")[0];
+        loadWeekSchedule(todayStr);
+      }
       else if (!data.error) showToast("No appointments found for today in Open Dental");
     } catch (err) {
       setSyncResult({ error: err.message });
@@ -4155,7 +4160,7 @@ function Settings({ showToast }) {
                           ? `Sync failed: ${syncResult.error}`
                           : syncResult.synced === 0
                             ? `No appointments found for today in ${pmsSystem}.`
-                            : `${syncResult.synced} patient${syncResult.synced !== 1 ? "s" : ""} synced to Daily Schedule${syncResult.skipped > 0 ? ` · ${syncResult.skipped} skipped` : ""}.`}
+                            : `${syncResult.synced} patient${syncResult.synced !== 1 ? "s" : ""} pulled from ${pmsSystem}${syncResult.persisted === false ? " (live mode — no DB)" : ""}${syncResult.skipped > 0 ? ` · ${syncResult.skipped} skipped` : ""}.`}
                       </div>
                     </div>
                   )}
@@ -4598,7 +4603,7 @@ export default function LevelAI() {
 
   // ── Core data state ──────────────────────────────────────────────────────────
   const [isMounted, setIsMounted]         = useState(false);
-  const [tab, setTab]                     = useState("week");
+  const [tab, setTab]                     = useState("schedule");
   const [sidebarOpen, setSidebarOpen]     = useState(() => {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("levelai_sidebar") !== "collapsed";
@@ -4703,8 +4708,12 @@ export default function LevelAI() {
     settled.forEach((r, i) => {
       if (r.status !== "fulfilled") return;
       r.value.forEach(p => {
-        // Deduplicate by patient+date+time (same fixture patient can appear on multiple days)
-        const key = `${p.id}_${p.appointmentDate}_${p.appointmentTime}`;
+        // Deduplicate: for OD/Postgres data, use id+date+time (unique per appointment).
+        // For fixture data, use name+date to prevent the same demo patient appearing on multiple days.
+        const isFixture = p._source === "fixture" || (p.id && p.id.startsWith("p") && p.id.length <= 3);
+        const key = isFixture
+          ? `fixture_${p.name}_${p.appointmentDate}`
+          : `${p.id}_${p.appointmentDate}_${p.appointmentTime}`;
         if (seen.has(key)) return;
         seen.add(key);
         if (p.hoursUntil != null) { allPatients.push(p); return; }
@@ -4757,6 +4766,8 @@ export default function LevelAI() {
     const monthStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}`;
     // Load the full week so WeekAhead shows all upcoming appointments and the
     // 7-day auto-verify window fires correctly for future-dated patients.
+    // The daily API now pulls from OD directly when DB is empty, so patients
+    // come from Open Dental by default — no manual sync required.
     loadWeekSchedule(todayStr);
     loadCalendar(monthStr);
   }, [isMounted, loadWeekSchedule, loadCalendar]);
