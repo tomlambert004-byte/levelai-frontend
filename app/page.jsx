@@ -3502,6 +3502,28 @@ function Settings({ showToast }) {
   const [pmsSystem]                 = useState("Open Dental");
   const [pmsSyncKey, setPmsSyncKey] = useState("");
   const [showPmsEdit, setShowPmsEdit] = useState(false);
+  const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | done | error
+  const [syncResult, setSyncResult] = useState(null);
+
+  const handlePmsSync = async () => {
+    setSyncStatus("syncing");
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/v1/pms/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: new Date().toISOString().split("T")[0] }),
+      });
+      const data = await res.json();
+      setSyncResult(data);
+      setSyncStatus(data.error ? "error" : "done");
+      if (data.synced > 0) showToast(`✅ Synced ${data.synced} patients from ${pmsSystem}`);
+      else if (!data.error) showToast("No appointments found for today in Open Dental");
+    } catch (err) {
+      setSyncResult({ error: err.message });
+      setSyncStatus("error");
+    }
+  };
 
   // RPA vault
   const [rpaVault, setRpaVault]     = useState(
@@ -3890,32 +3912,61 @@ function Settings({ showToast }) {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 15, fontWeight: 900, color: T.text }}>{pmsSystem}</div>
                       <div style={{ fontSize: 12, color: T.textSoft, marginTop: 2 }}>
-                        Schedule sync active · Last pulled 4 min ago
+                        {syncStatus === "done" && syncResult && !syncResult.error
+                          ? `Last synced: ${syncResult.synced} patients · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                          : "Pull today's schedule from Open Dental"}
                       </div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: 12 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: T.limeDark, animation: "pulse 2s infinite" }} />
-                      <span style={{ fontSize: 12, fontWeight: 800, color: T.limeDark }}>Live Sync</span>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      {/* Sync Now button */}
+                      <button onClick={handlePmsSync} disabled={syncStatus === "syncing"}
+                        style={{ padding: "8px 16px", borderRadius: 8, border: "none",
+                          background: syncStatus === "syncing" ? T.borderStrong : T.limeDark,
+                          color: "white", fontWeight: 800, cursor: syncStatus === "syncing" ? "not-allowed" : "pointer",
+                          fontSize: 12, display: "flex", alignItems: "center", gap: 6, transition: "0.2s" }}>
+                        {syncStatus === "syncing"
+                          ? <><span style={{ width: 10, height: 10, border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "white", borderRadius: "50%", animation: "spin 0.7s linear infinite", display:"inline-block" }} /> Syncing…</>
+                          : syncStatus === "done" && !syncResult?.error
+                            ? "↻ Sync Again"
+                            : "⟳ Sync Now"}
+                      </button>
+                      <button onClick={() => setShowPmsEdit(!showPmsEdit)}
+                        style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid " + T.indigoBorder,
+                          background: T.indigoLight, color: T.indigoDark, fontWeight: 800, cursor: "pointer", fontSize: 12 }}>
+                        {showPmsEdit ? "Cancel" : "Settings"}
+                      </button>
                     </div>
-                    <button onClick={() => setShowPmsEdit(!showPmsEdit)}
-                      style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid " + T.indigoBorder,
-                        background: T.indigoLight, color: T.indigoDark, fontWeight: 800, cursor: "pointer", fontSize: 12 }}>
-                      {showPmsEdit ? "Cancel" : "Update Token"}
-                    </button>
                   </div>
+
+                  {/* Sync result banner */}
+                  {syncResult && (
+                    <div style={{ borderTop: "1px solid " + T.border, padding: "12px 22px",
+                      background: syncResult.error ? T.redLight : T.limeLight,
+                      display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 16 }}>{syncResult.error ? "❌" : "✅"}</span>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: syncResult.error ? T.red : T.limeDark }}>
+                        {syncResult.error
+                          ? `Sync failed: ${syncResult.error}`
+                          : syncResult.synced === 0
+                            ? `No appointments found for today in ${pmsSystem}.`
+                            : `${syncResult.synced} patient${syncResult.synced !== 1 ? "s" : ""} synced to Daily Schedule${syncResult.skipped > 0 ? ` · ${syncResult.skipped} skipped` : ""}.`}
+                      </div>
+                    </div>
+                  )}
+
                   {showPmsEdit && (
                     <div style={{ borderTop: "1px solid " + T.border, padding: "18px 22px",
                       background: T.bg, display: "flex", gap: 12, alignItems: "flex-end" }}>
                       <div style={{ flex: 1 }}>
-                        <SInput label={pmsSystem === "Open Dental" ? "New eKey" : "New Sync Token"}
-                          type="password" placeholder="Paste new token…"
+                        <SInput label={pmsSystem === "Open Dental" ? "Customer Key" : "New Sync Token"}
+                          type="password" placeholder="Paste your Open Dental customer key…"
                           value={pmsSyncKey} onChange={e => setPmsSyncKey(e.target.value)}
                           validate="apiKey" required />
                       </div>
-                      <button onClick={() => { setShowPmsEdit(false); showToast("PMS sync token updated."); }}
+                      <button onClick={() => { setShowPmsEdit(false); showToast("PMS credentials updated."); }}
                         style={{ padding: "11px 20px", borderRadius: 8, border: "none", background: T.indigoDark,
                           color: "white", fontWeight: 800, cursor: "pointer", fontSize: 14, whiteSpace: "nowrap" }}>
-                        Save Token
+                        Save
                       </button>
                     </div>
                   )}
