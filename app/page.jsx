@@ -1,9 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
-import { SignedIn, SignedOut, useAuth, SignIn, useClerk } from "@clerk/nextjs";
+import { SignedIn, SignedOut, useAuth, useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
 import { useState, useCallback, useEffect, useRef } from "react";
-// ... your other imports (T, dollars, etc.) ...
-import { SignInButton, SignUpButton } from "@clerk/nextjs";
 // Theme
 const T = {
   bg:"#F5F5F0", bgCard:"#FFFFFF", border:"#E2E2DC", borderStrong:"#C8C8C0",
@@ -358,57 +356,93 @@ const NextBtn = ({ label = "Continue →", onClick, type = "button", disabled = 
   </button>
 );
 function AuthFlow({ onComplete, showToast }) {
+  const { signIn, setActive: setSignInActive, isLoaded: signInLoaded } = useSignIn();
+  const { signUp, setActive: setSignUpActive, isLoaded: signUpLoaded } = useSignUp();
+
   const [step, setStep] = useState("login");
+  const [authErr, setAuthErr] = useState("");
 
-  // Login / MFA
-  const [email, setEmail]     = useState("");
+  // Login
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [mfaCode, setMfaCode] = useState(["", "", "", "", "", ""]);
 
-  // Step 1 – Practice Profile
+  // Email verify (signup)
+  const [verifyCode, setVerifyCode] = useState(["","","","","",""]);
+
+  // Practice Profile
   const [pracName, setPracName] = useState("");
   const [npi, setNpi]           = useState("");
   const [taxId, setTaxId]       = useState("");
 
-  // Step 2 – PMS
+  // PMS
   const [pmsSystem, setPmsSystem]   = useState("");
   const [pmsSyncKey, setPmsSyncKey] = useState("");
 
-  // Step 3 – RPA Vault (keyed by payer id)
+  // RPA Vault
   const [rpaVault, setRpaVault] = useState(
     Object.fromEntries(RPA_PAYERS.map(p => [p.id, { user: "", pass: "" }]))
   );
   const [rpaExpanded, setRpaExpanded] = useState("delta");
 
-  // Step 4 – Team
-  const [invites, setInvites] = useState([{ email: "", role: "Front Desk" }]);
-
   // ── handlers ───────────────────────────────────────────────────────────────
-  const handleLoginSubmit = (e) => {
+  const handleSignIn = async (e) => {
     e.preventDefault();
-    showToast("Credentials verified. Sending MFA code…");
-    setTimeout(() => setStep("mfa"), 800);
-  };
-  const handleMfaChange = (index, val) => {
-    if (val.length > 1) return;
-    const nc = [...mfaCode]; nc[index] = val; setMfaCode(nc);
-    if (val && index < 5) document.getElementById(`mfa-${index + 1}`).focus();
-  };
-  const handleMfaSubmit = (e) => {
-    e.preventDefault();
-    if (mfaCode.join("").length === 6) {
-      showToast("Device verified. Let's set up your practice.");
-      setTimeout(() => setStep("profile"), 700);
+    setAuthErr("");
+    if (!signInLoaded) return;
+    try {
+      const res = await signIn.create({ identifier: email, password });
+      if (res.status === "complete") {
+        await setSignInActive({ session: res.createdSessionId });
+        // isSignedIn in LevelAI will flip → dashboard renders automatically
+      } else {
+        setAuthErr("Sign-in incomplete. Please try again.");
+      }
+    } catch (err) {
+      setAuthErr(err.errors?.[0]?.message || "Sign-in failed. Check your credentials.");
     }
   };
-  const handleTeamSubmit = (e) => {
+
+  const handleSignUp = async (e) => {
     e.preventDefault();
-    showToast("Setup complete! Welcome to Level AI 🎉");
-    setTimeout(() => onComplete(), 1000);
+    setAuthErr("");
+    if (!signUpLoaded) return;
+    try {
+      await signUp.create({ emailAddress: email, password });
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      setStep("verify");
+      showToast("Verification code sent to your email!");
+    } catch (err) {
+      setAuthErr(err.errors?.[0]?.message || "Could not create account. Try again.");
+    }
+  };
+
+  const handleVerifyChange = (index, val) => {
+    if (val.length > 1) return;
+    const nc = [...verifyCode]; nc[index] = val; setVerifyCode(nc);
+    if (val && index < 5) document.getElementById(`vc-${index + 1}`)?.focus();
+  };
+
+  const handleVerifySubmit = async (e) => {
+    e.preventDefault();
+    setAuthErr("");
+    const code = verifyCode.join("");
+    if (code.length !== 6) return;
+    try {
+      const res = await signUp.attemptEmailAddressVerification({ code });
+      if (res.status === "complete") {
+        await setSignUpActive({ session: res.createdSessionId });
+        showToast("Email verified! Let's set up your practice.");
+        setStep("profile");
+      } else {
+        setAuthErr("Verification incomplete. Please try again.");
+      }
+    } catch (err) {
+      setAuthErr(err.errors?.[0]?.message || "Invalid code. Please try again.");
+    }
   };
 
   // ── layout shell ───────────────────────────────────────────────────────────
-  const isWizardStep = ["profile","pms","rpa","team"].includes(step);
+  const isWizardStep = ["profile","pms","rpa"].includes(step);
 
   return (
     <div style={{ height: "100vh", display: "flex", background: T.bg, fontFamily: "'Nunito', sans-serif" }}>
@@ -467,28 +501,66 @@ function AuthFlow({ onComplete, showToast }) {
         <div style={{ width: "100%", maxWidth: 460 }}>
 
           {/* ───────── LOGIN ───────── */}
-    {step === "login" && (
-  <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-    <SignIn routing="hash" />
-  </div>
-)}
-          {/* ───────── MFA ───────── */}
-          {step === "mfa" && (
+          {step === "login" && (
+            <div style={{ animation: "fadeIn 0.4s ease-out" }}>
+              <div style={{ fontSize: 30, fontWeight: 900, color: T.text, marginBottom: 6 }}>Welcome back</div>
+              <div style={{ fontSize: 14, color: T.textSoft, marginBottom: 32, lineHeight: 1.5 }}>
+                Sign in to your Level AI practice dashboard.
+              </div>
+              <form onSubmit={handleSignIn} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <OInput label="Email" type="email" placeholder="you@practice.com" value={email} onChange={e => { setEmail(e.target.value); setAuthErr(""); }} required />
+                <OInput label="Password" type="password" placeholder="••••••••" value={password} onChange={e => { setPassword(e.target.value); setAuthErr(""); }} required />
+                {authErr && <div style={{ color: T.red, fontSize: 13, fontWeight: 700, padding: "10px 14px", background: T.redLight, borderRadius: 8, border: "1px solid " + T.redBorder }}>{authErr}</div>}
+                <NextBtn type="submit" label="Sign In →" />
+              </form>
+              <div style={{ marginTop: 20, borderTop: "1px solid " + T.border, paddingTop: 20 }}>
+                <div style={{ fontSize: 13, color: T.textSoft, marginBottom: 12 }}>New to Level AI?</div>
+                <button onClick={() => { setStep("signup"); setAuthErr(""); setEmail(""); setPassword(""); }}
+                  style={{ width: "100%", padding: "14px", background: "transparent", color: T.indigoDark,
+                    border: "2px solid " + T.indigoDark, borderRadius: 10, fontSize: 15, fontWeight: 800, cursor: "pointer" }}>
+                  New Practice — Create Account
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ───────── SIGN UP ───────── */}
+          {step === "signup" && (
+            <div style={{ animation: "fadeIn 0.4s ease-out" }}>
+              <div style={{ fontSize: 30, fontWeight: 900, color: T.text, marginBottom: 6 }}>Create your account</div>
+              <div style={{ fontSize: 14, color: T.textSoft, marginBottom: 32, lineHeight: 1.5 }}>
+                We&apos;ll send a verification code to confirm your email.
+              </div>
+              <form onSubmit={handleSignUp} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <OInput label="Work Email" type="email" placeholder="you@practice.com" value={email} onChange={e => { setEmail(e.target.value); setAuthErr(""); }} required />
+                <OInput label="Password" type="password" placeholder="8+ characters" value={password} onChange={e => { setPassword(e.target.value); setAuthErr(""); }} required />
+                {authErr && <div style={{ color: T.red, fontSize: 13, fontWeight: 700, padding: "10px 14px", background: T.redLight, borderRadius: 8, border: "1px solid " + T.redBorder }}>{authErr}</div>}
+                <NextBtn type="submit" label="Create Account →" />
+              </form>
+              <button onClick={() => { setStep("login"); setAuthErr(""); }}
+                style={{ marginTop: 16, background: "none", border: "none", color: T.textSoft, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>
+                ← Back to Sign In
+              </button>
+            </div>
+          )}
+
+          {/* ───────── EMAIL VERIFY ───────── */}
+          {step === "verify" && (
             <div style={{ animation: "fadeIn 0.4s ease-out" }}>
               <div style={{ display: "inline-flex", background: T.indigoLight, color: T.indigoDark,
                 padding: "7px 12px", borderRadius: 8, fontWeight: 800, fontSize: 12, marginBottom: 20, gap: 6 }}>
-                🔒 HIPAA Secure Login
+                🔒 HIPAA Secure Verification
               </div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: T.text, marginBottom: 8 }}>Two-Step Verification</div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: T.text, marginBottom: 8 }}>Check your email</div>
               <div style={{ fontSize: 14, color: T.textSoft, marginBottom: 32, lineHeight: 1.5 }}>
-                Enter the 6-digit code sent to your registered device.
+                We sent a 6-digit code to <strong>{email}</strong>. Enter it below to continue.
               </div>
-              <form onSubmit={handleMfaSubmit} style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+              <form onSubmit={handleVerifySubmit} style={{ display: "flex", flexDirection: "column", gap: 32 }}>
                 <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
-                  {mfaCode.map((digit, idx) => (
-                    <input key={idx} id={`mfa-${idx}`} type="text" inputMode="numeric" maxLength={1} value={digit}
-                      onChange={e => handleMfaChange(idx, e.target.value)}
-                      onKeyDown={e => { if (e.key === "Backspace" && !digit && idx > 0) document.getElementById(`mfa-${idx-1}`).focus(); }}
+                  {verifyCode.map((digit, idx) => (
+                    <input key={idx} id={`vc-${idx}`} type="text" inputMode="numeric" maxLength={1} value={digit}
+                      onChange={e => handleVerifyChange(idx, e.target.value)}
+                      onKeyDown={e => { if (e.key === "Backspace" && !digit && idx > 0) document.getElementById(`vc-${idx-1}`)?.focus(); }}
                       style={{ width: 52, height: 62, textAlign: "center", fontSize: 26, fontWeight: 900,
                         border: "2px solid " + (digit ? T.indigoDark : T.borderStrong),
                         borderRadius: 10, outline: "none", background: T.bgCard, color: T.text, transition: "0.2s" }}
@@ -496,7 +568,8 @@ function AuthFlow({ onComplete, showToast }) {
                       onBlur={e => { if (!digit) e.target.style.borderColor = T.borderStrong; }} />
                   ))}
                 </div>
-                <NextBtn type="submit" label="Verify & Continue" disabled={mfaCode.join("").length !== 6} />
+                {authErr && <div style={{ color: T.red, fontSize: 13, fontWeight: 700, padding: "10px 14px", background: T.redLight, borderRadius: 8, border: "1px solid " + T.redBorder }}>{authErr}</div>}
+                <NextBtn type="submit" label="Verify Email →" disabled={verifyCode.join("").length !== 6} />
               </form>
             </div>
           )}
@@ -649,61 +722,9 @@ function AuthFlow({ onComplete, showToast }) {
                   ← Back
                 </button>
                 <div style={{ flex: 1 }}>
-                  <NextBtn label="Next: Invite Team →" onClick={() => setStep("team")} />
+                  <NextBtn label="🎉 Launch Dashboard" onClick={() => { showToast("Setup complete! Welcome to Level AI 🎉"); }} />
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* Step 4 – Invite Team */}
-          {step === "team" && (
-            <div style={{ animation: "fadeIn 0.35s ease-out" }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: T.text, marginBottom: 6 }}>Invite Your Team</div>
-              <div style={{ fontSize: 13, color: T.textSoft, marginBottom: 28, lineHeight: 1.5 }}>
-                Give your front desk and billing staff access to the AI workflow dashboard.
-              </div>
-              <form onSubmit={handleTeamSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {invites.map((inv, idx) => (
-                  <div key={idx} style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-                    <div style={{ flex: 2 }}>
-                      <OInput label={idx === 0 ? "Email" : ""} type="email" placeholder="colleague@practice.com"
-                        value={inv.email} onChange={e => { const n = [...invites]; n[idx].email = e.target.value; setInvites(n); }} required />
-                    </div>
-                    <div style={{ flex: "0 0 130px", display: "flex", flexDirection: "column", gap: 7 }}>
-                      {idx === 0 && <label style={{ fontSize: 11, fontWeight: 800, color: T.textMid, textTransform: "uppercase", letterSpacing: "0.05em" }}>Role</label>}
-                      <select value={inv.role} onChange={e => { const n = [...invites]; n[idx].role = e.target.value; setInvites(n); }}
-                        style={{ padding: "13px 10px", border: "1px solid " + T.borderStrong, borderRadius: 10,
-                          fontSize: 13, outline: "none", cursor: "pointer", background: T.bgCard, fontFamily: "inherit" }}>
-                        <option>Admin</option>
-                        <option>Front Desk</option>
-                        <option>Biller</option>
-                      </select>
-                    </div>
-                    {idx > 0 && (
-                      <button type="button" onClick={() => setInvites(invites.filter((_, i) => i !== idx))}
-                        style={{ background: "none", border: "none", color: T.textSoft, cursor: "pointer", fontSize: 22, paddingBottom: 4 }}>
-                        &times;
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button type="button" onClick={() => setInvites([...invites, { email: "", role: "Front Desk" }])}
-                  style={{ alignSelf: "flex-start", background: "transparent", border: "none", color: T.indigoDark,
-                    fontWeight: 800, fontSize: 13, cursor: "pointer", padding: "4px 0" }}>
-                  + Add another team member
-                </button>
-
-                <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
-                  <button type="button" onClick={() => setStep("rpa")}
-                    style={{ flex: "0 0 auto", padding: "15px 20px", borderRadius: 10,
-                      border: "1px solid " + T.border, background: T.bgCard, color: T.textMid, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
-                    ← Back
-                  </button>
-                  <div style={{ flex: 1 }}>
-                    <NextBtn type="submit" label="🎉 Launch Dashboard" />
-                  </div>
-                </div>
-              </form>
             </div>
           )}
 
@@ -1591,6 +1612,7 @@ function CalendarView({ patients, results, triageMap, onSelectDay, currentDayLoc
 // ── Clean Week Ahead — 3 Category Boxes + Modal ─────────────────────────────────
 function WeekAhead({ patients, results, triageMap, agentLog, showToast, onSelectPatient, onVerify }) {
   const [modalCategory, setModalCategory] = useState(null);
+  const [focusedPatient, setFocusedPatient] = useState(null);
 
   const today = new Date();
   const todayStr = today.toISOString().split("T")[0];
@@ -1695,7 +1717,9 @@ function WeekAhead({ patients, results, triageMap, agentLog, showToast, onSelect
                   const t = triageMap[p.id];
                   const reasons = t ? (t.block.length > 0 ? t.block : t.notify) : [];
                   return (
-                    <div key={p.id} style={{ border: "1px solid " + T.border, borderRadius: 12, padding: 16, cursor: "pointer", background: T.bg }} onClick={() => { onSelectPatient(p); closeModal(); }}>
+                    <div key={p.id}
+                      style={{ border: "1px solid " + (focusedPatient?.id === p.id ? T.indigo : T.border), borderRadius: 12, padding: 16, cursor: "pointer", background: focusedPatient?.id === p.id ? T.indigoLight : T.bg, transition: "0.15s" }}
+                      onClick={() => setFocusedPatient(focusedPatient?.id === p.id ? null : p)}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
                           <div style={{ fontWeight: 800, fontSize: 16 }}>{p.name}</div>
@@ -1703,8 +1727,9 @@ function WeekAhead({ patients, results, triageMap, agentLog, showToast, onSelect
                             {p.appointmentDate} · {p.appointmentTime} · {p.procedure}
                           </div>
                         </div>
-                        <div style={{ textAlign: "right" }}>
+                        <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                           <div style={{ fontSize: 11, color: T.textSoft }}>{p.insurance}</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: T.indigoDark }}>{focusedPatient?.id === p.id ? "▲ Hide details" : "▼ View details"}</div>
                         </div>
                       </div>
 
@@ -1714,6 +1739,24 @@ function WeekAhead({ patients, results, triageMap, agentLog, showToast, onSelect
                           {reasons.map((r, i) => (
                             <div key={i} style={{ fontSize: 12, color: T.textMid, padding: "4px 0" }}>• {r}</div>
                           ))}
+                        </div>
+                      )}
+
+                      {focusedPatient?.id === p.id && (
+                        <div style={{ marginTop: 14, borderTop: "1px solid " + T.indigoBorder, paddingTop: 14 }} onClick={e => e.stopPropagation()}>
+                          <BenefitsPanel
+                            patient={p}
+                            result={results?.[p.id] || null}
+                            phaseInfo={null}
+                            onVerify={onVerify}
+                            triage={triageMap?.[p.id] || null}
+                            showToast={showToast}
+                          />
+                          <button
+                            onClick={() => { onSelectPatient(p); closeModal(); }}
+                            style={{ marginTop: 12, width: "100%", padding: "10px", borderRadius: 8, border: "1px solid " + T.indigoBorder, background: T.indigoLight, color: T.indigoDark, fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+                            Open in Daily Schedule →
+                          </button>
                         </div>
                       )}
                     </div>
@@ -1728,8 +1771,9 @@ function WeekAhead({ patients, results, triageMap, agentLog, showToast, onSelect
   );
 }
 // ── AI Workflow ───────────────────────────────────────────────────────────────
-function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast }) {
+function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast, results, triageMap }) {
   const [showAttentionPanel, setShowAttentionPanel] = useState(true);
+  const [focusedPatientId, setFocusedPatientId] = useState(null);
 
   const pending = log.filter(e => e.awaitingApproval);
   const outreach = log.filter(e => e.action === ACTION.OUTREACH);
@@ -1791,9 +1835,9 @@ function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast }) {
               const apptD = entry.appointmentDate ? new Date(entry.appointmentDate+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}) : null;
 
               return (
-                <div key={entry.id} onClick={()=>onSelectPatient({id:entry.patientId})}
-                     style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:12, padding:"12px 16px", display:"flex", alignItems:"center", gap:10, cursor:"pointer", transition:"0.15s", flexShrink: 0 }}
-                     onMouseEnter={e=>e.currentTarget.style.borderColor=T.indigo} onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+                <div key={entry.id} onClick={()=>setFocusedPatientId(entry.patientId)}
+                     style={{ background:T.bgCard, border:"1px solid " + (focusedPatientId===entry.patientId ? T.indigo : T.border), borderRadius:12, padding:"12px 16px", display:"flex", alignItems:"center", gap:10, cursor:"pointer", transition:"0.15s", flexShrink: 0 }}
+                     onMouseEnter={e=>e.currentTarget.style.borderColor=T.indigo} onMouseLeave={e=>{ if(focusedPatientId!==entry.patientId) e.currentTarget.style.borderColor=T.border; }}>
                   <div style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column" }}>
                     <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
                       <span style={{ color:T.text, fontSize:13, fontWeight:800 }}>{entry.patient}</span>
@@ -1860,6 +1904,31 @@ function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast }) {
                   )
                })}
              </div>
+          </div>
+        )}
+
+        {/* ── Patient detail panel ── */}
+        {focusedPatientId && (
+          <div style={{ width: 400, flexShrink: 0, display:"flex", flexDirection:"column", background:T.bgCard, border:"1px solid " + T.border, borderRadius:12, overflow:"hidden" }}>
+            <div style={{ padding:"14px 18px", borderBottom:"1px solid " + T.border, display:"flex", justifyContent:"space-between", alignItems:"center", background:T.bg, flexShrink:0 }}>
+              <div style={{ fontSize:14, fontWeight:900, color:T.text }}>Patient Details</div>
+              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                <button onClick={()=>{ onSelectPatient({id:focusedPatientId}); }} style={{ fontSize:11, fontWeight:800, color:T.indigoDark, background:T.indigoLight, border:"1px solid " + T.indigoBorder, borderRadius:6, padding:"4px 10px", cursor:"pointer" }}>
+                  Go to Schedule →
+                </button>
+                <button onClick={()=>setFocusedPatientId(null)} style={{ background:"none", border:"none", fontSize:20, color:T.textSoft, cursor:"pointer", lineHeight:1 }}>&times;</button>
+              </div>
+            </div>
+            <div style={{ flex:1, overflowY:"auto" }}>
+              <BenefitsPanel
+                patient={{ id: focusedPatientId, name: log.find(e=>e.patientId===focusedPatientId)?.patient || focusedPatientId }}
+                result={results?.[focusedPatientId] || null}
+                phaseInfo={null}
+                onVerify={()=>{}}
+                triage={triageMap?.[focusedPatientId] || null}
+                showToast={showToast}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -2091,6 +2160,9 @@ function Settings({ showToast }) {
   const [editUser, setEditUser]     = useState("");
   const [editPass, setEditPass]     = useState("");
 
+  // Team
+  const [invites, setInvites] = useState([{ email: "", role: "Front Desk" }]);
+
   const openEdit = (payerId) => {
     setEditingPayer(payerId);
     setEditUser(rpaVault[payerId]?.user || "");
@@ -2220,6 +2292,7 @@ function Settings({ showToast }) {
     { id: "general",      label: "General",      icon: "🏥" },
     { id: "automations",  label: "Automations",  icon: "⚡" },
     { id: "integrations", label: "Integrations", icon: "🔌" },
+    { id: "team",         label: "Team",         icon: "👥" },
   ];
 
   return (
@@ -2430,6 +2503,64 @@ function Settings({ showToast }) {
                 </div>
               </div>
 
+            </div>
+          )}
+
+          {/* ──────────── TEAM TAB ──────────────── */}
+          {activeTab === "team" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: T.text }}>Team Members</div>
+                <div style={{ fontSize: 13, color: T.textSoft, marginTop: 4 }}>
+                  Give your front desk and billing staff access to the Level AI dashboard.
+                </div>
+              </div>
+              <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12, padding: 24 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {invites.map((inv, idx) => (
+                    <div key={idx} style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                      <div style={{ flex: 2 }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {idx === 0 && <label style={{ fontSize: 11, fontWeight: 800, color: T.textMid, textTransform: "uppercase", letterSpacing: "0.05em" }}>Email</label>}
+                          <input type="email" placeholder="colleague@practice.com" value={inv.email}
+                            onChange={e => { const n = [...invites]; n[idx].email = e.target.value; setInvites(n); }}
+                            style={{ padding: "11px 14px", border: "1px solid " + T.border, borderRadius: 8, fontSize: 14,
+                              background: T.bgCard, outline: "none", color: T.text, fontFamily: "inherit", width: "100%" }}
+                            onFocus={e => e.target.style.borderColor = T.indigoDark}
+                            onBlur={e => e.target.style.borderColor = T.border} />
+                        </div>
+                      </div>
+                      <div style={{ flex: "0 0 130px", display: "flex", flexDirection: "column", gap: 6 }}>
+                        {idx === 0 && <label style={{ fontSize: 11, fontWeight: 800, color: T.textMid, textTransform: "uppercase", letterSpacing: "0.05em" }}>Role</label>}
+                        <select value={inv.role} onChange={e => { const n = [...invites]; n[idx].role = e.target.value; setInvites(n); }}
+                          style={{ padding: "11px 10px", border: "1px solid " + T.border, borderRadius: 8,
+                            fontSize: 13, outline: "none", cursor: "pointer", background: T.bgCard, fontFamily: "inherit" }}>
+                          <option>Admin</option>
+                          <option>Front Desk</option>
+                          <option>Biller</option>
+                        </select>
+                      </div>
+                      {idx > 0 && (
+                        <button type="button" onClick={() => setInvites(invites.filter((_, i) => i !== idx))}
+                          style={{ background: "none", border: "none", color: T.textSoft, cursor: "pointer", fontSize: 22, paddingBottom: 6 }}>
+                          &times;
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setInvites([...invites, { email: "", role: "Front Desk" }])}
+                    style={{ alignSelf: "flex-start", background: "transparent", border: "none", color: T.indigoDark,
+                      fontWeight: 800, fontSize: 13, cursor: "pointer", padding: "4px 0" }}>
+                    + Add another team member
+                  </button>
+                </div>
+                <button onClick={() => showToast("Invites sent! 🎉")}
+                  style={{ marginTop: 24, background: T.indigoDark, color: "white", padding: "11px 24px",
+                    border: "none", borderRadius: 8, fontWeight: 800, cursor: "pointer",
+                    fontSize: 14, boxShadow: "0 4px 12px rgba(79,70,229,0.25)" }}>
+                  Send Invites
+                </button>
+              </div>
             </div>
           )}
 
@@ -2925,6 +3056,7 @@ export default function LevelAI() {
 
         {tab === "agent" && (
           <AIWorkflow log={agentLog} showToast={showToast}
+            results={results} triageMap={triageMap}
             onSelectPatient={p => {
               const pt = patients.find(x => x.id === p.id);
               if (pt) { setSelected(pt); setTab("schedule"); }
