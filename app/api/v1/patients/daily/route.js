@@ -13,6 +13,9 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "../../../../../lib/prisma.js";
 import { syncDailySchedule } from "../../../../../lib/opendental.js";
 
+// Ensure Next.js never caches this route — schedule data must be fresh every request
+export const dynamic = "force-dynamic";
+
 // ── Fixture data (last-resort fallback) ──────────────────────────────────────
 const ALL_PATIENTS = [
   { id:"p1", name:"Sarah Mitchell",  dob:"1985-03-14", memberId:"UHC-884-221-09",  insurance:"UnitedHealthcare",       procedure:"Composite Restoration (D2391)",       provider:"Dr. Patel", fee:42000,  phone:"555-210-4832", email:"sarah.mitchell@email.com" },

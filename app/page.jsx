@@ -179,6 +179,7 @@ async function apiFetch(path, options = {}) {
   const isNextRoute = path.startsWith("/api/v1/");
   const url = isNextRoute ? path : `${PYTHON_BASE}${path}`;
   const res = await fetch(url, {
+    cache: "no-store",
     headers: { "Content-Type": "application/json", ...options.headers },
     ...options,
   });
