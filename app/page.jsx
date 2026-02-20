@@ -585,6 +585,19 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
 
 
   // ── handlers ───────────────────────────────────────────────────────────────
+  const handleGoogleSignIn = async () => {
+    if (!signInLoaded) return;
+    try {
+      await signIn.authenticateWithRedirect({
+        strategy: "oauth_google",
+        redirectUrl: "/sso-callback",
+        redirectUrlComplete: "/",
+      });
+    } catch (err) {
+      setAuthErr(err.errors?.[0]?.message || "Google sign-in failed.");
+    }
+  };
+
   const handleSignIn = async (e) => {
     e.preventDefault();
     setAuthErr("");
@@ -712,6 +725,22 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
                 {authErr && <div style={{ color: T.red, fontSize: 13, fontWeight: 700, padding: "10px 14px", background: T.redLight, borderRadius: 8, border: "1px solid " + T.redBorder }}>{authErr}</div>}
                 <NextBtn type="submit" label="Sign In →" />
               </form>
+              {/* ── Google OAuth divider + button ── */}
+              <div style={{ display:"flex", alignItems:"center", gap:12, margin:"20px 0" }}>
+                <div style={{ flex:1, height:1, background:T.border }} />
+                <span style={{ fontSize:12, color:T.textSoft, fontWeight:600 }}>or</span>
+                <div style={{ flex:1, height:1, background:T.border }} />
+              </div>
+              <button onClick={handleGoogleSignIn}
+                style={{ width:"100%", padding:"13px", background:T.bgCard, color:T.text,
+                  border:"2px solid "+T.borderStrong, borderRadius:10, fontSize:14, fontWeight:700,
+                  cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+                  transition:"0.2s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = T.indigo; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = T.borderStrong; }}>
+                <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                Continue with Google
+              </button>
               <div style={{ marginTop: 20, borderTop: "1px solid " + T.border, paddingTop: 20 }}>
                 <div style={{ fontSize: 13, color: T.textSoft, marginBottom: 12 }}>New to Level AI?</div>
                 <button onClick={() => { setStep("signup"); setAuthErr(""); setEmail(""); setPassword(""); }}
@@ -747,6 +776,22 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
                 {authErr && <div style={{ color: T.red, fontSize: 13, fontWeight: 700, padding: "10px 14px", background: T.redLight, borderRadius: 8, border: "1px solid " + T.redBorder }}>{authErr}</div>}
                 <NextBtn type="submit" label="Create Account →" />
               </form>
+              {/* ── Google OAuth divider + button ── */}
+              <div style={{ display:"flex", alignItems:"center", gap:12, margin:"20px 0" }}>
+                <div style={{ flex:1, height:1, background:T.border }} />
+                <span style={{ fontSize:12, color:T.textSoft, fontWeight:600 }}>or</span>
+                <div style={{ flex:1, height:1, background:T.border }} />
+              </div>
+              <button onClick={handleGoogleSignIn}
+                style={{ width:"100%", padding:"13px", background:T.bgCard, color:T.text,
+                  border:"2px solid "+T.borderStrong, borderRadius:10, fontSize:14, fontWeight:700,
+                  cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+                  transition:"0.2s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = T.indigo; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = T.borderStrong; }}>
+                <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                Continue with Google
+              </button>
               <button onClick={() => { setStep("login"); setAuthErr(""); }}
                 style={{ marginTop: 16, background: "none", border: "none", color: T.textSoft, fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>
                 ← Back to Sign In
@@ -2332,7 +2377,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
                     <div style={{ color:T.red, fontSize:12, fontWeight:900, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.05em" }}>Block Issues Detected</div>
                     {triage.block.map((r,i)=><div key={i} style={{ color:T.red, fontSize:13, fontWeight:600, marginBottom:i<triage.block.length-1?4:0, lineHeight: "1.4" }}>{"- " + r}</div>)}
 
-                    <PreauthWidget patient={patient} result={result} triage={triage} showToast={showToast} prefetched={preauthCache?.[patient?.id]} />
+                    <PreauthWidget patient={patient} result={result} triage={triage} showToast={showToast} />
                   </div>
                 )}
                 {triage.notify.length > 0 && (
@@ -2344,7 +2389,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
                 {/* Show PreauthWidget for Medicaid PA even without block issues */}
                 {triage.block.length === 0 && (isMedicaidPatient(patient) || result?._is_medicaid) &&
                   result?.medicaid_info?.prior_auth_required?.some(c => (patient.procedure || "").match(/D\d{4}/g)?.includes(c)) && (
-                  <PreauthWidget patient={patient} result={result} triage={triage} showToast={showToast} prefetched={preauthCache?.[patient?.id]} />
+                  <PreauthWidget patient={patient} result={result} triage={triage} showToast={showToast} />
                 )}
               </div>
             )}
@@ -5550,24 +5595,9 @@ export default function LevelAI() {
     else if (triage.notify.length > 0) newEntries.push(buildOutreachEntry(patient, triage));
     setAgentLog(log => [...newEntries.reverse(), ...log]);
 
-    // ── Module 5: Auto-trigger pre-auth letter when PA is required ─────────
-    const needsPA = triage.block.some(b => /pre-auth|missing.*tooth/i.test(b)) ||
-      (finalResult?._is_medicaid && finalResult?.medicaid_info?.prior_auth_required?.some(
-        c => (patient.procedure || "").match(/D\d{4}/g)?.includes(c)
-      ));
-    if (needsPA && !preauthCache[patient.id]) {
-      const procCode = (patient.procedure || "").match(/D\d{4}/)?.[0] || "D6010";
-      fetch("/api/v1/preauth/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patient_id: patient.id, procedure_code: procCode }),
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data?.letter) setPreauthCache(prev => ({ ...prev, [patient.id]: data }));
-        })
-        .catch(() => {}); // non-blocking
-    }
+    // ── Module 5: Pre-auth letter (manual trigger only) ─────────────────────
+    // Auto-generation removed — users must click "Generate Pre-Authorization Letter"
+    // button in PreauthWidget to initiate the letter drafting flow.
 
     // ── Module 3: Create SMS draft for block/notify patients ────────────────
     if ((triage.block.length > 0 || triage.notify.length > 0) && patient.phone && !sandboxMode) {
