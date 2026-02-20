@@ -10,7 +10,11 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.38.0",
+    "@prisma/adapter-pg": "^7.4.1",
+    "@prisma/client": "^7.4.1",
     "next": "16.1.6",
+    "pg": "^8.18.0",
+    "prisma": "^7.4.1",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },

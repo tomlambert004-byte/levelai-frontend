@@ -3456,6 +3456,127 @@ function Settings({ showToast }) {
   // Team
   const [invites, setInvites] = useState([{ email: "", role: "Front Desk" }]);
 
+  // CSV Import
+  const [csvRows, setCsvRows]           = useState(null);   // parsed preview rows
+  const [csvHeaders, setCsvHeaders]     = useState([]);     // detected headers
+  const [csvFileName, setCsvFileName]   = useState("");
+  const [csvMapping, setCsvMapping]     = useState({});     // { ourField: csvColumn }
+  const [importStep, setImportStep]     = useState("idle"); // idle | preview | importing | done
+  const [importResult, setImportResult] = useState(null);   // { imported, skipped, errors }
+  const csvInputRef                     = useRef(null);
+
+  // Expected fields for mapping
+  const CSV_FIELDS = [
+    { key: "firstName",      label: "First Name",       required: true  },
+    { key: "lastName",       label: "Last Name",        required: true  },
+    { key: "dateOfBirth",    label: "Date of Birth",    required: false },
+    { key: "phone",          label: "Phone",            required: false },
+    { key: "email",          label: "Email",            required: false },
+    { key: "insuranceName",  label: "Insurance Name",   required: false },
+    { key: "memberId",       label: "Member ID",        required: false },
+    { key: "groupNumber",    label: "Group Number",     required: false },
+    { key: "procedure",      label: "Procedure",        required: false },
+    { key: "provider",       label: "Provider",         required: false },
+    { key: "appointmentDate",label: "Appointment Date", required: false },
+    { key: "appointmentTime",label: "Appointment Time", required: false },
+  ];
+
+  // Auto-detect mapping by fuzzy-matching headers to our field names
+  function autoMap(headers) {
+    const normalize = s => s.toLowerCase().replace(/[\s_\-\/]/g, "");
+    const patterns = {
+      firstName:       ["firstname","first","fname","givenname"],
+      lastName:        ["lastname","last","lname","surname","familyname"],
+      dateOfBirth:     ["dateofbirth","dob","birthdate","birthday"],
+      phone:           ["phone","phonenumber","mobile","cell","telephone"],
+      email:           ["email","emailaddress","e-mail"],
+      insuranceName:   ["insurancename","insurance","insurer","carrier","payer","payername"],
+      memberId:        ["memberid","memberidnumber","membernumber","subscribernumber","insuranceid","groupmemberid"],
+      groupNumber:     ["groupnumber","groupno","groupid","groupplan"],
+      procedure:       ["procedure","procedurecode","service","treatment","proccode"],
+      provider:        ["provider","doctor","dentist","physician","drname"],
+      appointmentDate: ["appointmentdate","apptdate","appt_date","date","visitdate","scheddate"],
+      appointmentTime: ["appointmenttime","appttime","appt_time","time","visittime","schedtime"],
+    };
+    const mapped = {};
+    for (const [field, keywords] of Object.entries(patterns)) {
+      const match = headers.find(h => keywords.includes(normalize(h)));
+      if (match) mapped[field] = match;
+    }
+    return mapped;
+  }
+
+  function parseCsvText(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return { headers: [], rows: [] };
+    const parseRow = line => {
+      const result = []; let cell = ""; let inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') { inQ = !inQ; }
+        else if (c === ',' && !inQ) { result.push(cell.trim()); cell = ""; }
+        else { cell += c; }
+      }
+      result.push(cell.trim());
+      return result;
+    };
+    const headers = parseRow(lines[0]);
+    const rows = lines.slice(1).map(l => {
+      const vals = parseRow(l);
+      return Object.fromEntries(headers.map((h, i) => [h, vals[i] || ""]));
+    }).filter(r => Object.values(r).some(v => v));
+    return { headers, rows };
+  }
+
+  function handleCsvFile(file) {
+    if (!file) return;
+    setCsvFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = e => {
+      const { headers, rows } = parseCsvText(e.target.result);
+      setCsvHeaders(headers);
+      setCsvRows(rows);
+      setCsvMapping(autoMap(headers));
+      setImportStep("preview");
+      setImportResult(null);
+    };
+    reader.readAsText(file);
+  }
+
+  async function runImport() {
+    if (!csvRows) return;
+    setImportStep("importing");
+    // Map rows using current column mapping
+    const patients = csvRows.map(row => {
+      const out = {};
+      for (const { key } of CSV_FIELDS) {
+        const col = csvMapping[key];
+        out[key] = col ? (row[col] || "") : "";
+      }
+      return out;
+    });
+    try {
+      const res = await fetch("/api/v1/patients/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patients }),
+      });
+      const data = await res.json();
+      setImportResult(data);
+      setImportStep("done");
+      if (data.imported > 0) showToast(`✅ Imported ${data.imported} patients!`);
+    } catch (err) {
+      setImportResult({ error: err.message });
+      setImportStep("done");
+    }
+  }
+
+  function resetImport() {
+    setCsvRows(null); setCsvHeaders([]); setCsvFileName("");
+    setCsvMapping({}); setImportStep("idle"); setImportResult(null);
+    if (csvInputRef.current) csvInputRef.current.value = "";
+  }
+
   const openEdit = (payerId) => {
     setEditingPayer(payerId);
     setEditUser(rpaVault[payerId]?.user || "");
@@ -3577,6 +3698,7 @@ function Settings({ showToast }) {
     { id: "general",      label: "General",      icon: "🏥" },
     { id: "automations",  label: "Automations",  icon: "⚡" },
     { id: "integrations", label: "Integrations", icon: "🔌" },
+    { id: "import",       label: "Import",       icon: "📥" },
     { id: "team",         label: "Team",         icon: "👥" },
   ];
 
@@ -3794,6 +3916,220 @@ function Settings({ showToast }) {
                 </div>
               </div>
 
+            </div>
+          )}
+
+          {/* ──────────── IMPORT TAB ──────────────── */}
+          {activeTab === "import" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: T.text }}>Import Schedule</div>
+                <div style={{ fontSize: 13, color: T.textSoft, marginTop: 4 }}>
+                  Upload a CSV from your PMS to load today&apos;s (or any day&apos;s) patient list. Level AI will auto-map your columns.
+                </div>
+              </div>
+
+              {/* Template download hint */}
+              <div style={{ background: T.indigoLight, border: "1px solid " + T.indigoBorder, borderRadius: 10, padding: "14px 18px",
+                display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 20 }}>💡</span>
+                <div style={{ fontSize: 12, color: T.indigoDark, lineHeight: 1.7 }}>
+                  <strong>Supported columns:</strong> First Name, Last Name, Date of Birth, Phone, Email, Insurance Name,
+                  Member ID, Group Number, Procedure, Provider, Appointment Date, Appointment Time.<br />
+                  Column headers don&apos;t need to match exactly — Level AI auto-detects them.
+                </div>
+              </div>
+
+              {/* Step 1: Upload */}
+              {importStep === "idle" && (
+                <div
+                  style={{ background: T.bgCard, border: "2px dashed " + T.borderStrong, borderRadius: 14,
+                    padding: "48px 32px", display: "flex", flexDirection: "column", alignItems: "center",
+                    gap: 16, cursor: "pointer", transition: "all 0.2s" }}
+                  onClick={() => csvInputRef.current?.click()}
+                  onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = T.indigo; e.currentTarget.style.background = T.indigoLight; }}
+                  onDragLeave={e => { e.currentTarget.style.borderColor = T.borderStrong; e.currentTarget.style.background = T.bgCard; }}
+                  onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = T.borderStrong; e.currentTarget.style.background = T.bgCard; const f = e.dataTransfer.files[0]; if (f) handleCsvFile(f); }}>
+                  <span style={{ fontSize: 48 }}>📄</span>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: T.text }}>Drop your CSV here</div>
+                    <div style={{ fontSize: 13, color: T.textSoft, marginTop: 4 }}>or click to browse</div>
+                  </div>
+                  <input ref={csvInputRef} type="file" accept=".csv,text/csv" style={{ display: "none" }}
+                    onChange={e => handleCsvFile(e.target.files[0])} />
+                </div>
+              )}
+
+              {/* Step 2: Preview + column mapping */}
+              {importStep === "preview" && csvRows && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+                  {/* File info bar */}
+                  <div style={{ background: T.limeLight, border: "1px solid " + T.limeBorder, borderRadius: 10,
+                    padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      <span style={{ fontSize: 18 }}>📄</span>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: T.text }}>{csvFileName}</div>
+                        <div style={{ fontSize: 12, color: T.textSoft }}>{csvRows.length} rows detected</div>
+                      </div>
+                    </div>
+                    <button onClick={resetImport}
+                      style={{ background: "none", border: "1px solid " + T.border, borderRadius: 8, padding: "6px 14px",
+                        fontSize: 12, fontWeight: 700, color: T.textMid, cursor: "pointer" }}>
+                      Change file
+                    </button>
+                  </div>
+
+                  {/* Column mapping */}
+                  <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12, overflow: "hidden" }}>
+                    <div style={{ padding: "14px 20px", borderBottom: "1px solid " + T.border,
+                      background: T.bg, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: T.text }}>Column Mapping</div>
+                      <div style={{ fontSize: 12, color: T.textSoft }}>Auto-detected · adjust if needed</div>
+                    </div>
+                    <div style={{ padding: "16px 20px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 24px" }}>
+                      {CSV_FIELDS.map(({ key, label, required }) => (
+                        <div key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <label style={{ fontSize: 11, fontWeight: 800, color: required ? T.indigoDark : T.textMid,
+                            textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            {label}{required ? " *" : ""}
+                          </label>
+                          <select value={csvMapping[key] || ""}
+                            onChange={e => setCsvMapping(m => ({ ...m, [key]: e.target.value || undefined }))}
+                            style={{ padding: "8px 10px", border: "1px solid " + (csvMapping[key] ? T.limeBorder : T.border),
+                              borderRadius: 8, fontSize: 12, outline: "none", cursor: "pointer",
+                              background: csvMapping[key] ? T.limeLight : T.bgCard, fontFamily: "inherit",
+                              color: csvMapping[key] ? T.limeDark : T.textMid, fontWeight: csvMapping[key] ? 700 : 400 }}>
+                            <option value="">— not mapped —</option>
+                            {csvHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Preview table */}
+                  <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12, overflow: "hidden" }}>
+                    <div style={{ padding: "14px 20px", borderBottom: "1px solid " + T.border, background: T.bg }}>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: T.text }}>
+                        Preview <span style={{ color: T.textSoft, fontWeight: 600 }}>(first 5 rows)</span>
+                      </div>
+                    </div>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                        <thead>
+                          <tr style={{ background: T.bg }}>
+                            {CSV_FIELDS.filter(f => csvMapping[f.key]).map(f => (
+                              <th key={f.key} style={{ padding: "8px 14px", textAlign: "left", fontWeight: 800,
+                                color: T.textMid, borderBottom: "1px solid " + T.border, whiteSpace: "nowrap" }}>
+                                {f.label}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {csvRows.slice(0, 5).map((row, ri) => (
+                            <tr key={ri} style={{ borderBottom: "1px solid " + T.border }}>
+                              {CSV_FIELDS.filter(f => csvMapping[f.key]).map(f => (
+                                <td key={f.key} style={{ padding: "9px 14px", color: T.text, maxWidth: 160,
+                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {csvMapping[f.key] ? (row[csvMapping[f.key]] || <span style={{ color: T.textSoft }}>—</span>) : "—"}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {csvRows.length > 5 && (
+                      <div style={{ padding: "10px 18px", background: T.bg, fontSize: 12, color: T.textSoft,
+                        borderTop: "1px solid " + T.border }}>
+                        …and {csvRows.length - 5} more rows
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Import button */}
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <button onClick={resetImport}
+                      style={{ padding: "12px 22px", borderRadius: 8, border: "1px solid " + T.border,
+                        background: T.bg, color: T.textMid, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
+                      Cancel
+                    </button>
+                    <button onClick={runImport}
+                      disabled={!csvMapping.firstName || !csvMapping.lastName}
+                      style={{ flex: 1, padding: "12px 22px", borderRadius: 8, border: "none",
+                        background: (!csvMapping.firstName || !csvMapping.lastName) ? T.borderStrong : T.indigoDark,
+                        color: "white", fontWeight: 800, cursor: (!csvMapping.firstName || !csvMapping.lastName) ? "not-allowed" : "pointer",
+                        fontSize: 14, boxShadow: (!csvMapping.firstName || !csvMapping.lastName) ? "none" : "0 4px 12px rgba(79,70,229,0.25)" }}>
+                      Import {csvRows.length} Patients →
+                    </button>
+                  </div>
+                  {(!csvMapping.firstName || !csvMapping.lastName) && (
+                    <div style={{ fontSize: 12, color: T.amber, fontWeight: 700 }}>
+                      ⚠️ Map First Name and Last Name to import
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 3: Importing spinner */}
+              {importStep === "importing" && (
+                <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 14,
+                  padding: "48px 32px", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+                  <div style={{ width: 48, height: 48, border: "4px solid " + T.indigoBorder,
+                    borderTopColor: T.indigoDark, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                  <div style={{ fontSize: 15, fontWeight: 800, color: T.text }}>Importing patients…</div>
+                  <div style={{ fontSize: 12, color: T.textSoft }}>Saving to database — this only takes a second</div>
+                </div>
+              )}
+
+              {/* Step 4: Results */}
+              {importStep === "done" && importResult && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {importResult.error ? (
+                    <div style={{ background: T.redLight, border: "1px solid " + T.redBorder, borderRadius: 12,
+                      padding: "20px 24px", color: T.red, fontWeight: 700 }}>
+                      ❌ Import failed: {importResult.error}
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: "flex", gap: 14 }}>
+                        <div style={{ flex: 1, background: T.limeLight, border: "1px solid " + T.limeBorder, borderRadius: 12,
+                          padding: "20px 24px", textAlign: "center" }}>
+                          <div style={{ fontSize: 32, fontWeight: 900, color: T.limeDark }}>{importResult.imported}</div>
+                          <div style={{ fontSize: 13, color: T.limeDark, fontWeight: 700, marginTop: 4 }}>Imported</div>
+                        </div>
+                        {importResult.skipped > 0 && (
+                          <div style={{ flex: 1, background: T.amberLight, border: "1px solid " + T.amberBorder, borderRadius: 12,
+                            padding: "20px 24px", textAlign: "center" }}>
+                            <div style={{ fontSize: 32, fontWeight: 900, color: T.amber }}>{importResult.skipped}</div>
+                            <div style={{ fontSize: 13, color: T.amber, fontWeight: 700, marginTop: 4 }}>Skipped</div>
+                          </div>
+                        )}
+                      </div>
+                      {importResult.errors?.length > 0 && (
+                        <div style={{ background: T.amberLight, border: "1px solid " + T.amberBorder, borderRadius: 10,
+                          padding: "14px 18px" }}>
+                          <div style={{ fontSize: 12, fontWeight: 800, color: T.amber, marginBottom: 8 }}>
+                            ⚠️ {importResult.errors.length} rows had issues:
+                          </div>
+                          {importResult.errors.map((e, i) => (
+                            <div key={i} style={{ fontSize: 11, color: T.textMid, marginBottom: 4, fontFamily: "monospace" }}>{e}</div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <button onClick={resetImport}
+                    style={{ padding: "12px 24px", borderRadius: 8, border: "none", background: T.indigoDark,
+                      color: "white", fontWeight: 800, cursor: "pointer", fontSize: 14, alignSelf: "flex-start",
+                      boxShadow: "0 4px 12px rgba(79,70,229,0.25)" }}>
+                    Import Another File
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -4313,6 +4649,7 @@ export default function LevelAI() {
         @keyframes skshimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
         @keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
         @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
       `}</style>
 
       {/* ── Nav bar ─────────────────────────────────────────────────────── */}
