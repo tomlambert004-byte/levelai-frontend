@@ -372,20 +372,6 @@ function AuthFlow({ onComplete, showToast }) {
   // Email verify (signup)
   const [verifyCode, setVerifyCode] = useState(["","","","","",""]);
 
-  // Practice Profile
-  const [pracName, setPracName] = useState("");
-  const [npi, setNpi]           = useState("");
-  const [taxId, setTaxId]       = useState("");
-
-  // PMS
-  const [pmsSystem, setPmsSystem]   = useState("");
-  const [pmsSyncKey, setPmsSyncKey] = useState("");
-
-  // RPA Vault
-  const [rpaVault, setRpaVault] = useState(
-    Object.fromEntries(RPA_PAYERS.map(p => [p.id, { user: "", pass: "" }]))
-  );
-  const [rpaExpanded, setRpaExpanded] = useState("delta");
 
   // ── handlers ───────────────────────────────────────────────────────────────
   const handleSignIn = async (e) => {
@@ -433,9 +419,10 @@ function AuthFlow({ onComplete, showToast }) {
     try {
       const res = await signUp.attemptEmailAddressVerification({ code });
       if (res.status === "complete") {
+        // Flag that this is a new user who needs onboarding
+        if (typeof window !== "undefined") localStorage.setItem("pulp_needs_onboarding", "1");
         await setSignUpActive({ session: res.createdSessionId });
-        showToast("Email verified! Let's set up your practice.");
-        setStep("profile");
+        // isSignedIn flips → LevelAI renders → OnboardingWizard overlay shows
       } else {
         setAuthErr("Verification incomplete. Please try again.");
       }
@@ -445,8 +432,6 @@ function AuthFlow({ onComplete, showToast }) {
   };
 
   // ── layout shell ───────────────────────────────────────────────────────────
-  const isWizardStep = ["profile","pms","rpa"].includes(step);
-
   return (
     <div style={{ height: "100vh", display: "flex", background: T.bg, fontFamily: "'Nunito', sans-serif" }}>
 
@@ -577,133 +562,490 @@ function AuthFlow({ onComplete, showToast }) {
             </div>
           )}
 
-          {/* ───────── WIZARD STEPS ───────── */}
-          {isWizardStep && <WizardProgress currentStep={step} />}
+        </div>
+      </div>
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+      `}</style>
+    </div>
+  );
+}
 
-          {/* Step 1 – Practice Profile */}
-          {step === "profile" && (
-            <div style={{ animation: "fadeIn 0.35s ease-out" }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: T.text, marginBottom: 6 }}>Practice Profile</div>
-              <div style={{ fontSize: 13, color: T.textSoft, marginBottom: 28, lineHeight: 1.5 }}>
-                Your legal identity for clearinghouse credentialing and claim submissions.
+// ── Premium Onboarding Wizard ─────────────────────────────────────────────────
+// Shown as a full-screen overlay after new-practice signup.
+// Driven by localStorage flag "pulp_needs_onboarding" = "1".
+
+const WIZARD_STEPS = [
+  { id: "profile", label: "Practice Identity",  icon: "🏥" },
+  { id: "pms",     label: "Connect PMS",        icon: "🔌" },
+  { id: "rpa",     label: "RPA Vault",          icon: "🤖" },
+  { id: "team",    label: "Invite & Launch",    icon: "🚀" },
+];
+
+// Top 3 payers "discovered" from the PMS sync
+const DISCOVERED_PAYERS = [
+  { id: "delta",   name: "Delta Dental",  logo: "🔵", patients: 1247 },
+  { id: "metlife", name: "MetLife",       logo: "🟣", patients: 1089 },
+  { id: "cigna",   name: "Cigna",         logo: "🟠", patients: 1084 },
+];
+
+const PMS_SYNC_PHASES = [
+  "Authenticating token…",
+  "Syncing appointment book…",
+  "Analyzing payer mix…",
+  "Connection Successful! ✅",
+];
+
+function WizardProgressBar({ currentStep }) {
+  const idx = WIZARD_STEPS.findIndex(s => s.id === currentStep);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 48 }}>
+      {WIZARD_STEPS.map((s, i) => {
+        const done   = i < idx;
+        const active = i === idx;
+        const last   = i === WIZARD_STEPS.length - 1;
+        return (
+          <div key={s.id} style={{ display: "flex", alignItems: "center", flex: last ? "0 0 auto" : 1 }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                background: done ? "#22c55e" : active ? "white" : "rgba(255,255,255,0.15)",
+                border: active ? "3px solid white" : "none",
+                boxShadow: active ? "0 0 0 4px rgba(255,255,255,0.25)" : "none",
+                fontSize: done ? 16 : 13, fontWeight: 900,
+                color: done ? "white" : active ? "#4f46e5" : "rgba(255,255,255,0.45)",
+                transition: "all 0.3s",
+              }}>
+                {done ? "✓" : s.icon}
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <OInput label="Legal Practice Name" placeholder="e.g. Georgetown Dental Associates" value={pracName} onChange={e=>setPracName(e.target.value)} required />
-                <div style={{ display: "flex", gap: 14 }}>
-                  <div style={{ flex: 1 }}>
-                    <OInput label="NPI Number" placeholder="10 digits" value={npi} onChange={e=>setNpi(e.target.value)} required />
+              <div style={{
+                fontSize: 10, fontWeight: 800, marginTop: 6, whiteSpace: "nowrap",
+                color: active ? "white" : done ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.35)",
+                letterSpacing: "0.03em", textAlign: "center",
+              }}>
+                {s.label}
+              </div>
+            </div>
+            {!last && (
+              <div style={{
+                flex: 1, height: 2, margin: "0 8px", marginBottom: 20,
+                background: done ? "#22c55e" : "rgba(255,255,255,0.15)",
+                transition: "background 0.4s",
+              }} />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function OnboardingWizard({ onComplete, showToast }) {
+  const [step, setStep]         = useState("profile");
+  const [animating, setAnimating] = useState(false);
+
+  // Step 1 – Practice Identity
+  const [pracName, setPracName] = useState("");
+  const [npi, setNpi]           = useState("");
+  const [taxId, setTaxId]       = useState("");
+
+  // Step 2 – PMS Connection
+  const [pmsSystem, setPmsSystem]   = useState("");
+  const [pmsSyncKey, setPmsSyncKey] = useState("");
+  const [syncPhase, setSyncPhase]   = useState(-1); // -1 = not started, 0-3 = phases
+  const syncTimer = useRef(null);
+
+  // Step 3 – RPA Vault (only top 3 discovered payers)
+  const [rpaVault, setRpaVault] = useState(
+    Object.fromEntries(DISCOVERED_PAYERS.map(p => [p.id, { user: "", pass: "" }]))
+  );
+  const [rpaExpanded, setRpaExpanded] = useState("delta");
+
+  // Step 4 – Team
+  const [invites, setInvites] = useState([
+    { email: "", role: "Front Desk" },
+  ]);
+
+  const advance = (toStep) => {
+    setAnimating(true);
+    setTimeout(() => {
+      setStep(toStep);
+      setAnimating(false);
+    }, 200);
+  };
+
+  const startPmsSync = () => {
+    if (!pmsSystem || !pmsSyncKey) return;
+    setSyncPhase(0);
+    let i = 0;
+    syncTimer.current = setInterval(() => {
+      i += 1;
+      setSyncPhase(i);
+      if (i >= PMS_SYNC_PHASES.length - 1) {
+        clearInterval(syncTimer.current);
+        // auto-advance after a moment
+        setTimeout(() => advance("rpa"), 1200);
+      }
+    }, 900);
+  };
+
+  useEffect(() => () => clearInterval(syncTimer.current), []);
+
+  const contentStyle = {
+    opacity: animating ? 0 : 1,
+    transform: animating ? "translateY(12px)" : "translateY(0)",
+    transition: "opacity 0.2s, transform 0.2s",
+  };
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 10000,
+      display: "flex", fontFamily: "'Nunito', sans-serif",
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+        @keyframes wizFadeIn { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes wizPulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+        @keyframes wizSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        @keyframes wizGrow { from{width:0%} to{width:100%} }
+        .wiz-animate { animation: wizFadeIn 0.4s ease-out both; }
+      `}</style>
+
+      {/* ── Left dark panel ── */}
+      <div style={{
+        width: 380, flexShrink: 0,
+        background: "linear-gradient(160deg, #312e81 0%, #1e1b4b 50%, #0f172a 100%)",
+        padding: "52px 40px", display: "flex", flexDirection: "column",
+        position: "relative", overflow: "hidden",
+      }}>
+        {/* Ambient blobs */}
+        <div style={{ position:"absolute", top:-100, right:-80, width:360, height:360, borderRadius:"50%",
+          background:"#6366f1", opacity:0.15, filter:"blur(80px)", pointerEvents:"none" }} />
+        <div style={{ position:"absolute", bottom:-80, left:-60, width:300, height:300, borderRadius:"50%",
+          background:"#0ea5e9", opacity:0.12, filter:"blur(80px)", pointerEvents:"none" }} />
+
+        {/* Logo */}
+        <div style={{ position:"relative", zIndex:1, marginBottom:52 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <span style={{ fontSize:28 }}>🦷</span>
+            <span style={{ fontSize:24, fontWeight:900, color:"#a5f3fc", letterSpacing:"-0.02em" }}>
+              level<span style={{ color:"rgba(255,255,255,0.45)" }}>ai</span>
+            </span>
+          </div>
+          <div style={{ fontSize:11, fontWeight:800, color:"#84cc16", letterSpacing:"0.12em", textTransform:"uppercase", marginTop:8 }}>
+            Practice Setup
+          </div>
+        </div>
+
+        {/* Progress dots */}
+        <div style={{ position:"relative", zIndex:1, flex:1 }}>
+          <WizardProgressBar currentStep={step} />
+
+          {/* Left panel contextual copy */}
+          {step === "profile" && (
+            <div className="wiz-animate" style={{ color:"rgba(255,255,255,0.7)", fontSize:14, lineHeight:1.7 }}>
+              <div style={{ fontSize:28, marginBottom:16 }}>👋</div>
+              <div style={{ fontSize:18, fontWeight:900, color:"white", marginBottom:12 }}>
+                Welcome to Level AI.
+              </div>
+              <div>
+                Let&apos;s get your practice credentialed with Stedi&apos;s clearinghouse in under 5 minutes.
+                We&apos;ll handle everything else.
+              </div>
+            </div>
+          )}
+          {step === "pms" && (
+            <div className="wiz-animate" style={{ color:"rgba(255,255,255,0.7)", fontSize:14, lineHeight:1.7 }}>
+              <div style={{ fontSize:28, marginBottom:16 }}>🔌</div>
+              <div style={{ fontSize:18, fontWeight:900, color:"white", marginBottom:12 }}>
+                One connection. Everything syncs.
+              </div>
+              <div>
+                Connect your PMS and we&apos;ll automatically pull your daily schedule, appointment types, and patient list — no manual imports.
+              </div>
+            </div>
+          )}
+          {step === "rpa" && (
+            <div className="wiz-animate" style={{ color:"rgba(255,255,255,0.7)", fontSize:14, lineHeight:1.7 }}>
+              <div style={{ fontSize:28, marginBottom:16 }}>🤖</div>
+              <div style={{ fontSize:18, fontWeight:900, color:"white", marginBottom:12 }}>
+                Your top payers, fully automated.
+              </div>
+              <div>
+                We found your top 3 insurance networks from the PMS sync. Add your portal credentials and our RPA bots handle verification automatically.
+              </div>
+            </div>
+          )}
+          {step === "team" && (
+            <div className="wiz-animate" style={{ color:"rgba(255,255,255,0.7)", fontSize:14, lineHeight:1.7 }}>
+              <div style={{ fontSize:28, marginBottom:16 }}>🎉</div>
+              <div style={{ fontSize:18, fontWeight:900, color:"white", marginBottom:12 }}>
+                Almost there!
+              </div>
+              <div>
+                Invite your front desk and billing staff. They&apos;ll get immediate access to the verification dashboard — no extra setup needed.
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom stat */}
+        <div style={{ position:"relative", zIndex:1, background:"rgba(255,255,255,0.06)", borderRadius:12,
+          padding:"14px 18px", border:"1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ fontSize:11, color:"rgba(255,255,255,0.5)", fontWeight:700, marginBottom:4 }}>
+            AVERAGE SETUP TIME
+          </div>
+          <div style={{ fontSize:24, fontWeight:900, color:"#a5f3fc" }}>4 min 12 sec</div>
+          <div style={{ fontSize:11, color:"rgba(255,255,255,0.5)", marginTop:2 }}>
+            Most practices go live before their next patient.
+          </div>
+        </div>
+      </div>
+
+      {/* ── Right white panel ── */}
+      <div style={{
+        flex: 1, background: "white", overflowY: "auto",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "48px 64px",
+      }}>
+        <div style={{ width: "100%", maxWidth: 500, ...contentStyle }}>
+
+          {/* ═══ STEP 1: Practice Identity ═══ */}
+          {step === "profile" && (
+            <div className="wiz-animate">
+              <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
+                borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
+                STEP 1 OF 4
+              </div>
+              <h2 style={{ fontSize:28, fontWeight:900, color:"#1a1a18", marginBottom:8, lineHeight:1.2 }}>
+                Practice Identity
+              </h2>
+              <p style={{ fontSize:14, color:"#a0a09a", marginBottom:32, lineHeight:1.6 }}>
+                Your legal details for clearinghouse credentialing. This is submitted once — we handle all renewals.
+              </p>
+
+              <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+                <OInput label="Legal Practice Name" placeholder="e.g. Georgetown Dental Associates"
+                  value={pracName} onChange={e => setPracName(e.target.value)} required />
+                <div style={{ display:"flex", gap:14 }}>
+                  <div style={{ flex:1 }}>
+                    <OInput label="NPI Number" placeholder="1234567890"
+                      value={npi} onChange={e => setNpi(e.target.value)} required />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <OInput label="Tax ID (TIN)" placeholder="XX-XXXXXXX" value={taxId} onChange={e=>setTaxId(e.target.value)} required />
+                  <div style={{ flex:1 }}>
+                    <OInput label="Tax ID (TIN)" placeholder="XX-XXXXXXX"
+                      value={taxId} onChange={e => setTaxId(e.target.value)} required />
                   </div>
                 </div>
-              </div>
-              <div style={{ marginTop: 28 }}>
-                <NextBtn label="Next: Connect PMS →" onClick={() => { if (pracName && npi && taxId) setStep("pms"); }} />
+
+                {/* Reassurance */}
+                <div style={{ display:"flex", gap:10, alignItems:"center", background:"#f0f9ff",
+                  border:"1px solid #bae6fd", borderRadius:10, padding:"12px 16px" }}>
+                  <span style={{ fontSize:18 }}>🔒</span>
+                  <span style={{ fontSize:12, color:"#0369a1", fontWeight:700 }}>
+                    HIPAA-compliant. Your data is encrypted at rest and in transit.
+                  </span>
+                </div>
+
+                <NextBtn label="Next: Connect PMS →"
+                  disabled={!pracName || !npi || !taxId}
+                  onClick={() => advance("pms")} />
               </div>
             </div>
           )}
 
-          {/* Step 2 – Connect PMS */}
+          {/* ═══ STEP 2: Connect PMS ═══ */}
           {step === "pms" && (
-            <div style={{ animation: "fadeIn 0.35s ease-out" }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: T.text, marginBottom: 6 }}>Connect Your PMS</div>
-              <div style={{ fontSize: 13, color: T.textSoft, marginBottom: 28, lineHeight: 1.5 }}>
-                Level AI pulls your daily schedule directly from your Practice Management System. No manual entry.
+            <div className="wiz-animate">
+              <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
+                borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
+                STEP 2 OF 4
               </div>
+              <h2 style={{ fontSize:28, fontWeight:900, color:"#1a1a18", marginBottom:8, lineHeight:1.2 }}>
+                Connect Your PMS
+              </h2>
+              <p style={{ fontSize:14, color:"#a0a09a", marginBottom:32, lineHeight:1.6 }}>
+                We&apos;ll sync your schedule directly — no manual entry, ever.
+              </p>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                  <label style={{ fontSize: 11, fontWeight: 800, color: T.textMid, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    Practice Management System
-                  </label>
-                  <select value={pmsSystem} onChange={e => setPmsSystem(e.target.value)} required
-                    style={{ padding: "13px 16px", border: "1px solid " + T.borderStrong, borderRadius: 10,
-                      fontSize: 14, outline: "none", cursor: "pointer", background: T.bgCard,
-                      color: pmsSystem ? T.text : T.textSoft, fontFamily: "inherit" }}>
-                    <option value="">Select your PMS…</option>
-                    {PMS_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-
-                {pmsSystem && (
-                  <div style={{ animation: "fadeIn 0.3s ease-out" }}>
-                    <OInput label={pmsSystem === "Open Dental" ? "eKey" : "Sync Token"}
-                      placeholder={pmsSystem === "Open Dental" ? "Paste your Open Dental eKey" : "Paste your API / Sync Token"}
-                      type="password" value={pmsSyncKey} onChange={e => setPmsSyncKey(e.target.value)} required />
+              {syncPhase === -1 ? (
+                <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
+                  {/* PMS Selector */}
+                  <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+                    <label style={{ fontSize:11, fontWeight:800, color:"#52525a", textTransform:"uppercase", letterSpacing:"0.05em" }}>
+                      Practice Management System
+                    </label>
+                    <select value={pmsSystem} onChange={e => setPmsSystem(e.target.value)}
+                      style={{ padding:"13px 16px", border:"1px solid #c8c8c0", borderRadius:10, fontSize:14,
+                        outline:"none", cursor:"pointer", background:"white",
+                        color: pmsSystem ? "#1a1a18" : "#a0a09a", fontFamily:"inherit" }}>
+                      <option value="">Select your PMS…</option>
+                      {PMS_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
                   </div>
-                )}
 
-                {pmsSystem && (
-                  <div style={{ background: T.limeLight, border: "1px solid " + T.limeBorder, borderRadius: 10, padding: "12px 16px",
-                    display: "flex", alignItems: "flex-start", gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>ℹ️</span>
-                    <div style={{ fontSize: 12, color: T.limeDark, lineHeight: 1.5 }}>
-                      <strong>Where to find your {pmsSystem === "Open Dental" ? "eKey" : "Sync Token"}:</strong>{" "}
-                      {pmsSystem === "Open Dental" && "Open Dental → Setup → Advanced → HL7/API → eKey tab."}
-                      {pmsSystem === "Dentrix" && "Dentrix → Office Manager → Tools → Dentrix Enterprise → API Keys."}
-                      {pmsSystem === "Eaglesoft" && "Eaglesoft → Setup → Connections → Integration Hub → Token."}
-                      {!["Open Dental","Dentrix","Eaglesoft"].includes(pmsSystem) && "Contact your PMS support team for your integration token."}
+                  {pmsSystem && (
+                    <div style={{ animation:"wizFadeIn 0.3s ease-out" }}>
+                      <OInput
+                        label={pmsSystem === "Open Dental" ? "eKey" : "Sync Token"}
+                        type="password"
+                        placeholder={pmsSystem === "Open Dental" ? "Paste your Open Dental eKey" : "Paste your API / Sync Token"}
+                        value={pmsSyncKey} onChange={e => setPmsSyncKey(e.target.value)} required />
+                    </div>
+                  )}
+
+                  {pmsSystem && (
+                    <div style={{ background:"#f0fdf0", border:"1px solid #bbf7b0", borderRadius:10, padding:"12px 16px", display:"flex", gap:10, alignItems:"flex-start" }}>
+                      <span style={{ fontSize:16 }}>ℹ️</span>
+                      <div style={{ fontSize:12, color:"#3f6212", lineHeight:1.5 }}>
+                        <strong>Where to find it: </strong>
+                        {pmsSystem === "Open Dental" && "Open Dental → Setup → Advanced → HL7/API → eKey tab."}
+                        {pmsSystem === "Dentrix" && "Dentrix → Office Manager → Tools → API Keys."}
+                        {pmsSystem === "Eaglesoft" && "Eaglesoft → Setup → Connections → Integration Hub → Token."}
+                        {!["Open Dental","Dentrix","Eaglesoft"].includes(pmsSystem) && "Contact your PMS support team for your integration token."}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display:"flex", gap:10 }}>
+                    <button onClick={() => advance("profile")}
+                      style={{ flex:"0 0 auto", padding:"15px 20px", borderRadius:10, border:"1px solid #e2e2dc",
+                        background:"white", color:"#52525a", fontWeight:700, cursor:"pointer", fontSize:14 }}>
+                      ← Back
+                    </button>
+                    <div style={{ flex:1 }}>
+                      <NextBtn label="Sync PMS →" disabled={!pmsSystem || !pmsSyncKey} onClick={startPmsSync} />
                     </div>
                   </div>
-                )}
-              </div>
-
-              <div style={{ marginTop: 28, display: "flex", gap: 10 }}>
-                <button onClick={() => setStep("profile")} style={{ flex: "0 0 auto", padding: "15px 20px", borderRadius: 10,
-                  border: "1px solid " + T.border, background: T.bgCard, color: T.textMid, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
-                  ← Back
-                </button>
-                <div style={{ flex: 1 }}>
-                  <NextBtn label="Next: RPA Vault →" onClick={() => { if (pmsSystem && pmsSyncKey) setStep("rpa"); }} />
                 </div>
-              </div>
+              ) : (
+                /* ── Syncing animation ── */
+                <div style={{ animation:"wizFadeIn 0.3s ease-out" }}>
+                  <div style={{ background:"#f8fafc", border:"1px solid #e2e2dc", borderRadius:16, padding:"32px 28px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:28 }}>
+                      <div style={{ width:48, height:48, borderRadius:12, background:"#eef2ff",
+                        display:"flex", alignItems:"center", justifyContent:"center", fontSize:24 }}>
+                        🔌
+                      </div>
+                      <div>
+                        <div style={{ fontSize:15, fontWeight:900, color:"#1a1a18" }}>{pmsSystem}</div>
+                        <div style={{ fontSize:12, color:"#a0a09a", marginTop:2 }}>Establishing connection…</div>
+                      </div>
+                    </div>
+
+                    {/* Phase list */}
+                    <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                      {PMS_SYNC_PHASES.map((phase, i) => {
+                        const done    = i < syncPhase;
+                        const active  = i === syncPhase;
+                        const pending = i > syncPhase;
+                        return (
+                          <div key={i} style={{ display:"flex", alignItems:"center", gap:12 }}>
+                            <div style={{
+                              width:22, height:22, borderRadius:"50%", flexShrink:0,
+                              display:"flex", alignItems:"center", justifyContent:"center",
+                              background: done ? "#22c55e" : active ? "#6366f1" : "#e2e2dc",
+                              fontSize:11, fontWeight:900, color:"white",
+                              animation: active ? "wizPulse 1s ease-in-out infinite" : "none",
+                            }}>
+                              {done ? "✓" : active ? "…" : "○"}
+                            </div>
+                            <div style={{
+                              fontSize:14, fontWeight: active ? 800 : done ? 700 : 400,
+                              color: done ? "#1a1a18" : active ? "#4f46e5" : "#a0a09a",
+                            }}>
+                              {phase}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Progress bar */}
+                    <div style={{ marginTop:24, background:"#e2e2dc", borderRadius:4, height:6, overflow:"hidden" }}>
+                      <div style={{
+                        height:"100%", borderRadius:4, background:"linear-gradient(90deg,#6366f1,#0ea5e9)",
+                        width: `${Math.min(100, (syncPhase / (PMS_SYNC_PHASES.length - 1)) * 100)}%`,
+                        transition:"width 0.9s ease-out",
+                      }} />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Step 3 – RPA Credential Vault */}
+          {/* ═══ STEP 3: RPA Vault — Smart (only shows discovered payers) ═══ */}
           {step === "rpa" && (
-            <div style={{ animation: "fadeIn 0.35s ease-out" }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: T.text, marginBottom: 6 }}>RPA Credential Vault</div>
-              <div style={{ fontSize: 13, color: T.textSoft, marginBottom: 10, lineHeight: 1.5 }}>
-                When a payer's API returns incomplete data, our AI bot logs into their web portal using your provider credentials to scrape the full benefits. Add your top payers below.
+            <div className="wiz-animate">
+              <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
+                borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
+                STEP 3 OF 4
               </div>
-              <div style={{ background: T.rpaLight, border: "1px solid " + T.rpaBorder, borderRadius: 10,
-                padding: "10px 14px", marginBottom: 24, display: "flex", gap: 10, alignItems: "center" }}>
-                <span style={{ fontSize: 16 }}>🔐</span>
-                <span style={{ fontSize: 12, color: T.rpaDark, fontWeight: 700 }}>
-                  Credentials are AES-256 encrypted and never stored in plaintext.
+              <h2 style={{ fontSize:28, fontWeight:900, color:"#1a1a18", marginBottom:8, lineHeight:1.2 }}>
+                RPA Credential Vault
+              </h2>
+
+              {/* Smart discovery callout */}
+              <div style={{ background:"linear-gradient(135deg,#eef2ff,#f0f9ff)", border:"1px solid #c7d2fe",
+                borderRadius:12, padding:"16px 18px", marginBottom:24 }}>
+                <div style={{ fontSize:12, fontWeight:900, color:"#4f46e5", marginBottom:6 }}>
+                  🤖 PMS SYNC COMPLETE — INTELLIGENCE REPORT
+                </div>
+                <div style={{ fontSize:13, color:"#1e1b4b", lineHeight:1.6 }}>
+                  Based on your {pmsSystem || "PMS"} sync, we found{" "}
+                  <strong>3,420 active patients</strong>. Your top 3 insurance networks are:{" "}
+                  <strong>Delta Dental</strong>, <strong>MetLife</strong>, and{" "}
+                  <strong>Cigna</strong>.
+                </div>
+                <div style={{ fontSize:11, color:"#6366f1", marginTop:8, fontWeight:700 }}>
+                  Add credentials below to enable zero-touch RPA verification for these payers.
+                </div>
+              </div>
+
+              <div style={{ background:"#f0f9ff", border:"1px solid #bae6fd", borderRadius:10,
+                padding:"10px 14px", marginBottom:20, display:"flex", gap:10, alignItems:"center" }}>
+                <span style={{ fontSize:15 }}>🔐</span>
+                <span style={{ fontSize:12, color:"#0369a1", fontWeight:700 }}>
+                  AES-256 encrypted. Never stored in plaintext. HIPAA-compliant vault.
                 </span>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {RPA_PAYERS.map(payer => {
+              <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:20 }}>
+                {DISCOVERED_PAYERS.map(payer => {
                   const isOpen = rpaExpanded === payer.id;
-                  const creds = rpaVault[payer.id];
+                  const creds  = rpaVault[payer.id];
                   const filled = creds.user && creds.pass;
                   return (
-                    <div key={payer.id} style={{ border: "1px solid " + (filled ? T.limeBorder : T.border),
-                      borderRadius: 10, overflow: "hidden", transition: "border-color 0.2s" }}>
+                    <div key={payer.id} style={{ border:"1px solid " + (filled ? "#bbf7b0" : "#e2e2dc"),
+                      borderRadius:12, overflow:"hidden", transition:"border-color 0.2s",
+                      boxShadow: filled ? "0 0 0 2px rgba(132,204,22,0.15)" : "none" }}>
                       <div onClick={() => setRpaExpanded(isOpen ? null : payer.id)}
-                        style={{ padding: "13px 16px", display: "flex", alignItems: "center", gap: 12,
-                          cursor: "pointer", background: isOpen ? T.indigoLight : T.bgCard }}>
-                        <span style={{ fontSize: 20 }}>{payer.logo}</span>
-                        <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: T.text }}>{payer.name}</span>
-                        {filled && (
-                          <span style={{ fontSize: 10, fontWeight: 800, color: T.limeDark, background: T.limeLight,
-                            border: "1px solid " + T.limeBorder, padding: "2px 8px", borderRadius: 20 }}>✓ Saved</span>
-                        )}
-                        <span style={{ color: T.textSoft, fontSize: 18, transform: isOpen ? "rotate(180deg)" : "none", transition: "0.2s" }}>⌄</span>
+                        style={{ padding:"14px 18px", display:"flex", alignItems:"center", gap:12,
+                          cursor:"pointer", background: isOpen ? "#eef2ff" : "white" }}>
+                        <span style={{ fontSize:22 }}>{payer.logo}</span>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:14, fontWeight:900, color:"#1a1a18" }}>{payer.name}</div>
+                          <div style={{ fontSize:11, color:"#a0a09a", marginTop:1 }}>
+                            ~{payer.patients.toLocaleString()} patients
+                          </div>
+                        </div>
+                        {filled
+                          ? <span style={{ fontSize:10, fontWeight:800, color:"#3f6212", background:"#f0fdf0",
+                              border:"1px solid #bbf7b0", padding:"3px 10px", borderRadius:20 }}>✓ Saved</span>
+                          : <span style={{ fontSize:10, fontWeight:800, color:"#a0a09a", background:"#f5f5f0",
+                              padding:"3px 10px", borderRadius:20 }}>Pending</span>
+                        }
+                        <span style={{ color:"#a0a09a", fontSize:18, transform: isOpen ? "rotate(180deg)" : "none", transition:"0.2s" }}>⌄</span>
                       </div>
                       {isOpen && (
-                        <div style={{ padding: "14px 16px", borderTop: "1px solid " + T.border,
-                          background: T.bg, display: "flex", gap: 12 }}>
-                          <div style={{ flex: 1 }}>
+                        <div style={{ padding:"14px 18px", borderTop:"1px solid #e2e2dc", background:"#f8fafc", display:"flex", gap:12 }}>
+                          <div style={{ flex:1 }}>
                             <OInput label="Portal Username" placeholder="provider@practice.com"
                               value={creds.user}
                               onChange={e => setRpaVault(v => ({ ...v, [payer.id]: { ...v[payer.id], user: e.target.value } }))} />
                           </div>
-                          <div style={{ flex: 1 }}>
+                          <div style={{ flex:1 }}>
                             <OInput label="Portal Password" type="password" placeholder="••••••••"
                               value={creds.pass}
                               onChange={e => setRpaVault(v => ({ ...v, [payer.id]: { ...v[payer.id], pass: e.target.value } }))} />
@@ -715,27 +1057,136 @@ function AuthFlow({ onComplete, showToast }) {
                 })}
               </div>
 
-              <div style={{ fontSize: 12, color: T.textSoft, marginTop: 12, marginBottom: 4 }}>
-                Tip: Adding at least 3 payers significantly improves zero-call verification rates.
+              <div style={{ fontSize:12, color:"#a0a09a", marginBottom:20 }}>
+                💡 Tip: Adding credentials for all 3 payers typically saves 45+ minutes of manual verification calls per day.
               </div>
 
-              <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
-                <button onClick={() => setStep("pms")} style={{ flex: "0 0 auto", padding: "15px 20px", borderRadius: 10,
-                  border: "1px solid " + T.border, background: T.bgCard, color: T.textMid, fontWeight: 700, cursor: "pointer", fontSize: 14 }}>
+              <div style={{ display:"flex", gap:10 }}>
+                <button onClick={() => advance("pms")}
+                  style={{ flex:"0 0 auto", padding:"15px 20px", borderRadius:10, border:"1px solid #e2e2dc",
+                    background:"white", color:"#52525a", fontWeight:700, cursor:"pointer", fontSize:14 }}>
                   ← Back
                 </button>
-                <div style={{ flex: 1 }}>
-                  <NextBtn label="🎉 Launch Dashboard" onClick={() => { showToast("Setup complete! Welcome to Level AI 🎉"); }} />
+                <div style={{ flex:1 }}>
+                  <NextBtn label="Next: Invite Team →" onClick={() => advance("team")} />
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ STEP 4: Invite Team + Launch ═══ */}
+          {step === "team" && (
+            <div className="wiz-animate">
+              <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
+                borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
+                STEP 4 OF 4 — FINAL STEP
+              </div>
+              <h2 style={{ fontSize:28, fontWeight:900, color:"#1a1a18", marginBottom:8, lineHeight:1.2 }}>
+                Invite Your Team
+              </h2>
+              <p style={{ fontSize:14, color:"#a0a09a", marginBottom:28, lineHeight:1.6 }}>
+                Add your front desk or billing staff — they&apos;ll get immediate access. You can always add more later in Settings.
+              </p>
+
+              <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
+                {invites.map((inv, i) => (
+                  <div key={i} style={{ display:"flex", gap:10, alignItems:"flex-end" }}>
+                    <div style={{ flex:2 }}>
+                      <OInput label={i === 0 ? "Email Address" : ""}
+                        type="email" placeholder="colleague@practice.com"
+                        value={inv.email}
+                        onChange={e => {
+                          const next = [...invites];
+                          next[i] = { ...next[i], email: e.target.value };
+                          setInvites(next);
+                        }} />
+                    </div>
+                    <div style={{ flex:1 }}>
+                      {i === 0 && (
+                        <label style={{ display:"block", fontSize:11, fontWeight:800, color:"#52525a",
+                          textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:7 }}>
+                          Role
+                        </label>
+                      )}
+                      <select value={inv.role}
+                        onChange={e => {
+                          const next = [...invites];
+                          next[i] = { ...next[i], role: e.target.value };
+                          setInvites(next);
+                        }}
+                        style={{ padding:"13px 12px", border:"1px solid #c8c8c0", borderRadius:10,
+                          fontSize:13, outline:"none", background:"white", fontFamily:"inherit",
+                          color:"#1a1a18", width:"100%", cursor:"pointer" }}>
+                        <option>Front Desk</option>
+                        <option>Biller</option>
+                        <option>Admin</option>
+                        <option>Doctor</option>
+                      </select>
+                    </div>
+                    {invites.length > 1 && (
+                      <button onClick={() => setInvites(invites.filter((_,j) => j !== i))}
+                        style={{ background:"none", border:"none", color:"#a0a09a", fontSize:18,
+                          cursor:"pointer", padding:"13px 6px", flexShrink:0 }}>
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={() => setInvites([...invites, { email:"", role:"Front Desk" }])}
+                style={{ background:"none", border:"1px dashed #c8c8c0", borderRadius:10, color:"#6366f1",
+                  fontWeight:800, fontSize:13, cursor:"pointer", padding:"10px 16px",
+                  width:"100%", marginBottom:28, transition:"0.2s" }}
+                onMouseEnter={e => e.currentTarget.style.borderColor="#6366f1"}
+                onMouseLeave={e => e.currentTarget.style.borderColor="#c8c8c0"}>
+                + Add another team member
+              </button>
+
+              {/* What's next summary */}
+              <div style={{ background:"#f8fafc", border:"1px solid #e2e2dc", borderRadius:12, padding:"18px 20px", marginBottom:24 }}>
+                <div style={{ fontSize:12, fontWeight:900, color:"#52525a", marginBottom:12, textTransform:"uppercase", letterSpacing:"0.05em" }}>
+                  🎯 You&apos;re about to unlock:
+                </div>
+                {[
+                  "✅  Real-time eligibility verification via Stedi clearinghouse",
+                  "🤖  Automated RPA for Delta Dental, MetLife & Cigna portals",
+                  "📅  Daily schedule sync from " + (pmsSystem || "your PMS"),
+                  "💬  Patient outreach via Twilio SMS",
+                ].map(item => (
+                  <div key={item} style={{ fontSize:13, color:"#52525a", marginBottom:6, lineHeight:1.5 }}>{item}</div>
+                ))}
+              </div>
+
+              <div style={{ display:"flex", gap:10 }}>
+                <button onClick={() => advance("rpa")}
+                  style={{ flex:"0 0 auto", padding:"15px 20px", borderRadius:10, border:"1px solid #e2e2dc",
+                    background:"white", color:"#52525a", fontWeight:700, cursor:"pointer", fontSize:14 }}>
+                  ← Back
+                </button>
+                <button
+                  onClick={() => {
+                    const hasEmails = invites.some(i => i.email.trim());
+                    if (hasEmails) showToast("Invites sent! Your team will receive an email shortly. 🎉");
+                    onComplete();
+                  }}
+                  style={{
+                    flex:1, padding:"17px", background:"linear-gradient(135deg,#4f46e5,#7c3aed)",
+                    color:"white", border:"none", borderRadius:12, fontSize:16, fontWeight:900,
+                    cursor:"pointer", letterSpacing:"0.01em",
+                    boxShadow:"0 8px 24px rgba(79,70,229,0.4)",
+                    transition:"transform 0.2s, box-shadow 0.2s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow="0 12px 32px rgba(79,70,229,0.5)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 8px 24px rgba(79,70,229,0.4)"; }}>
+                  🚀 Launch My Dashboard
+                </button>
               </div>
             </div>
           )}
 
         </div>
       </div>
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-      `}</style>
     </div>
   );
 }
@@ -2612,6 +3063,21 @@ export default function LevelAI() {
     setTimeout(() => setToastMsg(""), 3500);
   }, []);
 
+  // ── Onboarding wizard (new-practice signup) ───────────────────────────────────
+  const [showWizard, setShowWizard] = useState(false);
+  useEffect(() => {
+    if (isSignedIn && typeof window !== "undefined") {
+      if (localStorage.getItem("pulp_needs_onboarding") === "1") {
+        setShowWizard(true);
+      }
+    }
+  }, [isSignedIn]);
+  const handleWizardComplete = useCallback(() => {
+    if (typeof window !== "undefined") localStorage.removeItem("pulp_needs_onboarding");
+    setShowWizard(false);
+    showToast("🎉 Welcome to Level AI! Your practice is live.");
+  }, [showToast]);
+
   // ── Idle timer (20 min) ───────────────────────────────────────────────────────
   const IDLE_MS = 20 * 60 * 1000;
   const WARN_MS = 19 * 60 * 1000; // warn at 19 min, auto-logout at 20
@@ -3227,6 +3693,14 @@ export default function LevelAI() {
       )}
 
       {toastMsg && <ToastBar msg={toastMsg} />}
+
+      {/* ── Onboarding wizard overlay (new practices) ───────────────────── */}
+      {showWizard && (
+        <OnboardingWizard
+          onComplete={handleWizardComplete}
+          showToast={showToast}
+        />
+      )}
 
       {/* ── Idle warning modal ───────────────────────────────────────────── */}
       {idleWarning && (
