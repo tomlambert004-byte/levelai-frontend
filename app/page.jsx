@@ -4902,14 +4902,19 @@ export default function LevelAI() {
   // Covers today for the kanban AND the next 7 days for WeekAhead + auto-verify.
   // Skips weekends (Sat/Sun) since the practice is closed and the API returns [].
   const loadWeekSchedule = useCallback(async (anchorDate) => {
-    // Build every calendar date from today through today+7, skipping weekends
+    // Build every calendar date from today through today+7.
+    // Always include today (even weekends) — server-side fixtures remap
+    // weekends to the nearest weekday so the demo is never empty.
+    // For live PMS data, weekends naturally return [] which is correct.
     const anchor = new Date(anchorDate + "T12:00:00");
     const fetchDates = [];
     for (let i = 0; i <= 7; i++) {
       const d = new Date(anchor);
       d.setDate(anchor.getDate() + i);
       const dow = d.getDay();
-      if (dow === 0 || dow === 6) continue; // skip Sat/Sun
+      const isToday = i === 0;
+      // Always fetch today; skip future weekends (server has no real data for them)
+      if (!isToday && (dow === 0 || dow === 6)) continue;
       fetchDates.push(d.toISOString().split("T")[0]);
     }
 
