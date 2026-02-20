@@ -110,10 +110,55 @@ function triagePatient(patient, result) {
   if (result.restorative?.composite_posterior_downgrade) notify.push("Posterior composite will be downgraded to amalgam rate -- patient may owe the difference");
   if (result.missing_tooth_clause?.applies && !isProsthetic) notify.push("Missing Tooth Clause on file -- will affect future implant/bridge coverage");
 
+  // ── Medicaid-specific triage ──────────────────────────────────────────────
+  if (result._is_medicaid && result.medicaid_info) {
+    const mInfo = result.medicaid_info;
+    const procCodes = (patient?.procedure || "").match(/D\d{4}/g) || [];
+    for (const code of procCodes) {
+      // PA required check
+      if ((mInfo.prior_auth_required || []).includes(code)) {
+        notify.push(`Medicaid PA required for ${code} — submit before appointment`);
+      }
+      // Frequency limit exceeded (if usage data available)
+      const freqInfo = mInfo.frequency_limits?.[code];
+      if (freqInfo && freqInfo.used >= freqInfo.max) {
+        block.push(`Medicaid frequency limit: ${code} used ${freqInfo.used}/${freqInfo.max} — not eligible until next period`);
+      }
+    }
+  }
+
+  // ── OON Assignment-of-Benefits triage ─────────────────────────────────────
+  if (result.assignment_of_benefits && !result.assignment_of_benefits.assigned_to_provider && result.in_network === false) {
+    notify.push("OON: Insurance reimburses PATIENT, not office — collect full fee at time of service");
+  }
+
   const level = block.length > 0 ? TRIAGE.CRITICAL : notify.length > 0 ? TRIAGE.WARNING : notices.length > 0 ? TRIAGE.NOTICE : TRIAGE.CLEAR;
   return { level, block, notify, notices, reasons: block, warnings: notify };
 }
 
+// ── Medicaid Detection (inline — no import needed for client component) ──────
+const MEDICAID_KW = /medicaid|medi-cal|denti-cal|chip|soonercare|masshealth|badgercare|husky|tmhp|ahcccs|superior\s*health|peach\s*state|sunshine\s*health|wellcare|molina|centene|amerihealth|caresource|illinicare|buckeye|nj\s*familycare|apple\s*health|healthy\s*michigan|virginia\s*medicaid|texas\s*health\s*steps/i;
+const MEDICAID_PAYER_IDS = new Set(["18916","77037","610279","77027","77034","77036","77033","77032","77012","77031","77030","77028","77039","77040","77003","77029"]);
+const PAYER_STATE_MAP = {"18916":"TX","77037":"TX","610279":"CA","77027":"NY","77034":"FL","77036":"PA","77033":"IL","77032":"OH","77012":"GA","77031":"NC","77030":"MI","77028":"NJ","77039":"VA","77040":"WA","77003":"AZ","77029":"MA"};
+const INSURANCE_STATE_MAP = {"medi-cal":"CA","denti-cal":"CA","soonercare":"OK","masshealth":"MA","badgercare":"WI","husky":"CT","peach state":"GA","healthy michigan":"MI","nj familycare":"NJ","apple health":"WA","ahcccs":"AZ","illinicare":"IL","buckeye":"OH","superior health":"TX","tmhp":"TX","sunshine health":"FL","virginia medicaid":"VA"};
+
+function isMedicaidPatient(patient) {
+  if (!patient) return false;
+  const ins = (patient.insurance || patient.insuranceName || "").toLowerCase();
+  const pid = (patient.payerId || "").trim();
+  return (pid && MEDICAID_PAYER_IDS.has(pid)) || MEDICAID_KW.test(ins);
+}
+
+function detectMedicaidStateClient(patient) {
+  if (!patient) return null;
+  const pid = (patient.payerId || "").trim();
+  if (pid && PAYER_STATE_MAP[pid]) return PAYER_STATE_MAP[pid];
+  const ins = (patient.insurance || patient.insuranceName || "").toLowerCase();
+  for (const [kw, st] of Object.entries(INSURANCE_STATE_MAP)) {
+    if (ins.includes(kw)) return st;
+  }
+  return null;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // API CLIENT  ·  Phase 1: Data Bridge
@@ -1459,16 +1504,33 @@ function PreauthWidget({ patient, result, triage, showToast }) {
     showToast("Email client opened with letter pre-filled ✉️");
   };
 
+  const isMedicaidPA = isMedicaidPatient(patient) || result?._is_medicaid;
+  const medicaidStatePA = result?._medicaid_state || detectMedicaidStateClient(patient);
+
   // ── IDLE ──────────────────────────────────────────────────────────────────
   if (status === "idle") return (
-    <button onClick={handleGenerate}
-      style={{ marginTop:12, background:T.indigoDark, color:"white", padding:"10px 16px", borderRadius:8,
-        fontWeight:800, cursor:"pointer", border:"none", width:"100%", display:"flex",
-        justifyContent:"center", alignItems:"center", gap:8, transition:"0.2s" }}
-      onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
-      onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
-      <span style={{ fontSize:16 }}>⚡</span> Generate Pre-Authorization Letter
-    </button>
+    <div style={{ marginTop:12 }}>
+      {isMedicaidPA && (
+        <div style={{ background:"#f5f3ff", border:"1px solid #ddd6fe", borderRadius:8, padding:"8px 12px", marginBottom:8, display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:10, fontWeight:900, color:"#7c3aed", textTransform:"uppercase", letterSpacing:"0.05em" }}>Medicaid PA Request</span>
+          {medicaidStatePA && (
+            <span style={{ fontSize:10, fontWeight:700, color:"#6b7280" }}>
+              {medicaidStatePA === "TX" ? "TMHP format — radiographs + narrative required" :
+               medicaidStatePA === "CA" ? "TAR format — X-rays required" :
+               `${medicaidStatePA} Medicaid — supporting docs required`}
+            </span>
+          )}
+        </div>
+      )}
+      <button onClick={handleGenerate}
+        style={{ background: isMedicaidPA ? "#7c3aed" : T.indigoDark, color:"white", padding:"10px 16px", borderRadius:8,
+          fontWeight:800, cursor:"pointer", border:"none", width:"100%", display:"flex",
+          justifyContent:"center", alignItems:"center", gap:8, transition:"0.2s" }}
+        onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
+        onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+        <span style={{ fontSize:16 }}>⚡</span> {isMedicaidPA ? "Generate Medicaid PA Letter" : "Generate Pre-Authorization Letter"}
+      </button>
+    </div>
   );
 
   // ── LOADING ───────────────────────────────────────────────────────────────
@@ -1804,6 +1866,118 @@ function OONEstimatorWidget({ oon, patient, showToast }) {
   );
 }
 
+// ── Medicaid Coverage Panel ───────────────────────────────────────────────────
+function MedicaidCoveragePanel({ patient, result }) {
+  const mInfo = result?.medicaid_info;
+  if (!mInfo) return null;
+
+  const procCodes = (patient.procedure || "").match(/D\d{4}/g) || [];
+  const state = mInfo.state || result._medicaid_state || detectMedicaidStateClient(patient);
+  const program = mInfo.program_name || result._medicaid_program || "Medicaid";
+
+  // CDT descriptions for display
+  const CDT_DESC = {
+    D0120:"Periodic Exam", D0150:"Comprehensive Exam", D0210:"Full Mouth X-rays", D0272:"BWX (2)", D0274:"BWX (4)",
+    D1110:"Prophy (Adult)", D1120:"Prophy (Child)", D1206:"Fluoride Varnish", D1351:"Sealant",
+    D2140:"Amalgam 1s", D2330:"Composite 1s Ant", D2391:"Composite 1s Post", D2392:"Composite 2s Post",
+    D2750:"Crown PFM", D2751:"Crown Porcelain", D3310:"RCT Anterior", D3320:"RCT Premolar", D3330:"RCT Molar",
+    D4341:"SRP (quad)", D4342:"SRP (1-3 teeth)", D5110:"Denture Upper", D5120:"Denture Lower",
+    D6010:"Implant Body", D6065:"Implant Crown", D7140:"Extraction", D7210:"Surgical Extraction",
+  };
+
+  return (
+    <div style={{ background:"#f5f3ff", border:"1px solid #ddd6fe", borderRadius:10, marginBottom:14, overflow:"hidden" }}>
+      {/* Header */}
+      <div style={{ background:"linear-gradient(135deg, #7c3aed, #6d28d9)", padding:"12px 14px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+        <div>
+          <div style={{ color:"white", fontSize:12, fontWeight:900, letterSpacing:"0.05em" }}>MEDICAID COVERAGE CHECK</div>
+          <div style={{ color:"rgba(255,255,255,0.7)", fontSize:10, fontWeight:600, marginTop:2 }}>{program}</div>
+        </div>
+        {state && (
+          <div style={{ background:"rgba(255,255,255,0.2)", borderRadius:6, padding:"3px 10px", color:"white", fontWeight:900, fontSize:12 }}>
+            {state}
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding:"12px 14px", display:"flex", flexDirection:"column", gap:8 }}>
+        {/* Procedure checks */}
+        {procCodes.length > 0 ? procCodes.map(code => {
+          const freqInfo = mInfo.frequency_limits?.[code];
+          const needsPA = (mInfo.prior_auth_required || []).includes(code);
+          const copay = mInfo.copays_cents?.[code];
+          const desc = CDT_DESC[code] || code;
+
+          return (
+            <div key={code} style={{ background:"white", borderRadius:8, border:"1px solid #e9e5f5", padding:"10px 12px" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <span style={{ fontSize:12, fontWeight:800, color:"#374151" }}>{code}</span>
+                  <span style={{ fontSize:11, color:"#6b7280", fontWeight:500 }}>{desc}</span>
+                </div>
+                <span style={{ fontSize:18 }}>✅</span>
+              </div>
+
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                {/* Frequency limit bar */}
+                {freqInfo && (
+                  <div style={{ flex:1, minWidth:140 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
+                      <span style={{ fontSize:10, fontWeight:700, color:"#6b7280" }}>Frequency</span>
+                      <span style={{ fontSize:10, fontWeight:800, color: freqInfo.used >= freqInfo.max ? "#dc2626" : "#374151" }}>
+                        {freqInfo.used}/{freqInfo.max} per {freqInfo.periodMonths}mo
+                      </span>
+                    </div>
+                    <div style={{ height:6, background:"#f3f4f6", borderRadius:3, overflow:"hidden" }}>
+                      <div style={{ height:"100%", borderRadius:3, transition:"width 0.3s",
+                        width: `${Math.min(100, (freqInfo.used / freqInfo.max) * 100)}%`,
+                        background: freqInfo.used >= freqInfo.max ? "#dc2626" : freqInfo.used >= freqInfo.max - 1 ? "#f59e0b" : "#7c3aed" }} />
+                    </div>
+                  </div>
+                )}
+
+                {/* PA badge */}
+                {needsPA && (
+                  <div style={{ display:"flex", alignItems:"center", gap:4, background:"#fef3c7", border:"1px solid #fcd34d", borderRadius:6, padding:"3px 8px" }}>
+                    <span style={{ fontSize:10, fontWeight:800, color:"#92400e" }}>PA REQUIRED</span>
+                  </div>
+                )}
+
+                {/* Copay */}
+                {copay != null && (
+                  <div style={{ display:"flex", alignItems:"center", gap:4, background:"#f0fdf4", border:"1px solid #bbf7d0", borderRadius:6, padding:"3px 8px" }}>
+                    <span style={{ fontSize:10, fontWeight:800, color:"#166534" }}>
+                      Copay: {copay === 0 ? "$0" : "$" + (copay/100).toFixed(0)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        }) : (
+          <div style={{ textAlign:"center", color:"#6b7280", fontSize:11, padding:"8px 0" }}>
+            No CDT codes found in procedure — select a procedure to check coverage
+          </div>
+        )}
+
+        {/* PA summary note */}
+        {(mInfo.prior_auth_required || []).length > 0 && procCodes.some(c => (mInfo.prior_auth_required || []).includes(c)) && (
+          <div style={{ background:"#fef3c7", border:"1px solid #fcd34d", borderRadius:8, padding:"8px 12px", marginTop:2 }}>
+            <div style={{ fontSize:10, fontWeight:900, color:"#92400e", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:3 }}>
+              Prior Authorization Required
+            </div>
+            <div style={{ fontSize:11, color:"#92400e", fontWeight:600, lineHeight:1.4 }}>
+              {state === "TX" ? "TMHP requires PA with radiographs and clinical narrative. Submit via TMHP portal or fax to (800) 925-9126." :
+               state === "CA" ? "Denti-Cal requires TAR (Treatment Authorization Request) with X-rays." :
+               "Submit PA to state Medicaid fiscal agent with supporting documentation."}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Benefits Panel ────────────────────────────────────────────────────────────
 function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast, onBack, backLabel }) {
   if (!patient) return (
@@ -1843,6 +2017,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
           )}
         </div>
         <div style={{ marginTop:8, display:"flex", gap:6, flexWrap:"wrap" }}>
+          {(isMedicaidPatient(patient) || result?._is_medicaid) && <Badge label={result?._medicaid_state ? `Medicaid · ${result._medicaid_state}` : "Medicaid"} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />}
           {isRPA && <Badge label="RPA Verified" color={T.rpaDark} bg={T.rpaLight} border={T.rpaBorder} icon="🤖" />}
           {isOON && <Badge label="Out-of-Network" color={T.amberDark} bg={T.amberLight} border={T.amberBorder} icon="⚠" />}
         </div>
@@ -1866,6 +2041,28 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
                 patient={patient}
                 showToast={showToast}
               />
+            )}
+
+            {/* OON Assignment of Benefits */}
+            {result.assignment_of_benefits && isOON && (
+              <div style={{ background: result.assignment_of_benefits.assigned_to_provider ? T.limeLight : T.amberLight,
+                border: "1px solid " + (result.assignment_of_benefits.assigned_to_provider ? T.limeBorder : T.amberBorder),
+                borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4,
+                  color: result.assignment_of_benefits.assigned_to_provider ? T.limeDark : T.amberDark }}>
+                  {result.assignment_of_benefits.assigned_to_provider ? "✅ Insurance Pays Office Directly" : "⚠️ Insurance Reimburses Patient"}
+                </div>
+                <div style={{ fontSize: 12, color: result.assignment_of_benefits.assigned_to_provider ? T.limeDark : T.amberDark, fontWeight: 600, lineHeight: 1.4 }}>
+                  {result.assignment_of_benefits.assigned_to_provider
+                    ? "Benefits are assigned to your office — insurance will pay you directly for covered services."
+                    : "Benefits assigned to subscriber — patient must pay full fee at checkout, then file for reimbursement from their insurer."}
+                </div>
+              </div>
+            )}
+
+            {/* Medicaid Coverage Panel */}
+            {(isMedicaidPatient(patient) || result?._is_medicaid) && result?.medicaid_info && (
+              <MedicaidCoveragePanel patient={patient} result={result} />
             )}
 
             {triage && (triage.block.length>0 || triage.notify.length>0) && (
@@ -2268,6 +2465,13 @@ function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, onOpenAl
 function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, isRPA, onSelect, colColor }) {
   const loading = phaseInfo && phaseInfo.phase !== "complete" && phaseInfo.phase !== "error";
   const isOON = patient.isOON || result?.in_network === false || result?.oon_estimate != null;
+  const isMedicaid = isMedicaidPatient(patient) || result?._is_medicaid;
+  const medicaidState = result?._medicaid_state || detectMedicaidStateClient(patient);
+
+  // Extract CDT codes from procedure string for PA check
+  const cdtCodes = (patient.procedure || "").match(/D\d{4}/g) || [];
+  const needsPA = isMedicaid && result?.medicaid_info?.prior_auth_required?.some(c => cdtCodes.includes(c));
+
   return (
     <div onClick={onSelect}
       style={{ background:T.bgCard, borderRadius:10, padding:"12px 13px", cursor:"pointer", border:"1.5px solid " + (isSelected?colColor:T.border), boxShadow:isSelected?"0 0 0 3px "+colColor+"22":"0 1px 3px "+T.shadow, transition:"all 0.15s", display: "flex", flexDirection: "column" }}
@@ -2275,6 +2479,7 @@ function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, i
       onMouseLeave={e=>{ if(!isSelected){ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.boxShadow="0 1px 3px "+T.shadow; e.currentTarget.style.transform="translateY(0)"; }}}>
       <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:5, flexWrap:"wrap" }}>
         <span style={{ color:T.text, fontSize:13, fontWeight:800, flex:1 }}>{patient.name}</span>
+        {isMedicaid && <Badge label={medicaidState ? `MEDICAID · ${medicaidState}` : "MEDICAID"} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />}
         {isOON  && <Badge label="OON"  color={T.amberDark} bg={T.amberLight} border={T.amberBorder} />}
         {isAuto && <Badge label="AUTO" color={T.indigo} bg={T.indigoLight} border={T.indigoBorder} icon="Bot" />}
         {isRPA  && <Badge label="RPA"  color={T.rpaDark} bg={T.rpaLight}   border={T.rpaBorder}   icon="Bot" />}
@@ -2290,6 +2495,11 @@ function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, i
         <span style={{ color:colColor, fontSize:11, fontWeight:800 }}>${(patient.fee/100).toLocaleString()}</span>
       </div>
       {loading && phaseInfo && <div style={{ marginTop:8 }}><PhaseIndicator phase={phaseInfo.phase} reason={phaseInfo.reason} compact /></div>}
+      {!loading && needsPA && (
+        <div style={{ marginTop:6, padding:"5px 8px", background:"#faf5ff", border:"1px solid #ddd6fe", borderRadius:6, display:"flex", alignItems:"center", gap:6 }}>
+          <span style={{ fontSize:11, color:"#7c3aed", fontWeight:700 }}>⚠️ PA Required for {cdtCodes.filter(c => result?.medicaid_info?.prior_auth_required?.includes(c)).join(", ")}</span>
+        </div>
+      )}
       {!loading && (triage?.notify||[]).length > 0 && (
         <div style={{ marginTop:6, display:"flex", gap:4, flexWrap:"wrap" }}>
           <Badge label="Notify Patient" color={T.amberDark} bg={T.amberLight} border={T.amberBorder} icon="Phone" />
@@ -4860,19 +5070,25 @@ export default function LevelAI() {
 
   // ── Auto-verify: fires for 24h and 7d windows once patients load ─────────────
   useEffect(() => {
-    patients.forEach(patient => {
+    patients.forEach((patient, idx) => {
       const h = patient.hoursUntil;
       if (h == null) return;
       const in24h = h <= 24 && h > 0;
       const in7d  = h <= 168 && h > 24;
-      const trigger = in24h ? "24h_auto" : in7d ? "7d_auto" : null;
+
+      // Medicaid patients get immediate verification regardless of time window
+      const isMedicaid = isMedicaidPatient(patient);
+      const trigger = isMedicaid ? "medicaid_auto" : in24h ? "24h_auto" : in7d ? "7d_auto" : null;
       if (!trigger) return;
+
       // Include appointmentDate in key so the same patient on different days
       // each get their own independent verification trigger.
       const key = `${patient.id}_${patient.appointmentDate}_${trigger}`;
       if (autoQueued.current.has(key)) return;
       autoQueued.current.add(key);
-      setTimeout(() => verify(patient, trigger), (in24h ? 600 : 1200) + Math.random() * 400);
+      // Medicaid patients verify with tighter stagger (immediate priority)
+      const delay = isMedicaid ? (300 + idx * 200) : (in24h ? 600 : 1200) + Math.random() * 400;
+      setTimeout(() => verify(patient, trigger), delay);
     });
   }, [patients, verify]);
 

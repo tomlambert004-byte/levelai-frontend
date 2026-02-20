@@ -141,6 +141,42 @@ const FIXTURES = {
     },
   },
 
+  // ── p8: Medicaid patient (Texas Medicaid / TMHP) ──────────────────────────────
+  p8: {
+    _fixture_id: "271_medicaid_tx",
+    _is_medicaid: true,
+    _medicaid_state: "TX",
+    subscriber: { member_id: "TMHP-990-221-08", first_name: "Marvin", last_name: "Medicaid",
+      date_of_birth: "1978-08-22", group_number: "TX-MEDICAID", plan_name: "Texas Medicaid (TMHP)" },
+    payer: { name: "Texas Medicaid (TMHP)", payer_id: "77037" },
+    coverage: { plan_status: "active", plan_begin_date: "2025-01-01", plan_end_date: "2026-12-31",
+      insurance_type: "Medicaid", in_network: true },
+    benefits: {
+      calendar_year_maximum: { amount_cents: null, used_cents: null, remaining_cents: null },
+      deductible: { individual_cents: 0, met_cents: 0, waived_for: ["all"] },
+      preventive: { coverage_pct: 100, deductible_applies: false, copay_cents: 0,
+        frequency: { cleanings: { times_per_period: 2, used_this_period: 1, period: "calendar_year",
+            last_service_date: "2026-06-15", next_eligible_date: null } } },
+      basic_restorative: { coverage_pct: 100, deductible_applies: false,
+        copay_cents: 300, composite_posterior_downgrade: false },
+      major_restorative: { coverage_pct: 100, deductible_applies: false,
+        copay_cents: 300, waiting_period_months: 0 },
+      missing_tooth_clause: { applies: false },
+      medicaid_info: {
+        state: "TX",
+        program_name: "Texas Medicaid (TMHP)",
+        prior_auth_required: ["D2750","D2751","D3310","D3320","D3330","D4341","D5110","D5120"],
+        frequency_limits: {
+          D1110: { max: 2, periodMonths: 12, used: 1 },
+          D0120: { max: 2, periodMonths: 12, used: 1 },
+          D0274: { max: 1, periodMonths: 12, used: 0 },
+          D2750: { max: 1, periodMonths: 60, perTooth: true, used: 0 },
+        },
+        copays_cents: { D0120: 0, D1110: 0, D2750: 300, D3310: 300 },
+      },
+    },
+  },
+
   // ── p7: Out-of-Network patient ───────────────────────────────────────────────
   p7: {
     _fixture_id: "271_oon_patient",
@@ -175,6 +211,12 @@ const FIXTURES = {
         { step: 3, name: "RPA Scrape",            status: "skipped",  result: "Not needed — history data sufficient" },
         { step: 4, name: "Calculation",           status: "complete", result: "($980 − $100 ded) × 50% = $440 est. insurance pmt" },
       ],
+    },
+    assignment_of_benefits: {
+      assigned_to_provider: false,
+      entity: "subscriber",
+      method: "reimbursement",
+      raw_indicator: "N",
     },
   },
 };
@@ -281,6 +323,21 @@ function normalize271(raw) {
   // Attach OON estimate block if present in fixture
   if (raw.oon_estimate) {
     result.oon_estimate = raw.oon_estimate;
+  }
+
+  // Attach assignment of benefits if present
+  if (raw.assignment_of_benefits) {
+    result.assignment_of_benefits = raw.assignment_of_benefits;
+  }
+
+  // Attach Medicaid info if present
+  if (raw._is_medicaid || (coverage.insurance_type || "").toLowerCase() === "medicaid") {
+    result._is_medicaid = true;
+    result._medicaid_state = raw._medicaid_state || null;
+    result._medicaid_program = payer.name || null;
+    if (benefits.medicaid_info) {
+      result.medicaid_info = benefits.medicaid_info;
+    }
   }
 
   return result;

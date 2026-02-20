@@ -22,13 +22,14 @@ const ALL_PATIENTS = [
   { id:"p5", name:"Emily Watkins",   dob:"1995-09-30", memberId:"MET-229-884-EW",  insurance:"MetLife",                procedure:"Prophylaxis + X-rays (D1110/D0274)", provider:"Dr. Chen",  fee:28000,  phone:"555-473-6621", email:"ewatkins@email.com" },
   { id:"p6", name:"David Okafor",    dob:"1980-01-15", memberId:"AET-55901-DO",    insurance:"Aetna",                  procedure:"Scaling & Root Planing (D4341)",     provider:"Dr. Patel", fee:75000,  phone:"555-119-8847", email:"dokafor@email.com" },
   { id:"p7", name:"Lisa Chen",       dob:"1987-06-12", memberId:"HUM-334-227-LC",  insurance:"Humana Dental",          procedure:"Crown, Porcelain (D2750)",           provider:"Dr. Patel", fee:145000, phone:"555-302-8819", email:"lisa.chen@email.com", isOON:true },
+  { id:"p8", name:"Marvin Medicaid",  dob:"1978-08-22", memberId:"TMHP-990-221-08", insurance:"Texas Medicaid (TMHP)",  procedure:"Crown, PFM (D2750)",                 provider:"Dr. Patel", fee:75000,  phone:"555-888-4401", email:"marvin.m@email.com",   payerId:"77037" },
 ];
 
 const WEEKLY_SCHEDULE = {
   1: [["p3","8:30 AM"],["p1","10:00 AM"],["p5","1:00 PM"],["p6","3:00 PM"]],
-  2: [["p2","8:00 AM"],["p4","9:30 AM"],["p1","11:00 AM"],["p3","1:30 PM"],["p7","2:30 PM"],["p5","3:30 PM"]],
-  3: [["p6","8:30 AM"],["p2","10:00 AM"],["p7","11:30 AM"],["p4","1:00 PM"],["p1","3:00 PM"]],
-  4: [["p5","8:00 AM"],["p7","9:00 AM"],["p3","10:30 AM"],["p6","12:00 PM"],["p2","1:30 PM"],["p4","3:30 PM"]],
+  2: [["p2","8:00 AM"],["p4","9:30 AM"],["p1","11:00 AM"],["p8","1:00 PM"],["p3","1:30 PM"],["p7","2:30 PM"],["p5","3:30 PM"]],
+  3: [["p6","8:30 AM"],["p2","10:00 AM"],["p7","11:30 AM"],["p4","1:00 PM"],["p8","2:00 PM"],["p1","3:00 PM"]],
+  4: [["p5","8:00 AM"],["p7","9:00 AM"],["p8","10:00 AM"],["p3","10:30 AM"],["p6","12:00 PM"],["p2","1:30 PM"],["p4","3:30 PM"]],
   5: [["p1","8:30 AM"],["p3","10:00 AM"],["p5","11:30 AM"]],
 };
 
@@ -51,7 +52,7 @@ function fixtureForDate(date) {
     const { hours, minutes } = parseTime(timeStr);
     const apptDate = new Date(`${date}T${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:00`);
     const hoursUntil = Math.round(((apptDate.getTime() - nowMs) / 3600000) * 10) / 10;
-    return { ...base, appointmentDate: date, appointmentTime: timeStr, hoursUntil, _source: "fixture" };
+    return { ...base, appointmentDate: date, appointmentTime: timeStr, hoursUntil, payerId: base.payerId || null, _source: "fixture" };
   });
 }
 
@@ -84,6 +85,7 @@ async function odDirectForDate(date) {
       email:           p.email         || "",
       fee:             null,
       isOON:           false,
+      payerId:         p.payerId       || null,
       appointmentDate: p.appointmentDate || date,
       appointmentTime: p.appointmentTime || "",
       hoursUntil,
@@ -132,6 +134,7 @@ export async function GET(request) {
                 email:           p.email         || "",
                 fee:             null,
                 isOON:           p.isOON         || false,
+                payerId:         p.payerId       || null,
                 appointmentDate: p.appointmentDate || date,
                 appointmentTime: p.appointmentTime || "",
                 hoursUntil,
