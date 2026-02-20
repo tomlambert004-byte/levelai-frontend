@@ -3343,24 +3343,61 @@ export default function LevelAI() {
     setPhases(prev => ({ ...prev, [id]: obj }));
   }, []);
 
-  // ── Fetch: today's schedule (Kanban) ─────────────────────────────────────────
+  // ── Fetch: today's schedule (Kanban) — also used for DayCardPanel refreshes ──
   const loadDailySchedule = useCallback(async (dateStr) => {
     setDailyLoading(true);
     setDailyError(null);
     try {
       const data = await apiGetDailySchedule(dateStr);
-      // Backend returns hoursUntil pre-computed; if it doesn't yet, compute here:
       const withHours = data.map(p => {
         if (p.hoursUntil != null) return p;
-        const diff = new Date(`${p.appointment_date}T${p.appointment_time || "09:00"}`) - new Date();
+        const diff = new Date(`${p.appointmentDate}T${p.appointmentTime || "09:00"}`) - new Date();
         return { ...p, hoursUntil: Math.floor(diff / (1000 * 60 * 60)) };
       });
-      setPatients(withHours);
+      // Merge today's records into patients, replacing any stale entries for this date
+      setPatients(prev => {
+        const otherDays = prev.filter(p => p.appointmentDate !== dateStr);
+        return [...otherDays, ...withHours];
+      });
     } catch (err) {
       setDailyError(err.message);
     } finally {
       setDailyLoading(false);
     }
+  }, []);
+
+  // ── Fetch: full current week (Mon–Fri) so WeekAhead + 7d auto-verify work ───
+  const loadWeekSchedule = useCallback(async (anchorDate) => {
+    // Build the Mon–Fri date strings for the week containing anchorDate
+    const anchor = new Date(anchorDate + "T12:00:00");
+    const dow = anchor.getDay(); // 0=Sun … 6=Sat
+    // Monday of this week (or next Monday if anchorDate is weekend)
+    const diffToMon = dow === 0 ? 1 : dow === 6 ? 2 : -(dow - 1);
+    const monday = new Date(anchor);
+    monday.setDate(anchor.getDate() + diffToMon);
+
+    const weekDates = [];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      weekDates.push(d.toISOString().split("T")[0]);
+    }
+
+    // Fetch all 5 days in parallel — failures are non-fatal per day
+    const results = await Promise.allSettled(weekDates.map(d => apiGetDailySchedule(d)));
+
+    const allPatients = [];
+    results.forEach((r, i) => {
+      if (r.status !== "fulfilled") return;
+      const dayStr = weekDates[i];
+      r.value.forEach(p => {
+        if (p.hoursUntil != null) { allPatients.push(p); return; }
+        const diff = new Date(`${p.appointmentDate}T${p.appointmentTime || "09:00"}`) - new Date();
+        allPatients.push({ ...p, hoursUntil: Math.floor(diff / (1000 * 60 * 60)) });
+      });
+    });
+
+    setPatients(allPatients);
   }, []);
 
   // ── Fetch: calendar month summary ────────────────────────────────────────────
@@ -3403,9 +3440,11 @@ export default function LevelAI() {
     const today = new Date();
     const todayStr = today.toISOString().split("T")[0];
     const monthStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}`;
-    loadDailySchedule(todayStr);
+    // Load the full week so WeekAhead shows all upcoming appointments and the
+    // 7-day auto-verify window fires correctly for future-dated patients.
+    loadWeekSchedule(todayStr);
     loadCalendar(monthStr);
-  }, [isMounted, loadDailySchedule, loadCalendar]);
+  }, [isMounted, loadWeekSchedule, loadCalendar]);
 
   // ── Verify: calls real API — same phase logic, no setTimeout ────────────────
   const verify = useCallback(async (patient, trigger = "manual") => {
@@ -3471,12 +3510,14 @@ export default function LevelAI() {
   useEffect(() => {
     patients.forEach(patient => {
       const h = patient.hoursUntil;
-      if (!h) return;
+      if (h == null) return;
       const in24h = h <= 24 && h > 0;
       const in7d  = h <= 168 && h > 24;
       const trigger = in24h ? "24h_auto" : in7d ? "7d_auto" : null;
       if (!trigger) return;
-      const key = `${patient.id}_${trigger}`;
+      // Include appointmentDate in key so the same patient on different days
+      // each get their own independent verification trigger.
+      const key = `${patient.id}_${patient.appointmentDate}_${trigger}`;
       if (autoQueued.current.has(key)) return;
       autoQueued.current.add(key);
       setTimeout(() => verify(patient, trigger), (in24h ? 600 : 1200) + Math.random() * 400);
@@ -3801,7 +3842,7 @@ export default function LevelAI() {
               {dailyLoading ? <KanbanSkeleton /> : (
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(200px, 1fr))", gap:10, minHeight:600 }}>
                   {COLS.map(col => {
-                    const colPts = patients.filter(col.filter);
+                    const colPts = todayPts.filter(col.filter);
                     return (
                       <div key={col.key} style={{ display:"flex", flexDirection:"column", overflow:"hidden", borderRadius:12, border:"1px solid " + col.border, background:col.bg }}>
                         <div style={{ padding:"10px 12px", borderBottom:"1px solid " + col.border, display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>

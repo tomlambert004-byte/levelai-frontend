@@ -118,9 +118,10 @@ const WEEKLY_SCHEDULE = {
     ["p7", "2:30 PM"],
     ["p5", "3:30 PM"],
   ],
-  3: [ // Wednesday — medium: 4 patients
+  3: [ // Wednesday — medium: 5 patients (p7 = OON)
     ["p6", "8:30 AM"],
     ["p2", "10:00 AM"],
+    ["p7", "11:30 AM"],
     ["p4", "1:00 PM"],
     ["p1", "3:00 PM"],
   ],
