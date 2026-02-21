@@ -78,6 +78,20 @@ function IconArrowRight({ className }: { className?: string }) {
     </svg>
   );
 }
+function IconDollar({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+    </svg>
+  );
+}
+function IconBuilding({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2" /><line x1="9" y1="6" x2="9" y2="6" /><line x1="15" y1="6" x2="15" y2="6" /><line x1="9" y1="10" x2="9" y2="10" /><line x1="15" y1="10" x2="15" y2="10" /><line x1="9" y1="14" x2="9" y2="14" /><line x1="15" y1="14" x2="15" y2="14" /><path d="M9 22v-4h6v4" />
+    </svg>
+  );
+}
 function IconMail({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -165,6 +179,38 @@ const FEATURES = [
         "Auto-sync every 3 minutes throughout the day",
         "Handles cancellations, add-ons, and reschedules",
         "Webhook support for instant PMS event processing",
+      ],
+    },
+  },
+  {
+    icon: IconDollar,
+    iconName: "IconDollar",
+    title: "Out-of-Network Cost Estimates",
+    description: "Don\u2019t just flag out-of-network patients \u2014 show them exactly what they\u2019ll owe. A 4-step estimation waterfall calculates allowable amounts and patient responsibility.",
+    detail: {
+      headline: "Turn \u201Cout of network\u201D from a dead end into a dollar amount.",
+      body: "Most verification tools tell you a patient is out of network and stop there. Level AI runs a 4-step estimation waterfall \u2014 checking historical ERA data, scraping payer portals for MAC/UCR fee schedules, and calculating the actual allowable amount, estimated insurance payment, and patient responsibility. Your front desk can quote a number before the patient sits in the chair.",
+      bullets: [
+        "4-step waterfall: network check, ERA history, portal scrape, calculation",
+        "Calculates allowable amounts from historical claims data",
+        "Estimates insurance payment and exact patient responsibility",
+        "Present cost estimates upfront \u2014 no chair-side surprises",
+      ],
+    },
+  },
+  {
+    icon: IconBuilding,
+    iconName: "IconBuilding",
+    title: "Medicaid Intelligence Engine",
+    description: "Auto-detects 20+ state Medicaid programs and applies state-specific rules \u2014 covered categories, frequency limits, prior auth requirements, and copay schedules.",
+    detail: {
+      headline: "Medicaid patients deserve the same verification confidence.",
+      body: "Medicaid is where most verification tools fall apart. Every state has different rules, different covered procedures, different frequency limits, and different prior auth requirements. Level AI auto-detects the state program by payer name or ID, then applies a state-specific rules engine covering 21 states. Your team sees exactly what\u2019s covered, what needs prior auth, and what the copay is \u2014 without calling the state.",
+      bullets: [
+        "Auto-detection of 20+ state programs (Medi-Cal, SoonerCare, CHIP, etc.)",
+        "Per-state rules: covered categories, frequency limits, age restrictions",
+        "Prior authorization requirements flagged per CDT code",
+        "Copay schedules by procedure type \u2014 no guessing",
       ],
     },
   },
