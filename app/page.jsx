@@ -67,29 +67,34 @@ const pct = (n) => n != null ? n + "%" : "--";
 //   accentColor — override teal accent (defaults to #14B8A6)
 
 function ToothCheckIcon({ size = 28, color = "#F5F5F0", accentColor = "#14B8A6", style = {} }) {
-  // Standalone tooth + checkmark icon — used for collapsed sidebar and as inline glyph in wordmark
+  // The teal checkmark IS the "v" letter — bold, prominent stroke.
+  // White tooth outline wraps around/above it. Wider, rounder molar shape matching original logo.
+  // SVG origin: bottom of the v aligns with the bottom of the viewBox.
+  // Tooth extends upward from there. The text baseline sits near the bottom.
+  const w = size;
+  const h = size * 1.7;
   return (
-    <svg width={size} height={size * 1.15} viewBox="0 0 36 42" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display:"block", ...style }}>
-      {/* Tooth outline */}
+    <svg width={w} height={h} viewBox="0 0 48 82" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display:"block", ...style }}>
+      {/* Tooth outline — wide rounded molar body, rises above the text */}
       <path
-        d="M18 2C14.5 2 12 4 10.5 7C9 10.2 8.5 14 9 18.5C9.6 23 11 27 12.3 30C13.1 32 14.5 32 15.1 30C15.7 27.5 16.3 24.5 18 24.5C19.7 24.5 20.3 27.5 20.9 30C21.5 32 22.9 32 23.7 30C25 27 26.4 23 27 18.5C27.5 14 27 10.2 25.5 7C24 4 21.5 2 18 2Z"
+        d="M24 2C17.5 2 13 5.5 10.5 11C8 17 7 23.5 8 32C9 40.5 11.5 46 14 51C15.3 53.5 17.5 54 18.5 51.5C20 47.5 21 43 24 43C27 43 28 47.5 29.5 51.5C30.5 54 32.7 53.5 34 51C36.5 46 39 40.5 40 32C41 23.5 40 17 37.5 11C35 5.5 30.5 2 24 2Z"
         stroke={color}
-        strokeWidth="2"
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
       />
-      {/* Subtle tooth highlight */}
+      {/* Tooth glossy swoosh */}
       <path
-        d="M12.5 9C14 7.8 16 7 18 7C20 7 22 7.8 23.5 9C22 10.8 20 11.5 18 11.5C16 11.5 14 10.8 12.5 9Z"
+        d="M14.5 13C17 10 20 8.5 24 8.5C28 8.5 31 10 33.5 13C31 16.5 28 18 24 18C20 18 17 16.5 14.5 13Z"
         fill={color}
         opacity="0.15"
       />
-      {/* Teal checkmark */}
+      {/* Teal "v" — THE letter. Bold stroke reads as "v". Bottom at y=62 = text baseline area */}
       <path
-        d="M12.5 20.5L16.5 25.5L24.5 14"
+        d="M8 34L23 62L40 16"
         stroke={accentColor}
-        strokeWidth="2.8"
+        strokeWidth="4.5"
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
@@ -112,10 +117,9 @@ function BrandLogo({ size = 20, showText = true, subtitle, subtitleColor, color,
     );
   }
 
-  // Full wordmark: HTML text with inline SVG tooth replacing "v"
-  // The tooth icon height is ~1.55x the font size to properly extend above the text baseline
-  // (matching the original logo where the tooth extends well above the lowercase letters)
-  const toothH = h * 1.55;
+  // Full wordmark: HTML text with inline SVG tooth+v replacing the letter "v"
+  // The tooth extends ~1.8x above the lowercase x-height (matching original logo)
+  const toothW = h * 0.88; // width of the tooth SVG — slightly wider than a "v" to match original
   const fontSize = h;
 
   return (
@@ -123,49 +127,48 @@ function BrandLogo({ size = 20, showText = true, subtitle, subtitleColor, color,
       <div style={{
         display:"flex", alignItems:"flex-end", lineHeight:1, userSelect:"none",
         fontFamily:"'Nunito', sans-serif", fontSize, fontWeight:400, color: textColor,
-        letterSpacing:"-0.02em", whiteSpace:"nowrap",
+        letterSpacing:"-0.01em", whiteSpace:"nowrap",
       }}>
         {/* "le" */}
         <span>le</span>
-        {/* Tooth+checkmark as "v" — offset upward so tooth cusps rise above baseline letters */}
+        {/* Tooth outline wrapping the teal "v" — the core logo mark */}
         <span style={{
           display:"inline-flex", alignItems:"flex-end",
-          marginLeft: h * -0.06, marginRight: h * -0.06,
-          marginBottom: h * -0.06,
+          marginLeft: h * -0.02, marginRight: h * -0.03,
+          marginBottom: h * -0.25,
         }}>
           <ToothCheckIcon
-            size={toothH * 0.7}
+            size={toothW}
             color={textColor}
             accentColor={teal}
-            style={{ marginBottom: h * -0.02 }}
           />
         </span>
         {/* "el" */}
         <span>el</span>
         {/* Space */}
-        <span style={{ width: h * 0.35 }} />
+        <span style={{ width: h * 0.32 }} />
         {/* "a" */}
         <span>a</span>
-        {/* "i" with teal dot — clip native dot and overlay teal one */}
+        {/* "i" with teal dot overlaying the native dot */}
         <span style={{ position:"relative", display:"inline-flex", flexDirection:"column", alignItems:"center" }}>
-          {/* Teal dot — sits above the i-stem, positioned over the native dot */}
+          {/* Teal dot — covers the native white "i" dot */}
           <span style={{
             position:"absolute",
-            top: h * 0.02,
+            top: h * 0.03,
             left:"50%",
             transform:"translateX(-50%)",
-            width: h * 0.19,
-            height: h * 0.19,
+            width: h * 0.17,
+            height: h * 0.17,
             borderRadius:"50%",
             backgroundColor: teal,
             zIndex:1,
           }} />
-          <span style={{ position:"relative" }}>i</span>
+          <span>i</span>
         </span>
       </div>
       {subtitle && (
-        <div style={{ fontSize: h * 0.32, fontWeight:700, color: subtitleColor || teal,
-          letterSpacing:"0.1em", marginTop: h * 0.1, paddingLeft:2, textTransform:"lowercase" }}>{subtitle}</div>
+        <div style={{ fontSize: h * 0.30, fontWeight:700, color: subtitleColor || teal,
+          letterSpacing:"0.1em", marginTop: h * 0.12, paddingLeft:2, textTransform:"lowercase" }}>{subtitle}</div>
       )}
     </div>
   );
