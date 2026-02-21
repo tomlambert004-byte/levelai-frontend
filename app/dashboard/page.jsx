@@ -388,9 +388,9 @@ function friendlyFailReason(errMsg, patient) {
   if (m.includes("no member id on file"))
     return `No member ID on file for ${patient?.name || "this patient"}. A valid member ID is required to verify benefits.`;
   if (m.includes("payer not recognized"))
-    return `"${payer}" is not recognized by our clearinghouse. The payer name may be misspelled or not in our network.`;
+    return `We don't recognize "${payer}" as a supported insurance carrier. The name may be misspelled or not yet in our network.`;
   if (m.includes("stedi_api_key not configured"))
-    return "Clearinghouse API is not configured. Your admin needs to set up Stedi credentials.";
+    return "Insurance verification hasn't been set up yet. Your admin needs to finish the initial setup in Settings.";
 
   // Error message pattern matches
   if (m.includes("unauthorized") || m.includes("401"))
@@ -438,9 +438,9 @@ function failureActionGuidance(failReason) {
   if (m.includes("credential") || m.includes("payer portal"))
     return "The payer portal login needs updating. Go to Settings → Integrations → RPA Vault and re-enter the credentials for this payer.";
   if (m.includes("authentication failed") || m.includes("clearinghouse") && m.includes("credential"))
-    return "The clearinghouse connection needs re-authentication. Contact your account admin or Level AI support.";
+    return "The insurance verification connection needs to be refreshed. Contact your admin or Level AI support.";
   if (m.includes("api is not configured") || m.includes("stedi"))
-    return "The clearinghouse API hasn't been configured yet. Your admin needs to complete setup in Settings → Integrations.";
+    return "Insurance verification hasn't been set up yet. Your admin needs to finish setup in Settings → Integrations.";
   if (m.includes("network error"))
     return "Check your internet connection and click Retry. If it persists, the verification service may be experiencing an outage.";
   if (m.includes("server error") || m.includes("on their end"))
@@ -882,14 +882,14 @@ const OInput = ({ label, type = "text", placeholder, value, onChange, required, 
       <input type={type} placeholder={placeholder} value={value} onChange={e => { onChange(e); }}
         style={{ width: "100%", padding: "13px 16px", border: "1.5px solid " + borderColor, borderRadius: 10,
           fontSize: 14, outline: "none", transition: "border-color 0.2s, box-shadow 0.2s", fontFamily: "inherit",
-          color: T.text, background: showErr ? "#fef2f2" : "white",
+          color: T.text, background: showErr ? T.redLight : T.bgCard,
           boxShadow: showErr ? "0 0 0 3px rgba(239,68,68,0.12)" : touched && !showErr && value ? "0 0 0 3px rgba(22,163,74,0.10)" : "none" }}
         onFocus={e => e.target.style.borderColor = showErr ? "#ef4444" : T.indigoDark}
         onBlur={e => { setTouched(true); e.target.style.borderColor = borderColor; }} />
       {showErr && (
         <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: -2 }}>
           <span style={{ fontSize: 14, lineHeight: 1 }}>⚠️</span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#dc2626" }}>{showErr}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: T.red }}>{showErr}</span>
         </div>
       )}
     </div>
@@ -1027,7 +1027,7 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
             Insurance verification on autopilot.
           </h1>
           <p style={{ fontSize: 15, lineHeight: 1.75, opacity: 0.75, maxWidth: 340 }}>
-            Level AI verifies every patient&apos;s insurance before they walk in the door, so your front desk never has to chase down benefits again. We handle the clearinghouse connections, payer portal automation, and patient outreach behind the scenes. Just connect your practice management system and let us do the heavy lifting.
+            Level AI verifies every patient&apos;s insurance before they walk in the door, so your front desk never has to chase down benefits again. We handle the insurance connections, payer portal automation, and patient outreach behind the scenes. Just connect your practice management system and let us do the heavy lifting.
           </p>
         </div>
       </div>
@@ -1455,7 +1455,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                 Welcome to Level AI.
               </div>
               <div>
-                Let&apos;s get your practice credentialed with Stedi&apos;s clearinghouse in under 5 minutes.
+                Let&apos;s get your practice set up for automatic insurance verification in under 5 minutes.
                 We&apos;ll handle everything else.
               </div>
             </div>
@@ -1552,8 +1552,8 @@ function OnboardingWizard({ onComplete, showToast }) {
                       fontFamily:"'Courier New', Courier, monospace",
                       letterSpacing:"0.15em", textAlign:"center", textTransform:"uppercase",
                       outline:"none", transition:"border-color 0.2s, box-shadow 0.2s",
-                      color:"#1a1a18",
-                      background: activationError ? "#fef2f2" : "white",
+                      color: T.text,
+                      background: activationError ? T.redLight : T.bgCard,
                       boxShadow: activationError ? "0 0 0 3px rgba(239,68,68,0.12)" : "none",
                     }}
                     onFocus={e => { if (!activationError) e.target.style.borderColor = "#14B8A6"; }}
@@ -1597,7 +1597,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                 Practice Identity
               </h2>
               <p style={{ fontSize:14, color:"#a0a09a", marginBottom:32, lineHeight:1.6 }}>
-                Your legal details for clearinghouse credentialing. This is submitted once — we handle all renewals.
+                Your practice details for insurance verification setup. This is submitted once — we handle all renewals.
               </p>
 
               <div style={{ display:"flex", flexDirection:"column", gap:18 }}>
@@ -1632,7 +1632,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                   border:"1px solid #bae6fd", borderRadius:10, padding:"12px 16px" }}>
                   <span style={{ fontSize:18 }}>🔒</span>
                   <span style={{ fontSize:12, color:"#0369a1", fontWeight:700 }}>
-                    HIPAA-compliant. Your data is encrypted at rest and in transit.
+                    Your information is fully protected and HIPAA-compliant.
                   </span>
                 </div>
 
@@ -1805,7 +1805,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                 padding:"10px 14px", marginBottom:20, display:"flex", gap:10, alignItems:"center" }}>
                 <span style={{ fontSize:15 }}>🔐</span>
                 <span style={{ fontSize:12, color:"#0369a1", fontWeight:700 }}>
-                  AES-256 encrypted. Never stored in plaintext. HIPAA-compliant vault.
+                  Your credentials are securely stored and protected. HIPAA-compliant.
                 </span>
               </div>
 
@@ -1955,7 +1955,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                   🎯 You&apos;re about to unlock:
                 </div>
                 {[
-                  "✅  Real-time eligibility verification via Stedi clearinghouse",
+                  "✅  Real-time insurance verification across 1,000+ carriers",
                   "🤖  Automated RPA for Delta Dental, MetLife & Cigna portals",
                   "📅  Daily schedule sync from " + (pmsSystem || "your PMS"),
                   "💬  Patient outreach via Twilio SMS",
@@ -3649,7 +3649,7 @@ function CredentialFixModal({ alert, practice, onClose, onSave, showToast }) {
           onClose();
         } else {
           const errData = await res.json().catch(() => ({}));
-          if (res.status === 401) showToast("Invalid API key — authentication failed. Please double-check the key.");
+          if (res.status === 401) showToast("That key didn't work — please double-check it and try again.");
           else if (res.status === 400) showToast(errData.error || "Invalid input — please check your credentials.");
           else showToast("Failed to save — please try again.");
         }
@@ -3712,7 +3712,7 @@ function CredentialFixModal({ alert, practice, onClose, onSave, showToast }) {
             <div style={{ fontSize:13, color:T.textMid, lineHeight:1.6 }}>
               {isPms
                 ? "Level AI could not pull today's schedule from your PMS. This usually means the sync key (eKey/token) has expired or was rotated."
-                : "Eligibility verification failed because the clearinghouse or payer portal credentials are missing, expired, or invalid."}
+                : "Verification failed — your payer portal credentials may be missing, expired, or need updating."}
             </div>
           </div>
 
@@ -3763,9 +3763,9 @@ function CredentialFixModal({ alert, practice, onClose, onSave, showToast }) {
               {/* Payer/clearinghouse fields */}
               <div style={{ background:T.indigoLight, border:"1px solid "+T.indigoBorder, borderRadius:10,
                 padding:"14px 16px", fontSize:12, color:T.indigoDark, lineHeight:1.6 }}>
-                <strong>Stedi Clearinghouse (EDI 270/271)</strong><br/>
+                <strong>Insurance Verification Engine</strong><br/>
                 This is managed by Level AI. If you see repeated failures, contact{" "}
-                <span style={{ fontWeight:800 }}>support@levelai.com</span> and we will check your clearinghouse connection.
+                <span style={{ fontWeight:800 }}>support@levelai.com</span> and we'll look into it right away.
               </div>
 
               <div style={{ borderTop:"1px solid "+T.border, paddingTop:16 }}>
@@ -3774,7 +3774,7 @@ function CredentialFixModal({ alert, practice, onClose, onSave, showToast }) {
                   RPA Payer Portal Credentials
                 </div>
                 <div style={{ fontSize:12, color:T.textSoft, marginBottom:14, lineHeight:1.5 }}>
-                  When the clearinghouse returns incomplete data, our bot logs into the payer portal directly.
+                  When our initial check returns incomplete data, we log into the payer portal directly to get full details.
                   Enter or update your portal login below.
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
@@ -3820,7 +3820,7 @@ function CredentialFixModal({ alert, practice, onClose, onSave, showToast }) {
                 <div style={{ background:T.rpaLight, border:"1px solid "+T.rpaBorder, borderRadius:8,
                   padding:"8px 12px", marginTop:12, display:"flex", gap:8, alignItems:"center" }}>
                   <span>{"🔐"}</span>
-                  <span style={{ fontSize:11, color:T.rpaDark, fontWeight:700 }}>AES-256 encrypted · Never stored in plaintext</span>
+                  <span style={{ fontSize:11, color:T.rpaDark, fontWeight:700 }}>Your credentials are securely protected</span>
                 </div>
               </div>
             </>
@@ -4346,7 +4346,7 @@ function DirectorySearchModal({ onSelect, onClose }) {
                 </div>
                 <div style={{ padding:"12px 16px", borderBottom:"1px solid "+T.border }}>
                   <input type="text" placeholder="Search by name, DOB, or insurance..." value={query} onChange={e=>setQuery(e.target.value)} autoFocus
-                         style={{ width:"100%", padding:"10px 14px", border:"1px solid "+T.border, borderRadius:8, fontSize:14, outline:"none", fontFamily:"inherit", boxSizing:"border-box" }} />
+                         style={{ width:"100%", padding:"10px 14px", border:"1px solid "+T.border, borderRadius:8, fontSize:14, outline:"none", fontFamily:"inherit", boxSizing:"border-box", background:T.bg, color:T.text }} />
                 </div>
                 <div style={{ flex:1, overflowY:"auto", padding:12, display:"flex", flexDirection:"column", gap:8 }}>
                   {filtered.length === 0
@@ -4383,7 +4383,7 @@ function DirectorySearchModal({ onSelect, onClose }) {
             </div>
             <div style={{ padding:"12px 16px", borderBottom:"1px solid "+T.border }}>
               <input type="text" placeholder="Search by name, DOB, or insurance..." value={query} onChange={e=>setQuery(e.target.value)} autoFocus
-                     style={{ width:"100%", padding:"10px 14px", border:"1px solid "+T.border, borderRadius:8, fontSize:14, outline:"none", fontFamily:"inherit", boxSizing:"border-box" }} />
+                     style={{ width:"100%", padding:"10px 14px", border:"1px solid "+T.border, borderRadius:8, fontSize:14, outline:"none", fontFamily:"inherit", boxSizing:"border-box", background:T.bg, color:T.text }} />
             </div>
             <div style={{ flex:1, overflowY:"auto", padding:12, display:"flex", flexDirection:"column", gap:10 }}>
               {filtered.length === 0
@@ -5877,7 +5877,7 @@ const SInput = ({ label, type = "text", placeholder, value, onChange, validate, 
       </label>
       <input type={type} placeholder={placeholder} value={value} onChange={onChange}
         style={{ padding: "11px 14px", border: "1.5px solid " + borderColor, borderRadius: 8, fontSize: 14,
-          background: showErr ? "#fef2f2" : T.bgCard, outline: "none", color: T.text, fontFamily: "inherit",
+          background: showErr ? T.redLight : T.bgCard, outline: "none", color: T.text, fontFamily: "inherit",
           width: "100%", transition: "border-color 0.2s, box-shadow 0.2s",
           boxShadow: showErr ? "0 0 0 3px rgba(239,68,68,0.10)" : touched && !showErr && value ? "0 0 0 3px rgba(22,163,74,0.08)" : "none" }}
         onFocus={e => e.target.style.borderColor = showErr ? "#ef4444" : T.indigoDark}
@@ -5885,7 +5885,7 @@ const SInput = ({ label, type = "text", placeholder, value, onChange, validate, 
       {showErr && (
         <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: -2 }}>
           <span style={{ fontSize: 13, lineHeight: 1 }}>⚠️</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#dc2626" }}>{showErr}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: T.red }}>{showErr}</span>
         </div>
       )}
     </div>
@@ -6170,7 +6170,7 @@ function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab
               borderRadius: 8, padding: "10px 14px", display: "flex", gap: 8, alignItems: "center" }}>
               <span>{"🔐"}</span>
               <span style={{ fontSize: 12, color: T.rpaDark, fontWeight: 700 }}>
-                AES-256 encrypted · Never stored in plaintext
+                Your credentials are securely protected
               </span>
             </div>
             <SInput label="Portal Username / Email" placeholder="provider@practice.com"
@@ -6278,7 +6278,7 @@ function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab
               <div>
                 <div style={{ fontSize: 22, fontWeight: 900, color: T.text }}>Practice Profile</div>
                 <div style={{ fontSize: 13, color: T.textSoft, marginTop: 4 }}>
-                  Your legal identity for clearinghouse credentialing and claim submissions.
+                  Your practice details for insurance verification and claim submissions.
                 </div>
               </div>
               <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12,
@@ -6344,7 +6344,7 @@ function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab
               <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12, padding: "4px 24px" }}>
                 <Toggle label="7-Day Pre-Verification" description="Automatically verify patients 7 days before their appointment." defaultChecked={true} />
                 <Toggle label="24-Hour Refresh" description="Re-run verification 24 hours prior to catch last-minute plan changes." defaultChecked={true} />
-                <Toggle label="RPA Fallback Engine" description="When the clearinghouse API returns thin data, AI logs into the carrier portal." defaultChecked={true} />
+                <Toggle label="RPA Fallback Engine" description="When our initial check returns limited info, AI logs into the carrier portal for full details." defaultChecked={true} />
                 <Toggle label="Auto-Draft Patient SMS" description="AI writes outreach drafts for missing tooth clauses, maxed benefits, and low remaining." defaultChecked={true} />
                 <Toggle label="Pre-Auth Automation" description="Automatically generate pre-authorization letters when Missing Tooth Clause is detected." defaultChecked={true} />
               </div>
@@ -6366,16 +6366,16 @@ function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab
                 <div style={{ fontSize: 12, fontWeight: 900, color: T.textMid, textTransform: "uppercase",
                   letterSpacing: "0.08em", marginBottom: 14 }}>Level AI Infrastructure</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <ManagedCard emoji="⚡" name="Stedi Clearinghouse API"
-                    description="Real-time EDI 270/271 eligibility queries across 1,000+ payers" />
+                  <ManagedCard emoji="⚡" name="Insurance Verification Engine"
+                    description="Real-time eligibility checks across 1,000+ insurance carriers" />
                   <ManagedCard emoji="💬" name="Twilio SMS"
                     description="Patient outreach, reminders, and benefit notifications" />
                 </div>
                 <div style={{ marginTop: 12, padding: "12px 16px", background: T.indigoLight,
                   border: "1px solid " + T.indigoBorder, borderRadius: 10,
                   fontSize: 12, color: T.indigoDark, fontWeight: 700, lineHeight: 1.6 }}>
-                  {"ℹ️"} These services are managed centrally by Level AI. No API keys required.
-                  Usage is billed per your Level AI subscription plan.
+                  {"ℹ️"} These services are managed by Level AI — nothing for you to set up.
+                  Usage is included in your Level AI subscription.
                 </div>
               </div>
 
@@ -6462,12 +6462,12 @@ function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab
                   </div>
                   <div style={{ fontSize: 11, color: T.rpaDark, fontWeight: 800, background: T.rpaLight,
                     border: "1px solid " + T.rpaBorder, padding: "3px 10px", borderRadius: 20 }}>
-                    🔐 AES-256 Encrypted
+                    🔐 Securely Protected
                   </div>
                 </div>
                 <div style={{ fontSize: 12, color: T.textSoft, marginBottom: 16, lineHeight: 1.6 }}>
-                  When Stedi returns incomplete data, the RPA bot logs into the carrier's provider portal
-                  using these credentials to retrieve full benefits directly.
+                  When our initial verification returns limited info, we log into the carrier's provider portal
+                  using these credentials to pull the full benefit details.
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {RPA_PAYERS.map(payer => {
@@ -6730,7 +6730,7 @@ function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab
               <div>
                 <div style={{ fontSize: 22, fontWeight: 900, color: T.text }}>Audit Log</div>
                 <div style={{ fontSize: 13, color: T.textSoft, marginTop: 4 }}>
-                  HIPAA-compliant activity log. Track all PHI access, verifications, imports, and system events.
+                  Complete activity log. Track all verifications, data access, imports, and system events.
                 </div>
               </div>
 
@@ -7881,7 +7881,7 @@ export default function LevelAI() {
     if (apiResult.verification_status === "error" || apiResult._failCategory) {
       const failReason = apiResult._failReason
         ? friendlyFailReason(apiResult._failReason, patient)
-        : "Verification failed — the clearinghouse could not process this request.";
+        : "Verification failed — we couldn't process this request. Please try again or contact support.";
       setResults(prev => ({ ...prev, [patient.id]: {
         ...apiResult,
         verification_status: STATUS.ERROR,
@@ -8018,9 +8018,42 @@ export default function LevelAI() {
     }
   }, [isLoading, setPhase, showToast, sandboxMode, accountMode, preauthCache, addCredentialAlert, practice]);
 
+  // ── Sandbox instant-resolve: pre-populate results from client-side fixtures ──
+  // When sandbox mode is active, we resolve ALL patients from fixtures immediately
+  // on load — no API calls, no race conditions, no rate-limit failures.
+  // This fires whenever patients change in sandbox mode and fills any missing results.
+  useEffect(() => {
+    if (!sandboxMode && accountMode !== "sandbox") return;
+    if (patients.length === 0) return;
+    const newResults = {};
+    const newPhases = {};
+    let changed = false;
+    patients.forEach(p => {
+      if (results[p.id]) return; // already resolved
+      const fixture = sandboxVerify(p.id);
+      const result = fixture
+        ? { ...fixture, _normalized_at: new Date().toISOString() }
+        : { ...SANDBOX_VERIFY_FIXTURES.p1, _source: "fixture_generic", _fixture_id: "generic_active", _normalized_at: new Date().toISOString() };
+      newResults[p.id] = result;
+      newPhases[p.id] = { phase: "complete", phases: ["api"] };
+      changed = true;
+    });
+    if (changed) {
+      setResults(prev => ({ ...prev, ...newResults }));
+      setPhases(prev => ({ ...prev, ...newPhases }));
+      // Also build agent log entries for the pre-populated results
+      const entries = patients
+        .filter(p => newResults[p.id])
+        .map(p => buildVerifyEntry(p, newResults[p.id], "24h_auto", ["api"]));
+      if (entries.length > 0) setAgentLog(log => [...entries.reverse(), ...log]);
+    }
+  }, [patients, sandboxMode, accountMode]);
+
   // ── Auto-verify: fires on schedule load for today, 24h, and 7d windows ───────
   // Admins skip auto-verify in live mode (preserves API calls) but run it in sandbox.
+  // In sandbox mode, results are pre-populated above — skip auto-verify entirely.
   useEffect(() => {
+    if (sandboxMode || accountMode === "sandbox") return; // sandbox uses instant-resolve above
     if (isAdmin && !sandboxMode && accountMode !== "sandbox") return;
     const todayISO = new Date().toISOString().split("T")[0];
     patients.forEach((patient, idx) => {
