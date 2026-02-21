@@ -51,7 +51,7 @@ const themes = {
     sidebar:"#FFFFFF",
   },
 };
-let T = themes.dark;
+let T = themes.light;
 
 function useTheme() {
   const [mode, setMode] = useState(() => {
