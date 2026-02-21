@@ -3569,39 +3569,126 @@ function FailedVerificationsPanel({ list, results, onClose, onSelect, onRetry })
 /**
  * Modal popup shown when a credential alert is clicked.
  * Shows the specific fields needed to fix the issue — PMS key, payer credentials, etc.
+ * Includes real-time validation with specific, actionable error messages.
  */
+
+// ── Credential Validators ────────────────────────────────────────────────────
+function validatePmsSyncKey(system, key) {
+  if (!key || !key.trim()) return { valid: false, error: "Sync key is required.", hint: null };
+  const trimmed = key.trim();
+
+  if (system === "Open Dental") {
+    // Open Dental eKeys are typically 20-40 alphanumeric characters
+    if (trimmed.length < 16) return { valid: false, error: "Invalid API key — too short.", hint: `Open Dental eKeys are typically 20+ characters. You entered ${trimmed.length}.` };
+    if (trimmed.length > 64) return { valid: false, error: "Invalid API key — too long.", hint: `This looks like it may include extra text. eKeys are usually 20-40 characters.` };
+    if (/\s/.test(trimmed)) return { valid: false, error: "Invalid API key — contains spaces.", hint: "eKeys should not contain spaces. Check for accidental whitespace when copying." };
+    if (!/^[A-Za-z0-9\-_]+$/.test(trimmed)) return { valid: false, error: "Invalid API key — contains special characters.", hint: "Open Dental eKeys only contain letters, numbers, hyphens, and underscores." };
+  } else if (system === "Dentrix") {
+    // Dentrix tokens are UUID-like or long alphanumeric strings
+    if (trimmed.length < 10) return { valid: false, error: "Invalid token — too short.", hint: `Dentrix sync tokens are typically 20+ characters. You entered ${trimmed.length}.` };
+    if (/\s/.test(trimmed)) return { valid: false, error: "Invalid token — contains spaces.", hint: "Tokens should not contain spaces. Check your clipboard." };
+  } else if (system === "Eaglesoft") {
+    if (trimmed.length < 8) return { valid: false, error: "Invalid token — too short.", hint: `Eaglesoft tokens are typically 10+ characters. You entered ${trimmed.length}.` };
+    if (/\s/.test(trimmed)) return { valid: false, error: "Invalid token — contains spaces.", hint: "Tokens should not contain spaces." };
+  }
+  return { valid: true, error: null, hint: null };
+}
+
+function validateRpaUsername(username) {
+  if (!username || !username.trim()) return { valid: false, error: "Username is required.", hint: null };
+  const trimmed = username.trim();
+  if (trimmed.length < 3) return { valid: false, error: "Invalid username — too short.", hint: "Portal usernames are typically an email address or at least 3 characters." };
+  // Check if it looks like an email (most payer portals use email login)
+  if (trimmed.includes("@")) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return { valid: false, error: "Invalid email format.", hint: "This looks like an email address but the format is wrong. Check for typos." };
+  }
+  if (/\s/.test(trimmed)) return { valid: false, error: "Invalid username — contains spaces.", hint: "Usernames should not contain spaces." };
+  return { valid: true, error: null, hint: null };
+}
+
+function validateRpaPassword(password) {
+  if (!password) return { valid: false, error: "Password is required.", hint: null };
+  if (password.length < 6) return { valid: false, error: "Invalid password — too short.", hint: `Payer portal passwords are typically 8+ characters. You entered ${password.length}.` };
+  if (password.length > 128) return { valid: false, error: "Invalid password — too long.", hint: "This exceeds the maximum length. Did you accidentally paste extra text?" };
+  return { valid: true, error: null, hint: null };
+}
+
+// ── Inline validation error display ──────────────────────────────────────────
+function FieldError({ error, hint }) {
+  if (!error) return null;
+  return (
+    <div style={{ marginTop:6 }}>
+      <div style={{ fontSize:12, fontWeight:700, color:T.red, display:"flex", alignItems:"center", gap:4 }}>
+        <span style={{ fontSize:13 }}>✕</span> {error}
+      </div>
+      {hint && (
+        <div style={{ fontSize:11, color:T.textMid, marginTop:2, paddingLeft:17, lineHeight:1.4 }}>
+          {hint}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CredentialFixModal({ alert, practice, onClose, onSave, showToast }) {
   const [pmsSystem, setPmsSystem] = useState(practice?.pmsSystem || "Open Dental");
   const [pmsSyncKey, setPmsSyncKey] = useState("");
   const [rpaUser, setRpaUser] = useState("");
   const [rpaPass, setRpaPass] = useState("");
   const [saving, setSaving] = useState(false);
+  // Track which fields have been touched (only show errors after user interacts)
+  const [touched, setTouched] = useState({});
 
   const isPms = alert.type === "pms";
 
+  // Real-time validation results
+  const pmsKeyValidation = isPms ? validatePmsSyncKey(pmsSystem, pmsSyncKey) : { valid: true };
+  const userValidation = !isPms ? validateRpaUsername(rpaUser) : { valid: true };
+  const passValidation = !isPms ? validateRpaPassword(rpaPass) : { valid: true };
+
+  const allValid = isPms ? pmsKeyValidation.valid : (userValidation.valid && passValidation.valid);
+
   const handleSave = async () => {
+    // Mark all fields as touched to show errors
+    setTouched({ pmsSyncKey: true, rpaUser: true, rpaPass: true });
+
+    if (!allValid) return; // Don't submit if validation fails
+
     setSaving(true);
     try {
       if (isPms) {
-        if (!pmsSyncKey) { showToast("Please enter your sync key."); setSaving(false); return; }
         const res = await fetch("/api/v1/practice", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pmsSystem, pmsSyncKey }),
+          body: JSON.stringify({ pmsSystem, pmsSyncKey: pmsSyncKey.trim() }),
         });
         if (res.ok) {
           showToast(`PMS credentials updated for ${pmsSystem}.`);
-          if (onSave) onSave({ type: "pms", pmsSystem, pmsSyncKey });
+          if (onSave) onSave({ type: "pms", pmsSystem, pmsSyncKey: pmsSyncKey.trim() });
           onClose();
-        } else { showToast("Failed to save — please try again."); }
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          if (res.status === 401) showToast("Invalid API key — authentication failed. Please double-check the key.");
+          else if (res.status === 400) showToast(errData.error || "Invalid input — please check your credentials.");
+          else showToast("Failed to save — please try again.");
+        }
       } else {
-        // Payer credential — for now just close with a toast since these go to vault
+        if (!rpaUser.trim() || !rpaPass) {
+          showToast("Please fill in both username and password.");
+          setSaving(false);
+          return;
+        }
         showToast("Payer credentials saved to vault.");
-        if (onSave) onSave({ type: "payer", user: rpaUser, pass: rpaPass });
+        if (onSave) onSave({ type: "payer", user: rpaUser.trim(), pass: rpaPass });
         onClose();
       }
-    } catch { showToast("Save failed — please try again."); }
+    } catch { showToast("Save failed — check your connection and try again."); }
     finally { setSaving(false); }
+  };
+
+  const inputBorder = (fieldName, validation) => {
+    if (!touched[fieldName]) return T.border;
+    return validation.valid ? "#22c55e" : T.red;
   };
 
   return (
@@ -3668,9 +3755,19 @@ function CredentialFixModal({ alert, practice, onClose, onSave, showToast }) {
                   {pmsSystem === "Open Dental" ? "Customer Key (eKey)" : "Sync Token"}
                 </label>
                 <input type="password" placeholder={pmsSystem === "Open Dental" ? "Paste your Open Dental eKey..." : "Paste your API token..."}
-                  value={pmsSyncKey} onChange={e => setPmsSyncKey(e.target.value)}
-                  style={{ width:"100%", padding:"12px 14px", borderRadius:8, border:"1px solid "+T.border,
-                    background:T.bg, fontSize:14, color:T.text, fontFamily:"monospace", boxSizing:"border-box" }} />
+                  value={pmsSyncKey}
+                  onChange={e => setPmsSyncKey(e.target.value)}
+                  onBlur={() => setTouched(t => ({ ...t, pmsSyncKey: true }))}
+                  style={{ width:"100%", padding:"12px 14px", borderRadius:8,
+                    border:"1.5px solid " + inputBorder("pmsSyncKey", pmsKeyValidation),
+                    background:T.bg, fontSize:14, color:T.text, fontFamily:"monospace", boxSizing:"border-box",
+                    transition:"border-color 0.2s" }} />
+                {touched.pmsSyncKey && <FieldError error={pmsKeyValidation.error} hint={pmsKeyValidation.hint} />}
+                {touched.pmsSyncKey && pmsKeyValidation.valid && pmsSyncKey && (
+                  <div style={{ marginTop:6, fontSize:12, fontWeight:700, color:"#22c55e", display:"flex", alignItems:"center", gap:4 }}>
+                    <span>✓</span> Key format looks valid ({pmsSyncKey.trim().length} characters)
+                  </div>
+                )}
               </div>
               <div style={{ background:T.indigoLight, border:"1px solid "+T.indigoBorder, borderRadius:8,
                 padding:"10px 14px", fontSize:12, color:T.indigoDark, lineHeight:1.6 }}>
@@ -3705,18 +3802,38 @@ function CredentialFixModal({ alert, practice, onClose, onSave, showToast }) {
                       Portal Username / Email
                     </label>
                     <input type="text" placeholder="provider@practice.com"
-                      value={rpaUser} onChange={e => setRpaUser(e.target.value)}
-                      style={{ width:"100%", padding:"12px 14px", borderRadius:8, border:"1px solid "+T.border,
-                        background:T.bg, fontSize:14, color:T.text, boxSizing:"border-box" }} />
+                      value={rpaUser}
+                      onChange={e => setRpaUser(e.target.value)}
+                      onBlur={() => setTouched(t => ({ ...t, rpaUser: true }))}
+                      style={{ width:"100%", padding:"12px 14px", borderRadius:8,
+                        border:"1.5px solid " + inputBorder("rpaUser", userValidation),
+                        background:T.bg, fontSize:14, color:T.text, boxSizing:"border-box",
+                        transition:"border-color 0.2s" }} />
+                    {touched.rpaUser && <FieldError error={userValidation.error} hint={userValidation.hint} />}
+                    {touched.rpaUser && userValidation.valid && rpaUser && (
+                      <div style={{ marginTop:6, fontSize:12, fontWeight:700, color:"#22c55e", display:"flex", alignItems:"center", gap:4 }}>
+                        <span>✓</span> Username looks valid
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label style={{ fontSize:12, fontWeight:800, color:T.text, display:"block", marginBottom:6 }}>
                       Portal Password
                     </label>
                     <input type="password" placeholder="••••••••"
-                      value={rpaPass} onChange={e => setRpaPass(e.target.value)}
-                      style={{ width:"100%", padding:"12px 14px", borderRadius:8, border:"1px solid "+T.border,
-                        background:T.bg, fontSize:14, color:T.text, fontFamily:"monospace", boxSizing:"border-box" }} />
+                      value={rpaPass}
+                      onChange={e => setRpaPass(e.target.value)}
+                      onBlur={() => setTouched(t => ({ ...t, rpaPass: true }))}
+                      style={{ width:"100%", padding:"12px 14px", borderRadius:8,
+                        border:"1.5px solid " + inputBorder("rpaPass", passValidation),
+                        background:T.bg, fontSize:14, color:T.text, fontFamily:"monospace", boxSizing:"border-box",
+                        transition:"border-color 0.2s" }} />
+                    {touched.rpaPass && <FieldError error={passValidation.error} hint={passValidation.hint} />}
+                    {touched.rpaPass && passValidation.valid && rpaPass && (
+                      <div style={{ marginTop:6, fontSize:12, fontWeight:700, color:"#22c55e", display:"flex", alignItems:"center", gap:4 }}>
+                        <span>✓</span> Password accepted ({rpaPass.length} characters)
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div style={{ background:T.rpaLight, border:"1px solid "+T.rpaBorder, borderRadius:8,
@@ -3735,11 +3852,12 @@ function CredentialFixModal({ alert, practice, onClose, onSave, showToast }) {
                 background:T.bg, color:T.textMid, fontWeight:700, cursor:"pointer", fontSize:14 }}>
               Cancel
             </button>
-            <button onClick={handleSave} disabled={saving}
+            <button onClick={handleSave} disabled={saving || (!allValid && Object.keys(touched).length > 0)}
               style={{ flex:2, padding:"13px", borderRadius:10, border:"none",
-                background: saving ? T.borderStrong : (isPms ? T.amberDark : T.indigoDark),
-                color:"white", fontWeight:800, cursor: saving ? "wait" : "pointer", fontSize:14,
-                boxShadow:"0 4px 12px rgba(0,0,0,0.15)" }}>
+                background: saving ? T.borderStrong : (!allValid && Object.keys(touched).length > 0) ? T.borderStrong : (isPms ? T.amberDark : T.indigoDark),
+                color: (!allValid && Object.keys(touched).length > 0) ? T.textSoft : "white",
+                fontWeight:800, cursor: saving || (!allValid && Object.keys(touched).length > 0) ? "not-allowed" : "pointer", fontSize:14,
+                boxShadow: allValid ? "0 4px 12px rgba(0,0,0,0.15)" : "none", transition:"all 0.2s" }}>
               {saving ? "Saving..." : isPms ? "Save & Reconnect" : "Save Credentials"}
             </button>
           </div>
