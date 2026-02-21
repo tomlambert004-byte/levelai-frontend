@@ -127,10 +127,12 @@ model AuditLog {
 
 // ── Activation codes (one-time license keys issued after payment) ──────────
 model ActivationCode {
-  id        String    @id @default(cuid())
-  code      String    @unique              // e.g. "LVL-8F3K-X9M2"
-  used      Boolean   @default(false)
-  usedBy    String?                        // Practice.id of the practice that redeemed it
-  createdAt DateTime  @default(now())
-  usedAt    DateTime?
+  id            String    @id @default(cuid())
+  code          String    @unique              // e.g. "LVL-8F3K-X9M2"
+  label         String?                        // admin note, e.g. "Dr. Smith — Smile Dental"
+  customerEmail String?                        // email of the customer the code was generated for
+  used          Boolean   @default(false)
+  usedBy        String?                        // Practice.id of the practice that redeemed it
+  createdAt     DateTime  @default(now())
+  usedAt        DateTime?
 }

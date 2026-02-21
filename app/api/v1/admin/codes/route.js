@@ -54,6 +54,8 @@ export async function GET() {
     const enriched = codes.map((c) => ({
       id: c.id,
       code: c.code,
+      label: c.label || null,
+      customerEmail: c.customerEmail || null,
       used: c.used,
       usedBy: c.usedBy,
       usedByName: c.usedBy ? practiceMap[c.usedBy] || "Unknown" : null,

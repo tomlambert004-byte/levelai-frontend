@@ -1031,8 +1031,36 @@ function OnboardingWizard({ onComplete, showToast }) {
     }, 200);
   };
 
-  const startPmsSync = () => {
+  const [pmsValidating, setPmsValidating] = useState(false);
+  const [pmsError, setPmsError] = useState("");
+
+  const startPmsSync = async () => {
     if (!pmsSystem || !pmsSyncKey) return;
+    setPmsError("");
+    setPmsValidating(true);
+
+    // Step 1 — validate credentials before starting animated sync
+    try {
+      const valRes = await fetch("/api/v1/pms/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pmsSystem, pmsSyncKey }),
+      });
+      const valData = await valRes.json();
+      if (!valData.valid) {
+        setPmsError(valData.error || "Invalid credentials. Please check your key and try again.");
+        setPmsValidating(false);
+        return;
+      }
+    } catch {
+      setPmsError("Could not validate credentials — network error. Please try again.");
+      setPmsValidating(false);
+      return;
+    }
+
+    setPmsValidating(false);
+
+    // Step 2 — credentials valid, start animated sync
     setSyncPhase(0);
     // Persist PMS credentials to practice record in parallel (non-blocking)
     fetch("/api/v1/practice", {
@@ -1355,6 +1383,15 @@ function OnboardingWizard({ onComplete, showToast }) {
                     </div>
                   )}
 
+                  {/* Validation error banner */}
+                  {pmsError && (
+                    <div style={{ background:"#fef2f2", border:"1px solid #fecaca", borderRadius:10, padding:"12px 16px",
+                      display:"flex", gap:10, alignItems:"flex-start", animation:"wizFadeIn 0.2s ease-out" }}>
+                      <span style={{ fontSize:16 }}>⚠️</span>
+                      <div style={{ fontSize:12, color:"#991b1b", lineHeight:1.5, fontWeight:600 }}>{pmsError}</div>
+                    </div>
+                  )}
+
                   <div style={{ display:"flex", gap:10 }}>
                     <button onClick={() => advance("profile")}
                       style={{ flex:"0 0 auto", padding:"15px 20px", borderRadius:10, border:"1px solid #e2e2dc",
@@ -1362,7 +1399,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                       ← Back
                     </button>
                     <div style={{ flex:1 }}>
-                      <NextBtn label="Sync PMS →" disabled={!pmsSystem || !pmsSyncKey} onClick={startPmsSync} />
+                      <NextBtn label={pmsValidating ? "Validating key…" : "Sync PMS →"} disabled={!pmsSystem || !pmsSyncKey || pmsValidating} onClick={startPmsSync} />
                     </div>
                   </div>
                 </div>
@@ -1516,9 +1553,17 @@ function OnboardingWizard({ onComplete, showToast }) {
                   ← Back
                 </button>
                 <div style={{ flex:1 }}>
-                  <NextBtn label="Next: Invite Team →" onClick={() => advance("team")} />
+                  <NextBtn label="Save & Continue →" onClick={() => advance("team")} />
                 </div>
               </div>
+
+              {/* Skip option */}
+              <button onClick={() => advance("team")}
+                style={{ display:"block", width:"100%", textAlign:"center", marginTop:12, padding:"10px",
+                  background:"transparent", border:"none", color:"#a0a09a", fontSize:12, fontWeight:700,
+                  cursor:"pointer", textDecoration:"underline", textUnderlineOffset:3 }}>
+                Skip for now — I&apos;ll add credentials later in Settings
+              </button>
             </div>
           )}
 
@@ -5446,6 +5491,9 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [newCode, setNewCode] = useState(null);
+  const [showGenForm, setShowGenForm] = useState(false);
+  const [genLabel, setGenLabel] = useState("");
+  const [genEmail, setGenEmail] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -5465,11 +5513,14 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
       const res = await fetch("/api/v1/admin/generate-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ count: 1 }),
+        body: JSON.stringify({ count: 1, label: genLabel.trim() || undefined, customerEmail: genEmail.trim() || undefined }),
       });
       const data = await res.json();
       if (data.codes?.[0]) {
         setNewCode(data.codes[0]);
+        setGenLabel("");
+        setGenEmail("");
+        setShowGenForm(false);
         // Refresh the codes list
         const updated = await fetch("/api/v1/admin/codes").then(r => r.json()).catch(() => ({ codes: [] }));
         setCodes(updated.codes || []);
@@ -5576,7 +5627,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                   <h1 style={{ fontSize: 24, fontWeight: 900, color: "#f1f5f9", marginBottom: 4 }}>Activation Codes</h1>
                   <p style={{ fontSize: 13, color: "#64748b" }}>Generate and manage single-use license codes for new practices</p>
                 </div>
-                <button onClick={handleGenerate} disabled={generating}
+                <button onClick={() => setShowGenForm(!showGenForm)} disabled={generating}
                   style={{
                     padding: "12px 24px", borderRadius: 10, border: "none", cursor: generating ? "not-allowed" : "pointer",
                     background: generating ? "#334155" : "linear-gradient(135deg, #6366f1, #4f46e5)",
@@ -5586,6 +5637,41 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                   {generating ? "⏳ Generating…" : "✨ Generate New Code"}
                 </button>
               </div>
+
+              {/* Generate form */}
+              {showGenForm && (
+                <div style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(79,70,229,0.05))",
+                  border: "1px solid rgba(99,102,241,0.2)", borderRadius: 14, padding: "24px 28px",
+                  marginBottom: 28, animation: "adminFadeIn 0.2s ease-out" }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: "#a5b4fc", marginBottom: 16 }}>New Code Details (optional)</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Customer / Practice Name</label>
+                      <input value={genLabel} onChange={e => setGenLabel(e.target.value)} placeholder="e.g. Dr. Smith — Smile Dental"
+                        style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #334155",
+                          background: "#0f172a", color: "#e2e8f0", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Customer Email</label>
+                      <input value={genEmail} onChange={e => setGenEmail(e.target.value)} placeholder="e.g. drsmith@smiledental.com" type="email"
+                        style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #334155",
+                          background: "#0f172a", color: "#e2e8f0", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={handleGenerate} disabled={generating}
+                      style={{ padding: "10px 24px", borderRadius: 8, border: "none", cursor: generating ? "not-allowed" : "pointer",
+                        background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "white", fontSize: 12, fontWeight: 800 }}>
+                      {generating ? "⏳ Generating…" : "Generate Code"}
+                    </button>
+                    <button onClick={() => { setShowGenForm(false); setGenLabel(""); setGenEmail(""); }}
+                      style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid #334155",
+                        background: "transparent", color: "#94a3b8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Stats row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 28 }}>
@@ -5636,20 +5722,30 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
               ) : (
                 <div style={{ background: "#1e293b", borderRadius: 12, border: "1px solid #334155", overflow: "hidden" }}>
                   {/* Table header */}
-                  <div style={{ display: "grid", gridTemplateColumns: "200px 100px 1fr 160px 50px",
+                  <div style={{ display: "grid", gridTemplateColumns: "180px 1fr 90px 1fr 140px 44px",
                     padding: "12px 20px", borderBottom: "1px solid #334155", gap: 12 }}>
-                    {["Code", "Status", "Used By", "Created", ""].map(h => (
+                    {["Code", "Customer", "Status", "Redeemed By", "Created", ""].map(h => (
                       <div key={h} style={{ fontSize: 10, fontWeight: 800, color: "#475569",
                         textTransform: "uppercase", letterSpacing: "0.08em" }}>{h}</div>
                     ))}
                   </div>
                   {/* Table rows */}
                   {codes.map((c, i) => (
-                    <div key={c.id} style={{ display: "grid", gridTemplateColumns: "200px 100px 1fr 160px 50px",
+                    <div key={c.id} style={{ display: "grid", gridTemplateColumns: "180px 1fr 90px 1fr 140px 44px",
                       padding: "14px 20px", borderBottom: i < codes.length - 1 ? "1px solid #1e293b" : "none",
                       background: i % 2 === 0 ? "transparent" : "rgba(15,23,42,0.4)", gap: 12, alignItems: "center" }}>
                       <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: 13,
                         fontWeight: 800, color: "#e2e8f0", letterSpacing: "0.05em" }}>{c.code}</div>
+                      <div style={{ overflow: "hidden" }}>
+                        {c.label ? (
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#cbd5e1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.label}</div>
+                        ) : (
+                          <div style={{ fontSize: 11, color: "#475569" }}>—</div>
+                        )}
+                        {c.customerEmail && (
+                          <div style={{ fontSize: 10, color: "#64748b", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.customerEmail}</div>
+                        )}
+                      </div>
                       <div>
                         <span style={{
                           display: "inline-block", padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 800,
@@ -5662,7 +5758,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                       </div>
                       <div style={{ fontSize: 12, color: c.usedByName ? "#cbd5e1" : "#475569" }}>
                         {c.usedByName || (c.used ? "Unknown practice" : "—")}
-                        {c.usedAt && <span style={{ color: "#475569", marginLeft: 6, fontSize: 11 }}>({fmtDate(c.usedAt)})</span>}
+                        {c.usedAt && <div style={{ color: "#475569", fontSize: 10, marginTop: 1 }}>{fmtDate(c.usedAt)}</div>}
                       </div>
                       <div style={{ fontSize: 11, color: "#64748b" }}>{fmtDate(c.createdAt)}</div>
                       <button onClick={() => copyCode(c.code)}
@@ -5864,6 +5960,20 @@ export default function LevelAI() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [dayPanelLoading, setDayPanelLoading] = useState(false);
 
+  // ── Stale credential alerts ────────────────────────────────────────────────
+  const [credentialAlerts, setCredentialAlerts] = useState([]);
+  // credentialAlerts = [{ type: "pms"|"payer", message: "...", dismissedAt: null }]
+  const addCredentialAlert = useCallback((type, message) => {
+    setCredentialAlerts(prev => {
+      // Don't duplicate
+      if (prev.some(a => a.type === type && !a.dismissedAt)) return prev;
+      return [...prev, { type, message, dismissedAt: null }];
+    });
+  }, []);
+  const dismissCredentialAlert = useCallback((type) => {
+    setCredentialAlerts(prev => prev.map(a => a.type === type ? { ...a, dismissedAt: new Date() } : a));
+  }, []);
+
   // ── UI state ─────────────────────────────────────────────────────────────────
   const [schedulePanel, setSchedulePanel] = useState("benefits");
   const [prevPanel, setPrevPanel]         = useState(null); // for back navigation
@@ -5929,10 +6039,15 @@ export default function LevelAI() {
       });
     } catch (err) {
       setDailyError(err.message);
+      // Detect PMS credential issues (Open Dental returns 401/403 which surfaces as 502 from our route)
+      const msg = (err.message || "").toLowerCase();
+      if (msg.includes("502") || msg.includes("401") || msg.includes("403") || msg.includes("authentication") || msg.includes("ekey") || msg.includes("invalid key") || msg.includes("unauthorized")) {
+        addCredentialAlert("pms", "Your PMS sync key may be invalid or expired. Update it in Settings to resume automatic schedule sync.");
+      }
     } finally {
       setDailyLoading(false);
     }
-  }, []);
+  }, [addCredentialAlert]);
 
   // ── Fetch: rolling 7-day window (today + 7 calendar days) ────────────────────
   // Covers today for the kanban AND the next 7 days for WeekAhead + auto-verify.
@@ -6064,6 +6179,11 @@ export default function LevelAI() {
     } catch (e) {
       setPhase(patient.id, { phase: "error", error: e.message });
       showToast(`Verification failed: ${e.message}`);
+      // Detect payer credential issues
+      const msg = (e.message || "").toLowerCase();
+      if (msg.includes("credential") || msg.includes("login") || msg.includes("authentication") || msg.includes("unauthorized") || msg.includes("invalid password") || msg.includes("session expired")) {
+        addCredentialAlert("payer", "One or more payer portal credentials may be expired. Update them in Settings → RPA Credential Vault.");
+      }
       return;
     }
     runPhases.push("api");
@@ -6144,7 +6264,7 @@ export default function LevelAI() {
         }
       }).catch(() => {}); // non-blocking
     }
-  }, [isLoading, setPhase, showToast, sandboxMode, preauthCache]);
+  }, [isLoading, setPhase, showToast, sandboxMode, preauthCache, addCredentialAlert]);
 
   // ── Auto-verify: fires on schedule load for today, 24h, and 7d windows ───────
   // Skipped for admin users and sandbox mode (no auth session → API returns 401).
@@ -6671,6 +6791,35 @@ export default function LevelAI() {
                   </button>
                 </div>
               )}
+
+              {/* ── Stale Credential Alerts ── */}
+              {credentialAlerts.filter(a => !a.dismissedAt).map(alert => (
+                <div key={alert.type} style={{ background:"#fef3c7", border:"1px solid #f59e0b", borderRadius:10,
+                  padding:"12px 18px", marginBottom:12, display:"flex", justifyContent:"space-between", alignItems:"center",
+                  animation:"wizFadeIn 0.3s ease-out", flexShrink:0 }}>
+                  <div style={{ display:"flex", alignItems:"flex-start", gap:10, flex:1 }}>
+                    <span style={{ fontSize:18, flexShrink:0 }}>⚠️</span>
+                    <div>
+                      <div style={{ fontWeight:900, fontSize:13, color:"#92400e" }}>
+                        {alert.type === "pms" ? "PMS Credentials Issue" : "Payer Portal Credentials Issue"}
+                      </div>
+                      <div style={{ fontSize:12, color:"#a16207", marginTop:2 }}>{alert.message}</div>
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", gap:8, flexShrink:0 }}>
+                    <button onClick={() => { setTab("settings"); dismissCredentialAlert(alert.type); }}
+                      style={{ background:"#f59e0b", color:"white", border:"none", borderRadius:8,
+                        padding:"6px 14px", fontWeight:800, cursor:"pointer", fontSize:11 }}>
+                      Open Settings
+                    </button>
+                    <button onClick={() => dismissCredentialAlert(alert.type)}
+                      style={{ background:"transparent", color:"#a16207", border:"1px solid #f59e0b", borderRadius:8,
+                        padding:"6px 10px", fontWeight:700, cursor:"pointer", fontSize:11 }}>
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))}
 
               {/* MorningBanner — shown once patients are loaded (even 0 auto-verified shows the clickable bot box) */}
               {!dailyLoading && (

@@ -49,6 +49,8 @@ export async function POST(request) {
 
     const body = await request.json().catch(() => ({}));
     const count = Math.min(Math.max(parseInt(body.count) || 1, 1), 50);
+    const label = (body.label || "").trim() || null;
+    const customerEmail = (body.customerEmail || "").trim().toLowerCase() || null;
 
     const codes = [];
     for (let i = 0; i < count; i++) {
@@ -63,7 +65,7 @@ export async function POST(request) {
       );
 
       const record = await prisma.activationCode.create({
-        data: { code },
+        data: { code, label, customerEmail },
       });
       codes.push(record.code);
     }
