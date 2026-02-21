@@ -53,60 +53,119 @@ const wholeDollars = (c) => c != null ? "$" + Math.round(Number(c)).toLocaleStri
 const pct = (n) => n != null ? n + "%" : "--";
 
 // ── Brand Logo Component ─────────────────────────────────────────────────────
-// Uses the actual logo image (levelai-logo.jpg) for pixel-perfect rendering.
-// The logo features: "le" white, "v" teal checkmark integrated into a white tooth outline, "el" white, "ai" white with teal dot on "i".
+// Inline SVG + HTML hybrid. Transparent background, theme-aware, scales perfectly.
+// Design: "le" + tooth-checkmark as "v" + "el  ai" with teal dot on "i".
+// The text uses regular HTML spans (inherits Nunito from body CSS) and the tooth+check
+// is a precisely positioned inline SVG — no images, no blend modes, fully native.
+//
 // Props:
-//   size      — controls height of the logo image (default 20)
-//   showText  — when false, shows only the tooth/v icon portion (for collapsed sidebar)
+//   size      — font-size of the wordmark text (default 20)
+//   showText  — when false, shows only the tooth+checkmark icon (for collapsed sidebar)
 //   subtitle  — optional subtitle text below the logo
-//   subtitleColor — color for the subtitle
-function BrandLogo({ size = 20, showText = true, subtitle, subtitleColor }) {
+//   subtitleColor — color for subtitle
+//   color     — override text color (defaults to theme foreground)
+//   accentColor — override teal accent (defaults to #14B8A6)
+
+function ToothCheckIcon({ size = 28, color = "#F5F5F0", accentColor = "#14B8A6", style = {} }) {
+  // Standalone tooth + checkmark icon — used for collapsed sidebar and as inline glyph in wordmark
+  return (
+    <svg width={size} height={size * 1.15} viewBox="0 0 36 42" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display:"block", ...style }}>
+      {/* Tooth outline */}
+      <path
+        d="M18 2C14.5 2 12 4 10.5 7C9 10.2 8.5 14 9 18.5C9.6 23 11 27 12.3 30C13.1 32 14.5 32 15.1 30C15.7 27.5 16.3 24.5 18 24.5C19.7 24.5 20.3 27.5 20.9 30C21.5 32 22.9 32 23.7 30C25 27 26.4 23 27 18.5C27.5 14 27 10.2 25.5 7C24 4 21.5 2 18 2Z"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      {/* Subtle tooth highlight */}
+      <path
+        d="M12.5 9C14 7.8 16 7 18 7C20 7 22 7.8 23.5 9C22 10.8 20 11.5 18 11.5C16 11.5 14 10.8 12.5 9Z"
+        fill={color}
+        opacity="0.15"
+      />
+      {/* Teal checkmark */}
+      <path
+        d="M12.5 20.5L16.5 25.5L24.5 14"
+        stroke={accentColor}
+        strokeWidth="2.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+function BrandLogo({ size = 20, showText = true, subtitle, subtitleColor, color, accentColor }) {
+  const textColor = color || T.text;
+  const teal = accentColor || "#14B8A6";
   const h = size;
 
-  // Collapsed mode — show just the tooth+checkmark icon (center portion of logo)
+  // Collapsed mode — show just the tooth+checkmark icon
   if (!showText) {
     return (
       <div style={{ display:"flex", alignItems:"center", justifyContent:"center" }}>
-        <div style={{ width: h, height: h, overflow:"hidden", position:"relative" }}>
-          <img
-            src="/levelai-logo.jpg"
-            alt="Level AI"
-            style={{
-              height: h * 2.2,
-              width: h * 2.2 * 3.6,
-              objectFit:"contain",
-              position:"absolute",
-              // Center on the tooth/v portion (roughly 30-55% of the width)
-              left: -(h * 2.2 * 3.6 * 0.28),
-              top: -(h * 0.45),
-              mixBlendMode:"lighten",
-            }}
-            draggable={false}
-          />
-        </div>
+        <ToothCheckIcon size={h} color={textColor} accentColor={teal} />
       </div>
     );
   }
 
-  const w = h * 3.6; // aspect ratio of the wordmark
+  // Full wordmark: HTML text with inline SVG tooth replacing "v"
+  // The tooth icon height is ~1.55x the font size to properly extend above the text baseline
+  // (matching the original logo where the tooth extends well above the lowercase letters)
+  const toothH = h * 1.55;
+  const fontSize = h;
+
   return (
     <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-start" }}>
-      <img
-        src="/levelai-logo.jpg"
-        alt="Level AI"
-        style={{
-          height: h,
-          width: w,
-          objectFit:"contain",
-          objectPosition:"center",
-          display:"block",
-          mixBlendMode:"lighten",
-        }}
-        draggable={false}
-      />
+      <div style={{
+        display:"flex", alignItems:"flex-end", lineHeight:1, userSelect:"none",
+        fontFamily:"'Nunito', sans-serif", fontSize, fontWeight:400, color: textColor,
+        letterSpacing:"-0.02em", whiteSpace:"nowrap",
+      }}>
+        {/* "le" */}
+        <span>le</span>
+        {/* Tooth+checkmark as "v" — offset upward so tooth cusps rise above baseline letters */}
+        <span style={{
+          display:"inline-flex", alignItems:"flex-end",
+          marginLeft: h * -0.06, marginRight: h * -0.06,
+          marginBottom: h * -0.06,
+        }}>
+          <ToothCheckIcon
+            size={toothH * 0.7}
+            color={textColor}
+            accentColor={teal}
+            style={{ marginBottom: h * -0.02 }}
+          />
+        </span>
+        {/* "el" */}
+        <span>el</span>
+        {/* Space */}
+        <span style={{ width: h * 0.35 }} />
+        {/* "a" */}
+        <span>a</span>
+        {/* "i" with teal dot — clip native dot and overlay teal one */}
+        <span style={{ position:"relative", display:"inline-flex", flexDirection:"column", alignItems:"center" }}>
+          {/* Teal dot — sits above the i-stem, positioned over the native dot */}
+          <span style={{
+            position:"absolute",
+            top: h * 0.02,
+            left:"50%",
+            transform:"translateX(-50%)",
+            width: h * 0.19,
+            height: h * 0.19,
+            borderRadius:"50%",
+            backgroundColor: teal,
+            zIndex:1,
+          }} />
+          <span style={{ position:"relative" }}>i</span>
+        </span>
+      </div>
       {subtitle && (
-        <div style={{ fontSize: h * 0.38, fontWeight:700, color: subtitleColor || "#14B8A6",
-          letterSpacing:"0.08em", marginTop:2, paddingLeft:2 }}>{subtitle}</div>
+        <div style={{ fontSize: h * 0.32, fontWeight:700, color: subtitleColor || teal,
+          letterSpacing:"0.1em", marginTop: h * 0.1, paddingLeft:2, textTransform:"lowercase" }}>{subtitle}</div>
       )}
     </div>
   );
