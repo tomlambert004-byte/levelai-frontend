@@ -393,7 +393,7 @@ export default function LandingPage() {
               <br className="hidden md:block" /> slow, risky liability.
             </h2>
             <p className="mx-auto max-w-2xl text-[#525252] text-lg">
-              Legacy verification platforms store your patient data indefinitely, charge per-claim fees,
+              Legacy verification platforms store your patient data indefinitely, charge per-lookup fees,
               and still require manual phone calls. Level AI is a different category entirely.
             </p>
           </div>
@@ -404,7 +404,7 @@ export default function LandingPage() {
                 "Patient data stored in vulnerable databases",
                 "Manual phone calls still required for exceptions",
                 "Batch processing \u2014 results arrive hours late",
-                "Per-claim fees that scale against you",
+                "Per-verification fees that scale against you",
                 "No pre-auth automation, just eligibility checks",
               ]},
               { label: "Level AI", color: "text-[#14B8A6]", border: "border-[#14B8A6]/20", items: [
