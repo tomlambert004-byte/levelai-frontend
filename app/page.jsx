@@ -7278,7 +7278,8 @@ export default function LevelAI() {
     setPhase(patient.id, { phase: "api" });
 
     // ── Sandbox path: resolve from client-side fixtures (no API call) ─────────
-    if (sandboxMode) {
+    // Covers both unauthenticated demo (sandboxMode) and signed-in sandbox accounts
+    if (sandboxMode || accountMode === "sandbox") {
       // Brief delay to show the loading animation (feels like real verification)
       await new Promise(r => setTimeout(r, 400 + Math.random() * 600));
       const fixtureResult = sandboxVerify(patient.id);
@@ -7423,7 +7424,7 @@ export default function LevelAI() {
 
     // ── Module 3: Create SMS draft for block/notify patients ────────────────
     // Uses LLM to generate natural-language patient-facing messages (no raw triage data)
-    if ((triage.block.length > 0 || triage.notify.length > 0) && patient.phone && !sandboxMode) {
+    if ((triage.block.length > 0 || triage.notify.length > 0) && patient.phone && !sandboxMode && accountMode !== "sandbox") {
       const isBlock = triage.block.length > 0;
       const draftType = isBlock ? "reschedule" : "outreach";
 
@@ -7465,7 +7466,7 @@ export default function LevelAI() {
         }
       })();
     }
-  }, [isLoading, setPhase, showToast, sandboxMode, preauthCache, addCredentialAlert, practice]);
+  }, [isLoading, setPhase, showToast, sandboxMode, accountMode, preauthCache, addCredentialAlert, practice]);
 
   // ── Auto-verify: fires on schedule load for today, 24h, and 7d windows ───────
   // Skipped for admin users only. Sandbox mode now resolves from client-side fixtures.
