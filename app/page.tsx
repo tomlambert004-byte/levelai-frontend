@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FeatureGrid } from "./FeatureGrid";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  *  Level AI — Marketing Landing Page
@@ -91,31 +92,91 @@ const FEATURES = [
     icon: IconShield,
     title: "Autonomous Overnight Verification",
     description: "Every patient on tomorrow\u2019s schedule is verified before your team walks in. A color-coded risk dashboard replaces the morning phone marathon.",
+    detail: {
+      headline: "Your schedule is verified before the coffee is ready.",
+      body: "Level AI pulls tomorrow\u2019s schedule from your PMS every evening and runs every patient through our clearinghouse automatically. By the time your front desk opens the dashboard, every patient is color-coded: verified, action required, or inactive. No phone calls. No spreadsheets. No surprises.",
+      bullets: [
+        "7-day and 24-hour auto-verify windows",
+        "Color-coded kanban board with real-time status",
+        "Automatic retry for transient payer errors",
+        "Works overnight so your team hits the ground running",
+      ],
+    },
   },
   {
     icon: IconFileText,
     title: "Instant Pre-Auth Generation",
     description: "One click produces a complete, payer-specific pre-authorization letter with correct CDT codes, clinical narratives, and practice credentials. No templates to fill.",
+    detail: {
+      headline: "Pre-auth letters that write themselves.",
+      body: "Our AI reads the patient\u2019s benefits, identifies the procedure codes, and generates a complete pre-authorization letter tailored to the specific payer\u2019s requirements. It includes the correct CDT codes, clinical narratives, practice credentials, and even the right fax number. One click, done.",
+      bullets: [
+        "Payer-specific formatting and requirements",
+        "Auto-populated CDT codes and clinical narratives",
+        "Downloadable PDF ready to send",
+        "Eliminates hours of manual letter writing per week",
+      ],
+    },
   },
   {
     icon: IconSearch,
     title: "Clause & Limitation Intelligence",
     description: "Automatically flags missing tooth clauses, waiting periods, frequency limitations, and annual max issues \u2014 before the patient is in the chair.",
+    detail: {
+      headline: "Catch the gotchas that cost you thousands.",
+      body: "Most verification tools tell you if a patient is \u201Cactive.\u201D That\u2019s table stakes. Level AI digs into the fine print \u2014 missing tooth clauses, waiting periods, frequency limitations, annual maximums, downgrades, and assignment of benefits. These are the hidden landmines that cause chair-side surprises and claim denials.",
+      bullets: [
+        "Missing tooth clause detection and flagging",
+        "Annual max and deductible tracking",
+        "Frequency limitation cross-referencing",
+        "Downgrade detection for composites and crowns",
+      ],
+    },
   },
   {
     icon: IconBot,
     title: "AI Benefits Analyst (Payer Pal)",
     description: "Ask plain-English questions about any patient\u2019s coverage. Our AI reads the full eligibility response and gives a straight answer in seconds.",
+    detail: {
+      headline: "Ask it anything. Get a straight answer.",
+      body: "Payer Pal is your AI-powered benefits analyst. Instead of decoding cryptic 271 responses or waiting on hold with the insurance company, just ask a plain-English question: \u201CDoes this patient have coverage for a crown on #14?\u201D or \u201CWhat\u2019s their remaining annual max?\u201D Payer Pal reads the full eligibility response and gives you a clear, accurate answer in seconds.",
+      bullets: [
+        "Plain-English Q&A about any patient\u2019s benefits",
+        "Reads and interprets full 271 eligibility responses",
+        "Answers in seconds, not minutes on hold",
+        "Flag answers you disagree with for admin review",
+      ],
+    },
   },
   {
     icon: IconPlug,
     title: "Deep PMS Integration",
     description: "Native connections to Open Dental, Dentrix, and Eaglesoft. Schedule data syncs automatically \u2014 no CSV uploads, no double-entry, no IT involvement.",
+    detail: {
+      headline: "Plug in once. Never think about it again.",
+      body: "Level AI connects directly to your practice management system \u2014 Open Dental, Dentrix, or Eaglesoft. Your schedule syncs automatically every 3 minutes throughout the day. New appointments, cancellations, and reschedules are reflected in real-time. No CSV uploads, no manual data entry, no IT department required.",
+      bullets: [
+        "5-minute setup with guided wizard",
+        "Auto-sync every 3 minutes throughout the day",
+        "Handles cancellations, add-ons, and reschedules",
+        "Webhook support for instant PMS event processing",
+      ],
+    },
   },
   {
     icon: IconPlay,
     title: "Risk-Free Sandbox Demo",
     description: "Try the full platform with realistic demo data before connecting your practice. No credit card, no commitment, no sales call required.",
+    detail: {
+      headline: "See it work before you commit to anything.",
+      body: "Our sandbox loads realistic demo patients with real-world insurance scenarios \u2014 verified patients, ones that need action, inactive coverage, and tricky edge cases. Click around, verify patients, generate pre-auth letters, ask Payer Pal questions. It\u2019s the full product experience with zero risk and zero commitment.",
+      bullets: [
+        "Realistic demo data with 8 patient scenarios",
+        "Full feature access \u2014 nothing gated or hidden",
+        "No credit card, no sign-up, no sales call",
+        "Takes 30 seconds to start exploring",
+      ],
+    },
   },
 ];
 
@@ -381,17 +442,12 @@ export default function LandingPage() {
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="group rounded-2xl border border-black/[0.06] bg-white p-7 hover:border-[#14B8A6]/30 hover:shadow-lg hover:shadow-[#14B8A6]/[0.04] transition-all">
-                <div className="w-11 h-11 rounded-xl bg-[#14B8A6]/10 flex items-center justify-center mb-5">
-                  <f.icon className="w-5 h-5 text-[#14B8A6]" />
-                </div>
-                <div className="text-base font-bold text-[#1A1A18] mb-2">{f.title}</div>
-                <p className="text-sm text-[#525252] leading-relaxed">{f.description}</p>
-              </div>
-            ))}
-          </div>
+          <FeatureGrid features={FEATURES.map(f => ({
+            iconName: f.icon.name,
+            title: f.title,
+            description: f.description,
+            detail: f.detail,
+          }))} />
         </div>
       </section>
 
