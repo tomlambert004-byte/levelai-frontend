@@ -4,6 +4,8 @@ const isProd = process.env.NODE_ENV === "production";
 const PROD_ORIGIN = "https://lvlai.app";
 
 const nextConfig: NextConfig = {
+  // Standalone output for Docker / Cloud Run — bundles only needed deps
+  output: "standalone",
   async headers() {
     return [
       {

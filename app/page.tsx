@@ -321,7 +321,7 @@ export default function LandingPage() {
               Get Started Free
               <IconArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <Link href="/login" className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-black/[0.03] px-7 py-3.5 text-base font-bold text-[#1A1A18] hover:bg-black/[0.06] transition-colors">
+            <Link href="/dashboard?sandbox=1" className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-black/[0.03] px-7 py-3.5 text-base font-bold text-[#1A1A18] hover:bg-black/[0.06] transition-colors">
               <IconPlay className="w-4 h-4 text-[#14B8A6]" />
               Try the Sandbox
             </Link>
@@ -595,7 +595,7 @@ export default function LandingPage() {
                 <li><a href="#features" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Features</a></li>
                 <li><a href="#pricing" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Pricing</a></li>
                 <li><a href="#how-it-works" className="text-[#525252] hover:text-[#1A1A18] transition-colors">How It Works</a></li>
-                <li><Link href="/login" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Sandbox Demo</Link></li>
+                <li><Link href="/dashboard?sandbox=1" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Sandbox Demo</Link></li>
               </ul>
             </div>
             <div>

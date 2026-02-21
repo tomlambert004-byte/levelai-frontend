@@ -1,0 +1,41 @@
+# Dependencies (rebuilt in Docker)
+node_modules
+npm-debug.log*
+
+# Build output (rebuilt in Docker)
+.next
+out
+
+# Version control
+.git
+.gitignore
+
+# IDE / editor
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment files (secrets injected via Cloud Run)
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose*.yml
+
+# CI
+.github
+
+# Claude worktrees
+.claude
+
+# Testing
+coverage
+*.test.*
+__tests__

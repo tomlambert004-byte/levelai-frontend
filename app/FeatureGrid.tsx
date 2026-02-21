@@ -240,7 +240,7 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
 
               {/* CTA */}
               <a
-                href="/login"
+                href="/dashboard?sandbox=1"
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 8,
                   borderRadius: 12, background: "#14B8A6", color: "#fff",
