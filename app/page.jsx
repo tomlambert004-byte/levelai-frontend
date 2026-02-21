@@ -5905,9 +5905,10 @@ export default function LevelAI() {
         .then(r => r.json()).then(d => {
           if (d.practice?.accountMode) setAccountMode(d.practice.accountMode);
           if (d.practice) setPractice(d.practice);
-          // If practice has no name, this is a new user who needs onboarding
+          // If practice has no name OR hasn't been activated, show onboarding wizard
           // (covers Clerk invite flow, Google OAuth, and any other sign-up path)
-          if (d.practice && !d.practice.name) {
+          // Admin users skip the wizard — they use the admin console
+          if (d.practice && (!d.practice.name || !d.practice.activatedAt) && !isAdmin) {
             setShowWizard(true);
           }
         })
