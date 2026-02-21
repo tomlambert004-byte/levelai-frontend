@@ -2,6 +2,7 @@
 export const dynamic = "force-dynamic";
 import { SignedIn, SignedOut, useAuth, useClerk, useSignIn, useSignUp, useUser } from "@clerk/nextjs";
 import { useState, useCallback, useEffect, useRef } from "react";
+import { generateFaxCoverSheet } from "../../lib/fax-cover-sheet";
 // Theme — dual palettes: calm, premium, harmonious
 // Satoshi font · #0A0A0A base · #3B82F6 accent (used sparingly)
 // Status colors: muted and sophisticated — no bright orange, hot pink, or jarring reds
@@ -3203,12 +3204,15 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
           {(isMedicaidPatient(patient) || result?._is_medicaid) && <Badge label={result?._medicaid_state ? `Medicaid · ${result._medicaid_state}` : "Medicaid"} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />}
           {isRPA && <Badge label="RPA Verified" color={T.rpaDark} bg={T.rpaLight} border={T.rpaBorder} icon="🤖" />}
           {isOON && <Badge label="Out-of-Network" color={T.amberDark} bg={T.amberLight} border={T.amberBorder} icon="⚠" />}
-          {isFaxPending && <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"2px 8px", borderRadius:20, fontSize:9, fontWeight:800, letterSpacing:"0.04em", background:"#8B5CF620", color:"#8B5CF6", border:"1px solid #8B5CF640" }}><span style={{ width:6, height:6, borderRadius:"50%", background:"#8B5CF6", animation:"faxPulse 1.5s ease-in-out infinite" }} />FAX PENDING</span>}
+          {isFaxPending && <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"2px 8px", borderRadius:20, fontSize:9, fontWeight:800, letterSpacing:"0.04em", background:"#8B5CF620", color:"#8B5CF6", border:"1px solid #8B5CF640" }}>📠 AUTO-FAXED</span>}
         </div>
-        {/* Fax Pending info banner */}
+        {/* Auto-Fax info banner with download */}
         {isFaxPending && result?.fax_details && (
-          <div style={{ marginTop:10, padding:"10px 14px", background:"#8B5CF610", border:"1px solid #8B5CF630", borderRadius:10 }}>
-            <div style={{ fontSize:10, fontWeight:900, color:"#8B5CF6", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4 }}>Information Request Sent</div>
+          <div style={{ marginTop:10, padding:"12px 14px", background:"#8B5CF610", border:"1px solid #8B5CF630", borderRadius:10 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+              <div style={{ fontSize:10, fontWeight:900, color:"#8B5CF6", textTransform:"uppercase", letterSpacing:"0.05em" }}>📠 Autonomous Fax Sent</div>
+              <span style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"2px 7px", borderRadius:10, fontSize:9, fontWeight:800, background:"#22c55e18", color:"#22c55e", border:"1px solid #22c55e30" }}>✓ DELIVERED</span>
+            </div>
             <div style={{ fontSize:12, color:T.textMid, fontWeight:600 }}>
               Fax sent to {result.fax_details.payer_name || "payer"}{result.fax_details.sent_at ? ` on ${new Date(result.fax_details.sent_at).toLocaleDateString()}` : ""}
             </div>
@@ -3217,6 +3221,66 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
                 Requested: {result.fax_details.missing_information_requested.slice(0, 3).join(", ")}{result.fax_details.missing_information_requested.length > 3 ? ` +${result.fax_details.missing_information_requested.length - 3} more` : ""}
               </div>
             )}
+            <div style={{ marginTop:10, display:"flex", gap:8 }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const html = generateFaxCoverSheet({
+                    payerName: result.fax_details.payer_name || patient.insurance,
+                    payerFaxNumber: result.fax_details.payer_fax || "N/A",
+                    practiceName: practice?.name || "Level AI Demo Practice",
+                    practiceNpi: practice?.npi || "1234567890",
+                    returnFax: practice?.faxNumber || "(512) 555-0199",
+                    returnEmail: practice?.email || "front@leveldental.com",
+                    patientName: patient.name,
+                    memberId: patient.memberId,
+                    patientDob: patient.dob,
+                    missingFields: result.fax_details.missing_information_requested || [],
+                    appointmentDate: patient.appointmentTime,
+                    isMedicaid: result._is_medicaid || false,
+                    medicaidState: result._medicaid_state || null,
+                  });
+                  const w = window.open("", "_blank");
+                  if (w) { w.document.write(html); w.document.close(); }
+                }}
+                style={{ flex:1, padding:"8px 12px", borderRadius:8, border:"1px solid #8B5CF640", background:"#8B5CF615", color:"#8B5CF6", fontSize:11, fontWeight:800, cursor:"pointer", transition:"all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background="#8B5CF625"; }}
+                onMouseLeave={e => { e.currentTarget.style.background="#8B5CF615"; }}
+              >📄 View Fax Cover Sheet</button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const html = generateFaxCoverSheet({
+                    payerName: result.fax_details.payer_name || patient.insurance,
+                    payerFaxNumber: result.fax_details.payer_fax || "N/A",
+                    practiceName: practice?.name || "Level AI Demo Practice",
+                    practiceNpi: practice?.npi || "1234567890",
+                    returnFax: practice?.faxNumber || "(512) 555-0199",
+                    returnEmail: practice?.email || "front@leveldental.com",
+                    patientName: patient.name,
+                    memberId: patient.memberId,
+                    patientDob: patient.dob,
+                    missingFields: result.fax_details.missing_information_requested || [],
+                    appointmentDate: patient.appointmentTime,
+                    isMedicaid: result._is_medicaid || false,
+                    medicaidState: result._medicaid_state || null,
+                  });
+                  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `Fax-${patient.name.replace(/\s+/g, "-")}-${new Date().toISOString().slice(0,10)}.html`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                  showToast("Downloaded! Open the file → Print → Save as PDF 📄");
+                }}
+                style={{ flex:1, padding:"8px 12px", borderRadius:8, border:"1px solid #8B5CF640", background:"#8B5CF615", color:"#8B5CF6", fontSize:11, fontWeight:800, cursor:"pointer", transition:"all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background="#8B5CF625"; }}
+                onMouseLeave={e => { e.currentTarget.style.background="#8B5CF615"; }}
+              >⬇ Download PDF</button>
+            </div>
           </div>
         )}
       </div>
@@ -4256,7 +4320,7 @@ function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, i
       <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:5, flexWrap:"wrap" }}>
         <span style={{ color:T.text, fontSize:13, fontWeight:800, flex:1 }}>{patient.name}</span>
         {isFailed && <Badge label="FAILED" color={T.red} bg={T.redLight} border={T.redBorder} />}
-        {isFaxPending && <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"2px 8px", borderRadius:20, fontSize:9, fontWeight:800, letterSpacing:"0.04em", background:"#8B5CF620", color:"#8B5CF6", border:"1px solid #8B5CF640" }}><span style={{ width:6, height:6, borderRadius:"50%", background:"#8B5CF6", animation:"faxPulse 1.5s ease-in-out infinite" }} />FAX PENDING</span>}
+        {isFaxPending && <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"2px 8px", borderRadius:20, fontSize:9, fontWeight:800, letterSpacing:"0.04em", background:"#8B5CF620", color:"#8B5CF6", border:"1px solid #8B5CF640" }}>📠 AUTO-FAXED</span>}
         {isUnverified && <Badge label="PENDING" color={T.amber} bg={T.amberLight} border={T.amberBorder} />}
         {isMedicaid && <Badge label={medicaidState ? `MEDICAID · ${medicaidState}` : "MEDICAID"} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />}
         {isOON  && <Badge label={`OON · ${patient.insurance || result?.payer_name || "OON"}`} color={T.amberDark} bg={T.amberLight} border={T.amberBorder} />}
@@ -8536,7 +8600,7 @@ export default function LevelAI() {
 
   const COLS = [
     { key:"action_required", label:"Action Required", color:T.amber,   bg:T.amberLight, border:T.amberBorder, filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.ACTION_REQUIRED },
-    { key:"pending_fax",     label:"Fax Pending",     color:"#8B5CF6",  bg:"#8B5CF620",  border:"#8B5CF640",   filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.PENDING_FAX    },
+    { key:"pending_fax",     label:"Auto-Faxed",      color:"#8B5CF6",  bg:"#8B5CF620",  border:"#8B5CF640",   filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.PENDING_FAX    },
     { key:"verified",        label:"Verified",        color:T.limeDark,bg:T.limeLight,  border:T.limeBorder,  filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.VERIFIED        },
     { key:"inactive",        label:"Inactive",        color:T.red,     bg:T.redLight,   border:T.redBorder,   filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.INACTIVE        },
     { key:"failed",          label:"Failed",          color:T.red,     bg:T.redLight,   border:T.redBorder,   filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.ERROR            },

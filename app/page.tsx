@@ -253,7 +253,7 @@ const STEPS = [
 const PRICING = [
   {
     name: "Starter",
-    price: "$199",
+    price: "$299",
     period: "/month",
     trial: "14-day free trial",
     description: "For solo practices getting started with AI verification.",
@@ -269,7 +269,7 @@ const PRICING = [
   },
   {
     name: "Professional",
-    price: "$399",
+    price: "$599",
     period: "/month",
     trial: "14-day free trial",
     description: "For growing practices that want the full AI experience.",
