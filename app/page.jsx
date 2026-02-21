@@ -312,16 +312,43 @@ async function apiSearchDirectory(query) {
 // Maps raw API error messages to short, human-readable reasons for the Failed panel.
 function friendlyFailReason(errMsg, patient) {
   const m = (errMsg || "").toLowerCase();
-  if (m.includes("unauthorized") || m.includes("401")) return "Authentication failed — check your credentials in Settings.";
-  if (m.includes("timeout") || m.includes("timed out") || m.includes("aborted")) return "Verification timed out — the payer portal didn't respond in time.";
-  if (m.includes("rate limit") || m.includes("429") || m.includes("too many")) return "Rate limited — too many requests. Try again in a minute.";
-  if (m.includes("member") && m.includes("not found")) return "Member ID not found by the payer. Double-check the ID.";
-  if (m.includes("payer") && (m.includes("not supported") || m.includes("unknown"))) return `Payer "${patient.insurance || "unknown"}" is not supported yet.`;
+  if (m.includes("unauthorized") || m.includes("401")) return "Authentication failed — the payer rejected our credentials.";
+  if (m.includes("timeout") || m.includes("timed out") || m.includes("aborted")) return "Verification timed out — the payer portal didn't respond in time. Try again shortly.";
+  if (m.includes("rate limit") || m.includes("429") || m.includes("too many")) return "Rate limited — too many requests sent. Wait a minute and retry.";
+  if (m.includes("member") && m.includes("not found")) return `Member ID "${patient.memberId || "unknown"}" was not found by the payer. Verify the member ID and payer are correct.`;
+  if (m.includes("payer") && (m.includes("not supported") || m.includes("unknown"))) return `Payer "${patient.insurance || "unknown"}" is not yet supported for electronic verification.`;
   if (m.includes("credential") || m.includes("login") || m.includes("password")) return "Payer portal credentials are invalid or expired.";
-  if (m.includes("network") || m.includes("fetch") || m.includes("econnrefused")) return "Network error — couldn't reach the verification service.";
-  if (m.includes("500") || m.includes("server")) return "The verification service had an internal error.";
-  if (m.includes("stedi")) return "Clearinghouse error — Stedi returned an unexpected response.";
-  return errMsg ? `Verification error: ${errMsg.slice(0, 80)}` : "Verification failed for an unknown reason.";
+  if (m.includes("network") || m.includes("fetch") || m.includes("econnrefused")) return "Network error — couldn't reach the verification service. Check your internet connection.";
+  if (m.includes("500") || m.includes("server")) return "The verification service had a temporary error. Try again in a moment.";
+  if (m.includes("stedi")) return "Clearinghouse returned an unexpected response. The payer may be temporarily unavailable.";
+  return errMsg ? `Verification error: ${errMsg.slice(0, 120)}` : "Verification failed for an unknown reason.";
+}
+
+/**
+ * Builds user-friendly action guidance based on the failure reason.
+ * Tells the front desk what to do next so they don't have to guess.
+ */
+function failureActionGuidance(failReason) {
+  const m = (failReason || "").toLowerCase();
+  if (m.includes("member id") && m.includes("not found"))
+    return "Ask the patient for their current insurance card. The member ID or payer may have changed.";
+  if (m.includes("not yet supported"))
+    return "This payer doesn't support electronic verification. You'll need to call the payer directly to verify benefits.";
+  if (m.includes("timed out"))
+    return "The payer portal is slow right now. Click Retry — it usually works on the second attempt.";
+  if (m.includes("rate limit"))
+    return "We sent too many requests at once. Wait 60 seconds, then click Retry.";
+  if (m.includes("credential"))
+    return "Your payer portal login needs updating. Go to Settings → Credentials to fix this.";
+  if (m.includes("authentication failed"))
+    return "Our connection to the clearinghouse needs re-authentication. Contact support if this persists.";
+  if (m.includes("network error"))
+    return "Check your internet connection and click Retry. If it keeps failing, the payer site may be down.";
+  if (m.includes("temporary error") || m.includes("service had"))
+    return "This is a temporary issue on the payer's end. Click Retry in a minute or two.";
+  if (m.includes("clearinghouse"))
+    return "The payer's electronic system may be down. Try again later, or call the payer directly.";
+  return "Click Retry to try again. If it keeps failing, you may need to call the payer to verify benefits manually.";
 }
 
 // POST /api/v1/verify  { patient_id, member_id, first_name, last_name, date_of_birth, insurance_name, payer_id, trigger }
@@ -3226,7 +3253,7 @@ function FailedVerificationsPanel({ list, results, onClose, onSelect, onRetry })
       <div style={{ padding:"16px 20px", borderBottom:"1px solid "+T.border, display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
         <div>
           <div style={{ fontSize:18, fontWeight:900, color:"#B91C1C" }}>Failed Verifications</div>
-          <div style={{ fontSize:12, color:T.textSoft, marginTop:2 }}>{list.length} patient{list.length !== 1 ? "s" : ""} couldn&apos;t be verified. Review and retry.</div>
+          <div style={{ fontSize:12, color:T.text, marginTop:2 }}>{list.length} patient{list.length !== 1 ? "s" : ""} couldn&apos;t be verified. Review reasons below and retry.</div>
         </div>
         <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", fontSize:24, color:T.textSoft }}>&times;</button>
       </div>
@@ -3236,6 +3263,7 @@ function FailedVerificationsPanel({ list, results, onClose, onSelect, onRetry })
         ) : list.map(p => {
           const r = results[p.id];
           const reason = r?._failReason || "Unknown error";
+          const guidance = failureActionGuidance(reason);
           const failedAt = r?._failedAt ? new Date(r._failedAt).toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit" }) : "";
           return (
             <div key={p.id}
@@ -3244,12 +3272,21 @@ function FailedVerificationsPanel({ list, results, onClose, onSelect, onRetry })
               onMouseLeave={e => e.currentTarget.style.borderColor="#FECACA"}>
               <div onClick={() => onSelect(p)} style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
                 <span style={{ fontWeight:800, fontSize:14, color:T.text }}>{p.name}</span>
-                <span style={{ fontSize:10, color:T.textSoft }}>{failedAt}</span>
+                <span style={{ fontSize:11, color:"#7f1d1d", fontWeight:600 }}>{failedAt}</span>
               </div>
-              <div onClick={() => onSelect(p)} style={{ fontSize:11, color:T.textMid, marginBottom:6 }}>{p.appointmentTime} · {p.procedure} · {p.insurance}</div>
-              <div style={{ fontSize:12, color:"#B91C1C", fontWeight:600, lineHeight:"1.4", marginBottom:10, padding:"8px 10px", background:"#fff", borderRadius:6, border:"1px solid #FECACA" }}>
+              <div onClick={() => onSelect(p)} style={{ fontSize:12, color:T.text, marginBottom:6, fontWeight:600 }}>{p.appointmentTime} &middot; {p.procedure} &middot; {p.insurance}</div>
+
+              {/* Why it failed */}
+              <div style={{ fontSize:12, color:"#B91C1C", fontWeight:700, lineHeight:"1.4", marginBottom:6, padding:"8px 10px", background:"#fff", borderRadius:6, border:"1px solid #FECACA" }}>
                 {reason}
               </div>
+
+              {/* What to do about it */}
+              <div style={{ fontSize:11, color:"#92400e", fontWeight:600, lineHeight:"1.5", marginBottom:10, padding:"8px 10px", background:"#fffbeb", borderRadius:6, border:"1px solid #fde68a", display:"flex", gap:6 }}>
+                <span style={{ flexShrink:0, fontSize:13 }}>&#128161;</span>
+                <span>{guidance}</span>
+              </div>
+
               <button
                 onClick={(e) => { e.stopPropagation(); onRetry(p); }}
                 style={{ padding:"7px 14px", borderRadius:7, border:"1px solid #FECACA", background:"#fff", color:"#B91C1C", fontWeight:800, cursor:"pointer", fontSize:11, transition:"all 0.15s" }}
@@ -3260,6 +3297,75 @@ function FailedVerificationsPanel({ list, results, onClose, onSelect, onRetry })
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Modal popup shown when a manual verification attempt fails.
+ * Explains why it failed and what the front desk should do next.
+ */
+function VerificationFailureModal({ patient, reason, guidance, onClose, onRetry }) {
+  return (
+    <div style={{
+      position:"fixed", inset:0, zIndex:9999, background:"rgba(0,0,0,0.6)",
+      display:"flex", alignItems:"center", justifyContent:"center", padding:20,
+    }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background:T.bgCard, borderRadius:16, maxWidth:460, width:"100%",
+        border:"1px solid #FECACA", boxShadow:"0 20px 60px rgba(0,0,0,0.4)",
+        overflow:"hidden", animation:"slideIn 0.2s ease-out",
+      }}>
+        {/* Header */}
+        <div style={{ padding:"20px 24px 16px", borderBottom:"1px solid " + T.border, display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+          <div>
+            <div style={{ fontSize:16, fontWeight:900, color:"#B91C1C", display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ fontSize:20 }}>&#10060;</span> Verification Failed
+            </div>
+            <div style={{ fontSize:14, fontWeight:800, color:T.text, marginTop:6 }}>{patient.name}</div>
+            <div style={{ fontSize:12, color:T.text, marginTop:2 }}>{patient.appointmentTime} &middot; {patient.procedure} &middot; {patient.insurance}</div>
+          </div>
+          <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", fontSize:22, color:T.textSoft, lineHeight:1 }}>&times;</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding:"16px 24px 20px" }}>
+          {/* Why it failed */}
+          <div style={{ marginBottom:16 }}>
+            <div style={{ fontSize:11, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", color:"#B91C1C", marginBottom:8 }}>Why It Failed</div>
+            <div style={{ fontSize:13, color:T.text, fontWeight:600, lineHeight:"1.5", padding:"10px 12px", background:"#FEF2F2", borderRadius:8, border:"1px solid #FECACA" }}>
+              {reason}
+            </div>
+          </div>
+
+          {/* What to do */}
+          <div style={{ marginBottom:20 }}>
+            <div style={{ fontSize:11, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", color:"#92400e", marginBottom:8 }}>What To Do</div>
+            <div style={{ fontSize:13, color:"#78350f", fontWeight:600, lineHeight:"1.5", padding:"10px 12px", background:"#fffbeb", borderRadius:8, border:"1px solid #fde68a", display:"flex", gap:8 }}>
+              <span style={{ flexShrink:0, fontSize:15 }}>&#128161;</span>
+              <span>{guidance}</span>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display:"flex", gap:10 }}>
+            <button
+              onClick={() => { onRetry(patient); onClose(); }}
+              style={{ flex:1, padding:"10px 16px", borderRadius:8, border:"none", background:"#B91C1C", color:"#fff", fontWeight:800, cursor:"pointer", fontSize:12, transition:"all 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.background="#991b1b"}
+              onMouseLeave={e => e.currentTarget.style.background="#B91C1C"}>
+              Retry Verification
+            </button>
+            <button
+              onClick={onClose}
+              style={{ flex:1, padding:"10px 16px", borderRadius:8, border:"1px solid " + T.border, background:T.bgCard, color:T.text, fontWeight:800, cursor:"pointer", fontSize:12, transition:"all 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.borderColor=T.borderStrong}
+              onMouseLeave={e => e.currentTarget.style.borderColor=T.border}>
+              Got It
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -3447,14 +3553,14 @@ function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, i
         {isAuto && <Badge label="AUTO" color={T.indigo} bg={T.indigoLight} border={T.indigoBorder} icon="Bot" />}
         {isRPA  && <Badge label="RPA"  color={T.rpaDark} bg={T.rpaLight}   border={T.rpaBorder}   icon="Bot" />}
       </div>
-      <div style={{ color:T.textSoft, fontSize:10, marginBottom:2 }}>DOB {patient.dob} · {patient.memberId}</div>
-      <div style={{ color:T.textMid, fontSize:11, fontWeight:700, marginBottom:2 }}>{patient.appointmentTime} · {patient.procedure}</div>
+      <div style={{ color:T.textMid, fontSize:10, fontWeight:600, marginBottom:2 }}>DOB {patient.dob} · {patient.memberId}</div>
+      <div style={{ color:T.text, fontSize:11, fontWeight:700, marginBottom:2 }}>{patient.appointmentTime} · {patient.procedure}</div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:2 }}>
-        <span style={{ color:T.textSoft, fontSize:10 }}>{patient.provider}</span>
-        <span style={{ color:T.textSoft, fontSize:10 }}>{patient.insurance}</span>
+        <span style={{ color:T.textMid, fontSize:10, fontWeight:600 }}>{patient.provider}</span>
+        <span style={{ color:T.textMid, fontSize:10, fontWeight:600 }}>{patient.insurance}</span>
       </div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-        <span style={{ color:T.textSoft, fontSize:10 }}>{patient.phone}</span>
+        <span style={{ color:T.textMid, fontSize:10, fontWeight:600 }}>{patient.phone}</span>
         <span style={{ color:colColor, fontSize:11, fontWeight:800 }}>${(patient.fee/100).toLocaleString()}</span>
       </div>
       {loading && phaseInfo && <div style={{ marginTop:8 }}><PhaseIndicator phase={phaseInfo.phase} reason={phaseInfo.reason} compact /></div>}
@@ -6638,6 +6744,10 @@ export default function LevelAI() {
   const [dismissedAlerts, setDismissedAlerts] = useState({ blocked: false, notify: false });
   const [showDirectoryModal, setShowDirectoryModal] = useState(false);
 
+  // ── Verification failure modal ─────────────────────────────────────────────
+  // { patient, reason, guidance } or null
+  const [failureModal, setFailureModal] = useState(null);
+
   // ── Practice data (for superbill NPI/TaxID/address) ──────────────────────────
   const [practice, setPractice] = useState(null);
 
@@ -6836,6 +6946,17 @@ export default function LevelAI() {
     if (isLoading(patient.id)) return;
     const runPhases = [];
 
+    // Clear any previous error result so the patient moves back to "Needs Review"
+    // while the retry is in progress (not stuck in "Failed" column)
+    setResults(prev => {
+      if (prev[patient.id]?.verification_status === STATUS.ERROR) {
+        const next = { ...prev };
+        delete next[patient.id];
+        return next;
+      }
+      return prev;
+    });
+
     setPhase(patient.id, { phase: "api" });
     let apiResult;
     try {
@@ -6851,7 +6972,12 @@ export default function LevelAI() {
         _failedAt: new Date().toISOString(),
       }}));
       if (trigger === "manual") {
-        showToast(`❌ ${patient.name} — ${failReason}`);
+        // Show detailed failure modal instead of a simple toast
+        setFailureModal({
+          patient,
+          reason: failReason,
+          guidance: failureActionGuidance(failReason),
+        });
       }
       // Detect payer credential issues
       const msg = (e.message || "").toLowerCase();
@@ -7059,8 +7185,8 @@ export default function LevelAI() {
   const inactiveCount = todayOnly.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.INACTIVE).length;
   const failedCount   = todayOnly.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.ERROR).length;
   const pendingCount  = todayOnly.filter(p => !results[p.id] || isLoading(p.id)).length;
-  // Full list of failed patients (all days, for the FailedVerificationsPanel)
-  const failedPatients = patients.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.ERROR);
+  // Failed patients scoped to today only (matches badge count — week-ahead failures live in WeekAhead view)
+  const failedPatients = todayOnly.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.ERROR);
   const todayIds      = new Set(todayOnly.map(p => p.id));
   const autoCount     = agentLog.filter(e => e.trigger !== "manual" && e.action === ACTION.VERIFIED && todayIds.has(e.patientId)).length;
   const rpaCount      = agentLog.filter(e => e.rpaEscalated && todayIds.has(e.patientId)).length;
@@ -7685,6 +7811,17 @@ export default function LevelAI() {
             setShowDirectoryModal(false);
             showToast(`${p.name} added — ${p.appointmentDate} at ${p.appointmentTime}!`);
           }}
+        />
+      )}
+
+      {/* ── Verification failure modal ─────────────────────────────────── */}
+      {failureModal && (
+        <VerificationFailureModal
+          patient={failureModal.patient}
+          reason={failureModal.reason}
+          guidance={failureModal.guidance}
+          onClose={() => setFailureModal(null)}
+          onRetry={(p) => verify(p, "manual")}
         />
       )}
 
