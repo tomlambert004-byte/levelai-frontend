@@ -123,7 +123,7 @@ function BrandLogo({ size = 20, showText = true, subtitle, subtitleColor, forceD
   );
 }
 
-const STATUS = { VERIFIED:"verified", ACTION_REQUIRED:"action_required", INACTIVE:"inactive", ERROR:"error" };
+const STATUS = { VERIFIED:"verified", ACTION_REQUIRED:"action_required", INACTIVE:"inactive", ERROR:"error", PENDING_FAX:"pending_fax" };
 const TRIAGE = { CLEAR:"CLEAR", NOTICE:"NOTICE", WARNING:"WARNING", CRITICAL:"CRITICAL" };
 const ACTION = { VERIFIED:"insurance_verified", RESCHEDULE:"reschedule_proposed", APPROVED:"reschedule_approved", DISMISSED:"reschedule_dismissed", OUTREACH:"outreach_queued", EMAIL_PAYER:"email_payer_inquiry" };
 
@@ -1341,6 +1341,8 @@ function OnboardingWizard({ onComplete, showToast }) {
   const [pracAddress, setPracAddress] = useState("");
   const [pracPhone, setPracPhone]     = useState("");
 
+  const [pracFax, setPracFax]         = useState("");
+
   // Step 2 – PMS Connection
   const [pmsSystem, setPmsSystem]   = useState("");
   const [pmsSyncKey, setPmsSyncKey] = useState("");
@@ -1648,6 +1650,11 @@ function OnboardingWizard({ onComplete, showToast }) {
                   value={pracEmail} onChange={e => setPracEmail(e.target.value)} required validate="email" />
                 <div style={{ fontSize:11, color:T.textSoft, marginTop:-10 }}>
                   Used as the sender for payer benefit request emails and patient correspondence.
+                </div>
+                <OInput label="Practice Fax Number" placeholder="e.g. (801) 555-4321" type="tel"
+                  value={pracFax} onChange={e => setPracFax(e.target.value)} />
+                <div style={{ fontSize:11, color:T.textSoft, marginTop:-10 }}>
+                  Optional — used to receive payer responses when missing information is requested via fax.
                 </div>
 
                 {/* Reassurance */}
@@ -2008,6 +2015,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                         taxId: taxId || undefined,
                         address: pracAddress || undefined,
                         phone: pracPhone || undefined,
+                        faxNumber: pracFax || undefined,
                         pmsSystem: pmsSystem || undefined,
                         pmsSyncKey: pmsSyncKey || undefined,
                         accountMode: "live",
@@ -3132,6 +3140,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
   const loading = phaseInfo && phaseInfo.phase !== "complete" && phaseInfo.phase !== "error";
   const isRPA = result?._source === "hybrid";
   const isOON = result?.in_network === false || result?.oon_estimate != null;
+  const isFaxPending = result?.verification_status === "pending_fax";
 
   return (
     <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden" }}>
@@ -3162,7 +3171,22 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
           {(isMedicaidPatient(patient) || result?._is_medicaid) && <Badge label={result?._medicaid_state ? `Medicaid · ${result._medicaid_state}` : "Medicaid"} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />}
           {isRPA && <Badge label="RPA Verified" color={T.rpaDark} bg={T.rpaLight} border={T.rpaBorder} icon="🤖" />}
           {isOON && <Badge label="Out-of-Network" color={T.amberDark} bg={T.amberLight} border={T.amberBorder} icon="⚠" />}
+          {isFaxPending && <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"2px 8px", borderRadius:20, fontSize:9, fontWeight:800, letterSpacing:"0.04em", background:"#8B5CF620", color:"#8B5CF6", border:"1px solid #8B5CF640" }}><span style={{ width:6, height:6, borderRadius:"50%", background:"#8B5CF6", animation:"faxPulse 1.5s ease-in-out infinite" }} />FAX PENDING</span>}
         </div>
+        {/* Fax Pending info banner */}
+        {isFaxPending && result?.fax_details && (
+          <div style={{ marginTop:10, padding:"10px 14px", background:"#8B5CF610", border:"1px solid #8B5CF630", borderRadius:10 }}>
+            <div style={{ fontSize:10, fontWeight:900, color:"#8B5CF6", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4 }}>Information Request Sent</div>
+            <div style={{ fontSize:12, color:T.textMid, fontWeight:600 }}>
+              Fax sent to {result.fax_details.payer_name || "payer"}{result.fax_details.sent_at ? ` on ${new Date(result.fax_details.sent_at).toLocaleDateString()}` : ""}
+            </div>
+            {result.fax_details.missing_information_requested?.length > 0 && (
+              <div style={{ marginTop:6, fontSize:11, color:T.textSoft }}>
+                Requested: {result.fax_details.missing_information_requested.slice(0, 3).join(", ")}{result.fax_details.missing_information_requested.length > 3 ? ` +${result.fax_details.missing_information_requested.length - 3} more` : ""}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ flex:1, overflowY:"auto", padding:"16px 20px", minHeight: 0 }}>
@@ -4182,6 +4206,7 @@ function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, failedCo
 function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, isRPA, onSelect, colColor }) {
   const loading = phaseInfo && phaseInfo.phase !== "complete" && phaseInfo.phase !== "error";
   const isFailed = result?.verification_status === "error";
+  const isFaxPending = result?.verification_status === "pending_fax";
   const isUnverified = !result && !loading; // No result and not loading = needs review
   const isOON = patient.isOON || result?.in_network === false || result?.oon_estimate != null;
   const isMedicaid = isMedicaidPatient(patient) || result?._is_medicaid;
@@ -4193,12 +4218,13 @@ function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, i
 
   return (
     <div onClick={onSelect}
-      style={{ background:T.bgCard, borderRadius:10, padding:"12px 13px", cursor:"pointer", border:"1.5px solid " + (isSelected?colColor:T.border), boxShadow:isSelected?"0 0 0 3px "+colColor+"22":"0 1px 3px "+T.shadow, transition:"all 0.15s", display: "flex", flexDirection: "column" }}
+      style={{ background:isFaxPending ? "#8B5CF608" : T.bgCard, borderRadius:10, padding:"12px 13px", cursor:"pointer", border:"1.5px solid " + (isSelected?colColor:isFaxPending?"#8B5CF630":T.border), boxShadow:isSelected?"0 0 0 3px "+colColor+"22":"0 1px 3px "+T.shadow, transition:"all 0.15s", display: "flex", flexDirection: "column" }}
       onMouseEnter={e=>{ if(!isSelected){ e.currentTarget.style.borderColor=colColor; e.currentTarget.style.boxShadow="0 4px 12px "+colColor+"20"; e.currentTarget.style.transform="translateY(-2px)"; }}}
-      onMouseLeave={e=>{ if(!isSelected){ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.boxShadow="0 1px 3px "+T.shadow; e.currentTarget.style.transform="translateY(0)"; }}}>
+      onMouseLeave={e=>{ if(!isSelected){ e.currentTarget.style.borderColor=isFaxPending?"#8B5CF630":T.border; e.currentTarget.style.boxShadow="0 1px 3px "+T.shadow; e.currentTarget.style.transform="translateY(0)"; }}}>
       <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:5, flexWrap:"wrap" }}>
         <span style={{ color:T.text, fontSize:13, fontWeight:800, flex:1 }}>{patient.name}</span>
         {isFailed && <Badge label="FAILED" color={T.red} bg={T.redLight} border={T.redBorder} />}
+        {isFaxPending && <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"2px 8px", borderRadius:20, fontSize:9, fontWeight:800, letterSpacing:"0.04em", background:"#8B5CF620", color:"#8B5CF6", border:"1px solid #8B5CF640" }}><span style={{ width:6, height:6, borderRadius:"50%", background:"#8B5CF6", animation:"faxPulse 1.5s ease-in-out infinite" }} />FAX PENDING</span>}
         {isUnverified && <Badge label="PENDING" color={T.amber} bg={T.amberLight} border={T.amberBorder} />}
         {isMedicaid && <Badge label={medicaidState ? `MEDICAID · ${medicaidState}` : "MEDICAID"} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />}
         {isOON  && <Badge label={`OON · ${patient.insurance || result?.payer_name || "OON"}`} color={T.amberDark} bg={T.amberLight} border={T.amberBorder} />}
@@ -4241,7 +4267,7 @@ const MOCK_DIRECTORY = [
 
 const TIME_SLOTS = ["8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM","4:00 PM","4:30 PM"];
 
-function DirectorySearchModal({ onSelect, onClose }) {
+function DirectorySearchModal({ onSelect, onClose, practice }) {
   const [mode, setMode]           = useState("schedule"); // "schedule" | "preverify"
   const [step, setStep]           = useState(1);          // 1=date/time, 2=patient search
   const [selDate, setSelDate]     = useState("");
@@ -4250,11 +4276,12 @@ function DirectorySearchModal({ onSelect, onClose }) {
   const [verifying, setVerifying] = useState(null);       // patient id being verified
   const [verifyRes, setVerifyRes] = useState({});         // map id -> result|error
 
-  // Build next 7 weekdays from today
+  // Build next N weekdays from today (N = practice verificationDaysAhead, default 7)
+  const daysAhead = practice?.verificationDaysAhead || 7;
   const weekdays = (() => {
     const days = [];
     const d = new Date();
-    while (days.length < 7) {
+    while (days.length < daysAhead) {
       if (d.getDay() !== 0 && d.getDay() !== 6) {
         days.push({
           dateStr: d.toISOString().split("T")[0],
@@ -4946,7 +4973,7 @@ function CalendarView({ patients, results, triageMap, onSelectDay, currentDayLoc
 }
 
 // ── Week Ahead ────────────────────────────────────────────────────────────────
-function WeekAhead({ patients, results, triageMap, agentLog, showToast, onSelectPatient, onVerify }) {
+function WeekAhead({ patients, results, triageMap, agentLog, showToast, onSelectPatient, onVerify, practice }) {
   const [modalCategory, setModalCategory] = useState(null);
   const [focusedPatient, setFocusedPatient] = useState(null);
 
@@ -4978,7 +5005,7 @@ function WeekAhead({ patients, results, triageMap, agentLog, showToast, onSelect
       <div style={{ marginBottom: 16, flexShrink: 0 }}>
         <div style={{ fontSize: 22, fontWeight: 900 }}>Week Ahead</div>
         <div style={{ fontSize: 13, color: T.textSoft, marginTop: 2 }}>
-          {allUpcoming.length} upcoming appointment{allUpcoming.length !== 1 ? "s" : ""} · next 7 days
+          {allUpcoming.length} upcoming appointment{allUpcoming.length !== 1 ? "s" : ""} · next {practice?.verificationDaysAhead || 7} days
         </div>
       </div>
 
@@ -5923,6 +5950,10 @@ function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab
   const [npiVal, setNpiVal]         = useState(practice?.npi || "");
   const [taxIdVal, setTaxIdVal]     = useState(practice?.taxId || "");
   const [emailVal, setEmailVal]     = useState(practice?.email || "");
+  const [faxVal, setFaxVal]         = useState(practice?.faxNumber || "");
+
+  // Automations
+  const [verificationDays, setVerificationDays] = useState(practice?.verificationDaysAhead || 7);
 
   // PMS
   const [pmsSystem]                 = useState("Open Dental");
@@ -6326,6 +6357,11 @@ function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab
                 <div style={{ fontSize:11, color:T.textSoft, marginTop:-10 }}>
                   Used as the sender for payer benefit request emails and patient correspondence.
                 </div>
+                <SInput label="Practice Fax Number" type="tel" placeholder="(555) 123-4567" value={faxVal}
+                  onChange={e => setFaxVal(e.target.value)} />
+                <div style={{ fontSize:11, color:T.textSoft, marginTop:-10 }}>
+                  Used to receive payer responses when missing information is requested via fax.
+                </div>
                 <button onClick={async () => {
                   try {
                     await fetch("/api/v1/practice", {
@@ -6336,6 +6372,7 @@ function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab
                         email: emailVal || undefined,
                         npi: npiVal || undefined,
                         taxId: taxIdVal || undefined,
+                        faxNumber: faxVal || undefined,
                       }),
                     });
                     showToast("Practice profile saved.");
@@ -6365,7 +6402,43 @@ function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab
                 </div>
               </div>
               <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12, padding: "4px 24px" }}>
-                <Toggle label="7-Day Pre-Verification" description="Automatically verify patients 7 days before their appointment." defaultChecked={true} />
+                {/* Verification Window Slider */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 0", borderBottom: "1px solid " + T.border }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: T.text }}>Verification Window</div>
+                    <div style={{ fontSize: 12, color: T.textSoft, marginTop: 2 }}>
+                      How many days ahead to automatically verify patients on the schedule.
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+                      <span style={{ fontSize: 11, color: T.textSoft, fontWeight: 700, minWidth: 24 }}>1</span>
+                      <input type="range" min={1} max={25} step={1} value={verificationDays}
+                        onChange={e => setVerificationDays(parseInt(e.target.value))}
+                        style={{ flex: 1, accentColor: T.lime, height: 6, cursor: "pointer" }} />
+                      <span style={{ fontSize: 11, color: T.textSoft, fontWeight: 700, minWidth: 24, textAlign: "right" }}>25</span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginLeft: 20 }}>
+                    <div style={{ fontSize: 28, fontWeight: 900, color: T.lime, lineHeight: 1 }}>{verificationDays}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: T.textSoft, textTransform: "uppercase", letterSpacing: "0.05em" }}>days</div>
+                    {verificationDays !== (practice?.verificationDaysAhead || 7) && (
+                      <button onClick={async () => {
+                        try {
+                          await fetch("/api/v1/practice", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ verificationDaysAhead: verificationDays }),
+                          });
+                          showToast(`Verification window set to ${verificationDays} day${verificationDays !== 1 ? "s" : ""}.`);
+                        } catch { showToast("Failed to save — please try again."); }
+                      }}
+                        style={{ marginTop: 6, padding: "4px 12px", fontSize: 10, fontWeight: 800,
+                          background: T.lime, color: "#000", border: "none", borderRadius: 6,
+                          cursor: "pointer", transition: "0.2s" }}>
+                        Save
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <Toggle label="24-Hour Refresh" description="Re-run verification 24 hours prior to catch last-minute plan changes." defaultChecked={true} />
                 <Toggle label="RPA Fallback Engine" description="When our initial check returns limited info, AI logs into the carrier portal for full details." defaultChecked={true} />
                 <Toggle label="Auto-Draft Patient SMS" description="AI writes outreach drafts for missing tooth clauses, maxed benefits, and low remaining." defaultChecked={true} />
@@ -6946,7 +7019,7 @@ function ToastBar({ msg, fading }) {
   );
 }
 // ── Admin Dashboard (full-screen, shown instead of practice dashboard for admin users) ──
-function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
+function AdminDashboard({ showToast, onSignOut }) {
   const [activeTab, setActiveTab] = useState("codes");
   const [codes, setCodes] = useState([]);
   const [practices, setPractices] = useState([]);
@@ -7105,12 +7178,6 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
 
         {/* Bottom actions */}
         <div style={{ padding: "0 12px", display: "flex", flexDirection: "column", gap: 4 }}>
-          <button onClick={onSwitchToPractice}
-            style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
-              borderRadius: 8, border: "1px solid #1F1F1F", cursor: "pointer", fontSize: 12, fontWeight: 700,
-              background: "transparent", color: "#A3A3A3", transition: "all 0.15s" }}>
-            <span style={{ fontSize: 14 }}>📋</span> Switch to Practice View
-          </button>
           <button onClick={onSignOut}
             style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
               borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700,
@@ -7753,18 +7820,19 @@ export default function LevelAI() {
     }
   }, [addCredentialAlert]);
 
-  // ── Fetch: rolling 7-day window (today + 7 calendar days) ────────────────────
-  // Covers today for the kanban AND the next 7 days for WeekAhead + auto-verify.
-  // Skips weekends (Sat/Sun) since the practice is closed and the API returns [].
+  // ── Fetch: rolling N-day window (today + N calendar days) ────────────────────
+  // Covers today for the kanban AND the next N days for WeekAhead + auto-verify.
+  // N = practice.verificationDaysAhead (default 7). Skips weekends.
   const loadWeekSchedule = useCallback(async (anchorDate, { silent = false } = {}) => {
     if (!silent) setDailyLoading(true);
-    // Build every calendar date from today through today+7.
+    const daysAhead = practice?.verificationDaysAhead || 7;
+    // Build every calendar date from today through today+daysAhead.
     // Always include today (even weekends) — server-side fixtures remap
     // weekends to the nearest weekday so the demo is never empty.
     // For live PMS data, weekends naturally return [] which is correct.
     const anchor = new Date(anchorDate + "T12:00:00");
     const fetchDates = [];
-    for (let i = 0; i <= 7; i++) {
+    for (let i = 0; i <= daysAhead; i++) {
       const d = new Date(anchor);
       d.setDate(anchor.getDate() + i);
       const dow = d.getDay();
@@ -8091,6 +8159,97 @@ export default function LevelAI() {
         })();
       }
     }
+
+    // ── Module 6: Auto-fax fallback for missing information ──────────────
+    // When verification returns incomplete data and practice has a fax number,
+    // automatically send a fax to the payer requesting the missing information.
+    // Fully autonomous — no human interaction required.
+    const hasMissingData = finalResult.verification_status === "action_required" || finalResult.verification_status === "error";
+    const practiceHasFax = !!practice?.faxNumber;
+    const payerContact = resolvePreAuthContact(patient, finalResult);
+    const payerHasFax = !!payerContact?.fax;
+
+    if (hasMissingData && practiceHasFax && payerHasFax) {
+      // Determine what fields are missing from the verification result
+      const missingFields = [];
+      const flags = finalResult.actionFlags || {};
+      if (flags.missing_tooth_clause) missingFields.push("Missing tooth clause details");
+      if (flags.pre_auth_required) missingFields.push("Pre-authorization requirements");
+      if (flags.waiting_period_active) missingFields.push("Waiting period end date");
+      if (flags.frequency_limit_reached) missingFields.push("Frequency limitation reset dates");
+      if (flags.annual_max_low) missingFields.push("Annual maximum remaining and reset date");
+      if (flags.cob_active) missingFields.push("Coordination of Benefits — secondary payer info");
+      if (finalResult._failCategory === "payer_unsupported") missingFields.push("Complete benefit breakdown — electronic verification unavailable");
+      if (finalResult._failCategory === "payer_system_error") missingFields.push("Complete benefit breakdown — payer system error");
+
+      // Only auto-fax if there are specific missing fields to request
+      if (missingFields.length > 0) {
+        const isSandbox = sandboxMode || accountMode === "sandbox";
+
+        if (isSandbox) {
+          // Sandbox: simulate fax with delay
+          setTimeout(() => {
+            setResults(prev => ({
+              ...prev,
+              [patient.id]: {
+                ...prev[patient.id],
+                verification_status: "pending_fax",
+                fax_details: {
+                  fax_id: `fax_sandbox_${Date.now()}`,
+                  status: "sent",
+                  sent_at: new Date().toISOString(),
+                  payer_name: payerContact.label || patient.insurance,
+                  payer_fax: payerContact.fax,
+                  missing_information_requested: missingFields,
+                },
+              },
+            }));
+            showToast(`📠 Auto-faxed info request to ${payerContact.label || patient.insurance} for ${patient.name}`);
+          }, 1500 + Math.random() * 1000);
+        } else {
+          // Live mode: call fax API in background
+          (async () => {
+            try {
+              const res = await fetch("/api/v1/fax/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  payerName: payerContact.name || patient.insurance,
+                  payerFaxNumber: payerContact.fax,
+                  patientName: patient.name,
+                  memberId: patient.memberId,
+                  patientDob: patient.dob,
+                  appointmentDate: patient.appointmentDate,
+                  missingFields,
+                }),
+              });
+              const data = await res.json();
+              if (data.success) {
+                setResults(prev => ({
+                  ...prev,
+                  [patient.id]: {
+                    ...prev[patient.id],
+                    verification_status: "pending_fax",
+                    fax_details: {
+                      fax_id: data.faxId,
+                      status: "sent",
+                      sent_at: new Date().toISOString(),
+                      payer_name: payerContact.label || patient.insurance,
+                      payer_fax: payerContact.fax,
+                      missing_information_requested: missingFields,
+                    },
+                  },
+                }));
+                showToast(`📠 Auto-faxed info request to ${payerContact.label || patient.insurance} for ${patient.name}`);
+              }
+            } catch (err) {
+              console.error("[auto-fax] Failed:", err);
+              // Non-blocking — patient stays in action_required
+            }
+          })();
+        }
+      }
+    }
   }, [isLoading, setPhase, showToast, sandboxMode, accountMode, preauthCache, addCredentialAlert, practice]);
 
   // ── Sandbox instant-resolve: pre-populate results from client-side fixtures ──
@@ -8311,8 +8470,11 @@ export default function LevelAI() {
   const autoVerifiedPatientIds = new Set(agentLog.filter(e => e.trigger !== "manual" && e.action === ACTION.VERIFIED).map(e => e.patientId));
   const autoVerifiedList = patients.filter(p => autoVerifiedPatientIds.has(p.id));
 
+  const faxPendingCount = todayOnly.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.PENDING_FAX).length;
+
   const COLS = [
     { key:"action_required", label:"Action Required", color:T.amber,   bg:T.amberLight, border:T.amberBorder, filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.ACTION_REQUIRED },
+    { key:"pending_fax",     label:"Fax Pending",     color:"#8B5CF6",  bg:"#8B5CF620",  border:"#8B5CF640",   filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.PENDING_FAX    },
     { key:"verified",        label:"Verified",        color:T.limeDark,bg:T.limeLight,  border:T.limeBorder,  filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.VERIFIED        },
     { key:"inactive",        label:"Inactive",        color:T.red,     bg:T.redLight,   border:T.redBorder,   filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.INACTIVE        },
     { key:"failed",          label:"Failed",          color:T.red,     bg:T.redLight,   border:T.redBorder,   filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.ERROR            },
@@ -8391,8 +8553,22 @@ export default function LevelAI() {
     );
   }
   if (!isSignedIn && !sandboxMode) {
-    // Redirect to /login — middleware handles this server-side, but this is a client-side fallback
-    if (typeof window !== "undefined") window.location.href = "/login";
+    // Re-check URL params defensively — sandboxMode state may not have been set
+    // during SSR (no window) or during hydration race conditions
+    if (typeof window !== "undefined") {
+      const urlSandbox = new URLSearchParams(window.location.search).get("sandbox") === "1";
+      if (urlSandbox) {
+        setSandboxMode(true);
+        setAccountMode("sandbox");
+        return (
+          <div style={{ height: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ color: T.textSoft, fontSize: 14, fontWeight: 700 }}>Loading…</div>
+          </div>
+        );
+      }
+      // Not sandbox — redirect to login
+      window.location.href = "/login";
+    }
     return (
       <div style={{ height: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ color: T.textSoft, fontSize: 14, fontWeight: 700 }}>Redirecting to login...</div>
@@ -8406,7 +8582,6 @@ export default function LevelAI() {
       <>
         <AdminDashboard
           showToast={showToast}
-          onSwitchToPractice={() => setAdminView(false)}
           onSignOut={() => signOut()}
         />
         {toastMsg && <ToastBar msg={toastMsg} fading={toastFading} />}
@@ -8473,6 +8648,7 @@ export default function LevelAI() {
         @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
         @keyframes toastIn{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
         @keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateX(20px)}}
+        @keyframes faxPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.3;transform:scale(0.8)}}
         button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid ${T.indigo};outline-offset:2px;}
       `}</style>
 
@@ -8781,6 +8957,7 @@ export default function LevelAI() {
             agentLog={agentLog}
             triageMap={triageMap}
             results={results}
+            practice={practice}
             onApprove={handleApprove}
             onDismiss={handleDismiss}
             showToast={showToast}
@@ -8918,7 +9095,7 @@ export default function LevelAI() {
                   ? <Skeleton w={200} h={11} />
                   : <span style={{ color:T.textSoft, fontSize:11 }}>{patients.length} patients · {isMounted ? new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}) : ""}</span>
                 }
-                <span style={{ color:T.indigo, fontSize:11, fontWeight:700 }}>&#x1F916; Auto-verifies 7d + 24h before appt</span>
+                <span style={{ color:T.indigo, fontSize:11, fontWeight:700 }}>&#x1F916; Auto-verifies {practice?.verificationDaysAhead || 7}d + 24h before appt</span>
               </div>
             </div>
 
@@ -8971,6 +9148,7 @@ export default function LevelAI() {
       {/* ── Directory modal ───────────────────────────────────────────────── */}
       {showDirectoryModal && (
         <DirectorySearchModal
+          practice={practice}
           onClose={() => setShowDirectoryModal(false)}
           onSelect={(p) => {
             const diff = new Date(p.appointmentDate) - new Date();

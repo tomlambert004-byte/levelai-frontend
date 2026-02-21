@@ -22,6 +22,8 @@ model Practice {
   pmsSystem     String?                        // "Open Dental" | "Dentrix" | "Eaglesoft"
   pmsSyncKey    String?                        // encrypted PMS sync key / eKey
   webhookSecret String?                        // per-practice HMAC secret for PMS webhooks
+  faxNumber     String?                        // practice fax for receiving payer info requests
+  verificationDaysAhead Int @default(7)        // 1-25 days ahead to auto-verify schedule
   activatedAt   DateTime?                      // set when activation code is redeemed
 
   // ── Stripe billing ──

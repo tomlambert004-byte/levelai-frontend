@@ -36,6 +36,8 @@ export async function POST(request) {
     if (body.phone)       updateData.phone       = body.phone;
     if (body.pmsSystem)   updateData.pmsSystem   = body.pmsSystem;
     if (body.pmsSyncKey)  updateData.pmsSyncKey  = body.pmsSyncKey;
+    if (body.faxNumber !== undefined) updateData.faxNumber = body.faxNumber || null;
+    if (body.verificationDaysAhead !== undefined) updateData.verificationDaysAhead = Math.max(1, Math.min(25, parseInt(body.verificationDaysAhead) || 7));
 
     const practice = await prisma.practice.upsert({
       where:  { clerkUserId: userId },
@@ -51,6 +53,8 @@ export async function POST(request) {
         phone:       body.phone       || null,
         pmsSystem:   body.pmsSystem   || null,
         pmsSyncKey:  body.pmsSyncKey  || null,
+        faxNumber:   body.faxNumber   || null,
+        verificationDaysAhead: body.verificationDaysAhead ? Math.max(1, Math.min(25, parseInt(body.verificationDaysAhead) || 7)) : 7,
       },
     });
 
