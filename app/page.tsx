@@ -202,12 +202,12 @@ const FEATURES = [
     icon: IconBuilding,
     iconName: "IconBuilding",
     title: "Medicaid Intelligence Engine",
-    description: "Auto-detects 20+ state Medicaid programs and applies state-specific rules \u2014 covered categories, frequency limits, prior auth requirements, and copay schedules.",
+    description: "Auto-detects all 50 state Medicaid programs and applies state-specific rules \u2014 covered categories, frequency limits, prior auth requirements, and copay schedules.",
     detail: {
       headline: "Medicaid patients deserve the same verification confidence.",
-      body: "Medicaid is where most verification tools fall apart. Every state has different rules, different covered procedures, different frequency limits, and different prior auth requirements. Level AI auto-detects the state program by payer name or ID, then applies a state-specific rules engine covering 21 states. Your team sees exactly what\u2019s covered, what needs prior auth, and what the copay is \u2014 without calling the state.",
+      body: "Medicaid is where most verification tools fall apart. Every state has different rules, different covered procedures, different frequency limits, and different prior auth requirements. Level AI auto-detects the state program by payer name or ID, then applies a state-specific rules engine covering all 50 states. Your team sees exactly what\u2019s covered, what needs prior auth, and what the copay is \u2014 without calling the state.",
       bullets: [
-        "Auto-detection of 20+ state programs (Medi-Cal, SoonerCare, CHIP, etc.)",
+        "Complete coverage across all 50 states (Medi-Cal, SoonerCare, CHIP, etc.)",
         "Per-state rules: covered categories, frequency limits, age restrictions",
         "Prior authorization requirements flagged per CDT code",
         "Copay schedules by procedure type \u2014 no guessing",

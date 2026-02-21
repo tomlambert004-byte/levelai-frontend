@@ -123,8 +123,9 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
         .feature-modal-card::-webkit-scrollbar { display: none; }
       `}} />
 
+      {/* Primary features — 3-column grid */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {features.map((f, i) => {
+        {features.slice(0, 6).map((f, i) => {
           const Icon = ICON_MAP[f.iconName];
           return (
             <button
@@ -147,6 +148,34 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
           );
         })}
       </div>
+
+      {/* Highlighted features — wider 2-column layout for visual balance */}
+      {features.length > 6 && (
+        <div className="grid md:grid-cols-2 gap-6 mt-6">
+          {features.slice(6).map((f, i) => {
+            const Icon = ICON_MAP[f.iconName];
+            return (
+              <button
+                key={f.title}
+                onClick={() => setActiveIdx(i + 6)}
+                className="group rounded-2xl border border-black/[0.06] bg-white p-7 hover:border-[#14B8A6]/30 hover:shadow-lg hover:shadow-[#14B8A6]/[0.04] transition-all text-left cursor-pointer"
+              >
+                <div className="w-11 h-11 rounded-xl bg-[#14B8A6]/10 flex items-center justify-center mb-5">
+                  {Icon && <Icon className="w-5 h-5 text-[#14B8A6]" />}
+                </div>
+                <div className="text-base font-bold text-[#1A1A18] mb-2">{f.title}</div>
+                <p className="text-sm text-[#525252] leading-relaxed mb-4">{f.description}</p>
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#14B8A6] opacity-0 group-hover:opacity-100 transition-opacity">
+                  Learn more
+                  <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* ── Feature Detail Modal ── */}
       {active && ActiveIcon && (
