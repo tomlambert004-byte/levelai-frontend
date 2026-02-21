@@ -2,7 +2,7 @@ import Link from "next/link";
 
 /* ─────────────────────────────────────────────────────────────────────────────
  *  Level AI — Marketing Landing Page
- *  Silicon Valley–style dark-first SaaS page
+ *  Clean, modern light-mode SaaS page
  *  Next.js 16 server component · Tailwind v4
  * ───────────────────────────────────────────────────────────────────────────── */
 
@@ -200,22 +200,22 @@ const STATS = [
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F0] selection:bg-[#14B8A6]/30 overflow-x-hidden font-sans">
+    <div className="min-h-screen bg-[#F5F5F0] text-[#1A1A18] selection:bg-[#14B8A6]/30 overflow-x-hidden font-sans">
 
       {/* ═══════════════════════════ NAVIGATION ═══════════════════════════════ */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.06] bg-[#0A0A0A]/80 backdrop-blur-xl">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-black/[0.06] bg-[#F5F5F0]/80 backdrop-blur-xl">
         <div className="mx-auto max-w-7xl flex items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-3">
-            <img src="/levelai-logo.png" alt="Level AI" className="h-9" draggable={false} />
+            <img src="/levelai-logo-dark.png" alt="Level AI" className="h-9" draggable={false} />
           </Link>
-          <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-[#A3A3A3]">
-            <a href="#features" className="hover:text-[#F5F5F0] transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-[#F5F5F0] transition-colors">How It Works</a>
-            <a href="#pricing" className="hover:text-[#F5F5F0] transition-colors">Pricing</a>
-            <Link href="/contact" className="hover:text-[#F5F5F0] transition-colors">Contact</Link>
+          <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-[#525252]">
+            <a href="#features" className="hover:text-[#1A1A18] transition-colors">Features</a>
+            <a href="#how-it-works" className="hover:text-[#1A1A18] transition-colors">How It Works</a>
+            <a href="#pricing" className="hover:text-[#1A1A18] transition-colors">Pricing</a>
+            <Link href="/contact" className="hover:text-[#1A1A18] transition-colors">Contact</Link>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-bold text-[#F5F5F0] hover:bg-white/[0.08] transition-colors">
+            <Link href="/dashboard" className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-black/10 bg-black/[0.03] px-4 py-2 text-sm font-bold text-[#1A1A18] hover:bg-black/[0.06] transition-colors">
               Sign In
             </Link>
             <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-lg bg-[#14B8A6] px-4 py-2 text-sm font-bold text-white hover:bg-[#0D9488] transition-colors shadow-lg shadow-[#14B8A6]/20">
@@ -233,7 +233,7 @@ export default function LandingPage() {
 
         <div className="relative mx-auto max-w-5xl px-6 text-center">
           {/* Badge */}
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#14B8A6]/30 bg-[#14B8A6]/[0.08] px-4 py-1.5 text-xs font-bold text-[#5EEAD4] tracking-wide uppercase">
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#14B8A6]/30 bg-[#14B8A6]/[0.08] px-4 py-1.5 text-xs font-bold text-[#0D9488] tracking-wide uppercase">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#14B8A6] animate-pulse" />
             Now in early access
           </div>
@@ -241,10 +241,10 @@ export default function LandingPage() {
           <h1 className="text-5xl md:text-7xl lg:text-8xl font-black leading-[0.95] tracking-tight mb-6">
             Insurance verification
             <br />
-            <span className="bg-gradient-to-r from-[#14B8A6] to-[#5EEAD4] bg-clip-text text-transparent">on autopilot.</span>
+            <span className="bg-gradient-to-r from-[#0D9488] to-[#14B8A6] bg-clip-text text-transparent">on autopilot.</span>
           </h1>
 
-          <p className="mx-auto max-w-2xl text-lg md:text-xl text-[#A3A3A3] leading-relaxed mb-10">
+          <p className="mx-auto max-w-2xl text-lg md:text-xl text-[#525252] leading-relaxed mb-10">
             Level AI eliminates the insurance chaos that burns out dental front desks.
             Every patient verified before they walk in the door &mdash; automatically.
           </p>
@@ -254,7 +254,7 @@ export default function LandingPage() {
               Get Started Free
               <IconArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-7 py-3.5 text-base font-bold text-[#F5F5F0] hover:bg-white/[0.06] transition-colors">
+            <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-black/[0.03] px-7 py-3.5 text-base font-bold text-[#1A1A18] hover:bg-black/[0.06] transition-colors">
               <IconPlay className="w-4 h-4 text-[#14B8A6]" />
               Try the Sandbox
             </Link>
@@ -263,12 +263,12 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════════════════ STATS BAR ════════════════════════════════ */}
-      <section className="border-y border-white/[0.06] bg-[#1A1A1A]/50">
-        <div className="mx-auto max-w-6xl grid grid-cols-2 md:grid-cols-4 divide-x divide-white/[0.06]">
+      <section className="border-y border-black/[0.06] bg-white/50">
+        <div className="mx-auto max-w-6xl grid grid-cols-2 md:grid-cols-4 divide-x divide-black/[0.06]">
           {STATS.map((s) => (
             <div key={s.label} className="py-10 px-6 text-center">
               <div className="text-3xl md:text-4xl font-black text-[#14B8A6] mb-1">{s.value}</div>
-              <div className="text-sm text-[#A3A3A3] font-semibold">{s.label}</div>
+              <div className="text-sm text-[#525252] font-semibold">{s.label}</div>
             </div>
           ))}
         </div>
@@ -283,7 +283,7 @@ export default function LandingPage() {
               Insurance chaos is costing you
               <br className="hidden md:block" /> time, money, and sanity.
             </h2>
-            <p className="mx-auto max-w-2xl text-[#A3A3A3] text-lg">
+            <p className="mx-auto max-w-2xl text-[#525252] text-lg">
               Dental front desks spend hours every day on the phone with insurance companies.
               The process is manual, error-prone, and soul-crushing.
             </p>
@@ -310,11 +310,11 @@ export default function LandingPage() {
                 body: "Insurance verification is the number one source of front-desk frustration and the leading cause of staff turnover in dental practices.",
               },
             ].map((card) => (
-              <div key={card.title} className="group rounded-2xl border border-white/[0.06] bg-[#1A1A1A] p-8 hover:border-[#14B8A6]/30 transition-colors">
+              <div key={card.title} className="group rounded-2xl border border-black/[0.06] bg-white p-8 hover:border-[#14B8A6]/30 transition-colors">
                 <card.icon className="w-8 h-8 text-[#14B8A6] mb-5" />
                 <div className="text-2xl font-black text-[#14B8A6] mb-1">{card.stat}</div>
-                <div className="text-base font-bold text-[#F5F5F0] mb-3">{card.title}</div>
-                <p className="text-sm text-[#A3A3A3] leading-relaxed">{card.body}</p>
+                <div className="text-base font-bold text-[#1A1A18] mb-3">{card.title}</div>
+                <p className="text-sm text-[#525252] leading-relaxed">{card.body}</p>
               </div>
             ))}
           </div>
@@ -330,7 +330,7 @@ export default function LandingPage() {
               Meet your AI-powered
               <br className="hidden md:block" /> insurance co-pilot.
             </h2>
-            <p className="mx-auto max-w-2xl text-[#A3A3A3] text-lg">
+            <p className="mx-auto max-w-2xl text-[#525252] text-lg">
               Level AI plugs into your practice management system and handles insurance verification,
               pre-authorization, and patient outreach &mdash; automatically.
             </p>
@@ -353,11 +353,11 @@ export default function LandingPage() {
                 "Full visibility 24 hours before every appointment",
               ]},
             ].map((col) => (
-              <div key={col.label} className={`rounded-2xl border ${col.border} bg-[#1A1A1A] p-8`}>
+              <div key={col.label} className={`rounded-2xl border ${col.border} bg-white p-8`}>
                 <div className={`text-sm font-extrabold tracking-wide uppercase ${col.color} mb-6`}>{col.label}</div>
                 <ul className="space-y-4">
                   {col.items.map((item) => (
-                    <li key={item} className="flex items-start gap-3 text-sm text-[#A3A3A3] leading-relaxed">
+                    <li key={item} className="flex items-start gap-3 text-sm text-[#525252] leading-relaxed">
                       <IconCheck className={`w-4 h-4 mt-0.5 flex-shrink-0 ${col.color}`} />
                       {item}
                     </li>
@@ -382,12 +382,12 @@ export default function LandingPage() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {FEATURES.map((f) => (
-              <div key={f.title} className="group rounded-2xl border border-white/[0.06] bg-[#1A1A1A] p-7 hover:border-[#14B8A6]/30 hover:shadow-lg hover:shadow-[#14B8A6]/[0.04] transition-all">
+              <div key={f.title} className="group rounded-2xl border border-black/[0.06] bg-white p-7 hover:border-[#14B8A6]/30 hover:shadow-lg hover:shadow-[#14B8A6]/[0.04] transition-all">
                 <div className="w-11 h-11 rounded-xl bg-[#14B8A6]/10 flex items-center justify-center mb-5">
                   <f.icon className="w-5 h-5 text-[#14B8A6]" />
                 </div>
-                <div className="text-base font-bold text-[#F5F5F0] mb-2">{f.title}</div>
-                <p className="text-sm text-[#A3A3A3] leading-relaxed">{f.description}</p>
+                <div className="text-base font-bold text-[#1A1A18] mb-2">{f.title}</div>
+                <p className="text-sm text-[#525252] leading-relaxed">{f.description}</p>
               </div>
             ))}
           </div>
@@ -395,14 +395,14 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════════════════ HOW IT WORKS ═════════════════════════════ */}
-      <section id="how-it-works" className="py-24 md:py-36 bg-[#1A1A1A]/40">
+      <section id="how-it-works" className="py-24 md:py-36 bg-white/40">
         <div className="mx-auto max-w-5xl px-6">
           <div className="text-center mb-16">
             <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#14B8A6] mb-4">How it works</div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
               Up and running in minutes.
             </h2>
-            <p className="mx-auto max-w-xl text-[#A3A3A3] text-lg">
+            <p className="mx-auto max-w-xl text-[#525252] text-lg">
               No lengthy onboarding. No IT department required. Connect your PMS and start verifying today.
             </p>
           </div>
@@ -417,8 +417,8 @@ export default function LandingPage() {
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#14B8A6]/10 border border-[#14B8A6]/20 text-xl font-black text-[#14B8A6] mb-5">
                   {step.num}
                 </div>
-                <div className="text-lg font-bold text-[#F5F5F0] mb-2">{step.title}</div>
-                <p className="text-sm text-[#A3A3A3] leading-relaxed">{step.description}</p>
+                <div className="text-lg font-bold text-[#1A1A18] mb-2">{step.title}</div>
+                <p className="text-sm text-[#525252] leading-relaxed">{step.description}</p>
               </div>
             ))}
           </div>
@@ -433,7 +433,7 @@ export default function LandingPage() {
             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
               Simple, transparent pricing.
             </h2>
-            <p className="mx-auto max-w-xl text-[#A3A3A3] text-lg">
+            <p className="mx-auto max-w-xl text-[#525252] text-lg">
               Start free. Scale when you&apos;re ready. No contracts, no surprises.
             </p>
           </div>
@@ -445,7 +445,7 @@ export default function LandingPage() {
                 className={`relative rounded-2xl border p-8 flex flex-col ${
                   plan.highlighted
                     ? "border-[#14B8A6]/40 bg-gradient-to-b from-[#14B8A6]/[0.06] to-[#1A1A1A] shadow-xl shadow-[#14B8A6]/10"
-                    : "border-white/[0.06] bg-[#1A1A1A]"
+                    : "border-black/[0.06] bg-white"
                 }`}
               >
                 {plan.highlighted && (
@@ -453,18 +453,18 @@ export default function LandingPage() {
                     Most Popular
                   </div>
                 )}
-                <div className="text-sm font-bold text-[#A3A3A3] uppercase tracking-wide mb-2">{plan.name}</div>
+                <div className="text-sm font-bold text-[#525252] uppercase tracking-wide mb-2">{plan.name}</div>
                 <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-4xl font-black text-[#F5F5F0]">{plan.price}</span>
-                  {plan.period && <span className="text-sm text-[#A3A3A3] font-semibold">{plan.period}</span>}
+                  <span className="text-4xl font-black text-[#1A1A18]">{plan.price}</span>
+                  {plan.period && <span className="text-sm text-[#525252] font-semibold">{plan.period}</span>}
                 </div>
                 {plan.trial && (
                   <div className="text-xs font-bold text-[#14B8A6] mb-3">{plan.trial} &middot; No credit card required</div>
                 )}
-                <p className="text-sm text-[#A3A3A3] mb-6 leading-relaxed">{plan.description}</p>
+                <p className="text-sm text-[#525252] mb-6 leading-relaxed">{plan.description}</p>
                 <ul className="space-y-3 mb-8 flex-1">
                   {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm text-[#A3A3A3]">
+                    <li key={f} className="flex items-start gap-2 text-sm text-[#525252]">
                       <IconCheck className="w-4 h-4 mt-0.5 text-[#14B8A6] flex-shrink-0" />
                       {f}
                     </li>
@@ -475,7 +475,7 @@ export default function LandingPage() {
                   className={`block w-full text-center rounded-xl py-3 text-sm font-extrabold transition-colors ${
                     plan.highlighted
                       ? "bg-[#14B8A6] text-white hover:bg-[#0D9488] shadow-lg shadow-[#14B8A6]/20"
-                      : "border border-white/10 bg-white/[0.03] text-[#F5F5F0] hover:bg-white/[0.06]"
+                      : "border border-black/10 bg-black/[0.03] text-[#1A1A18] hover:bg-black/[0.06]"
                   }`}
                 >
                   {plan.cta}
@@ -489,14 +489,14 @@ export default function LandingPage() {
       {/* ═══════════════════════════ CONTACT / CTA ════════════════════════════ */}
       <section id="contact" className="py-24 md:py-36 bg-gradient-to-b from-transparent via-[#14B8A6]/[0.03] to-transparent">
         <div className="mx-auto max-w-4xl px-6 text-center">
-          <div className="rounded-3xl border border-white/[0.06] bg-[#1A1A1A] p-12 md:p-16">
+          <div className="rounded-3xl border border-black/[0.06] bg-white p-12 md:p-16">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#14B8A6]/10 mb-6">
               <IconMail className="w-6 h-6 text-[#14B8A6]" />
             </div>
             <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-4">
               Ready to eliminate insurance chaos?
             </h2>
-            <p className="mx-auto max-w-xl text-[#A3A3A3] text-lg mb-8">
+            <p className="mx-auto max-w-xl text-[#525252] text-lg mb-8">
               Whether you&apos;re a solo practice or a 50-location DSO, we&apos;d love to show you how Level AI can
               transform your insurance workflow.
             </p>
@@ -505,7 +505,7 @@ export default function LandingPage() {
                 Start Your Free Trial
                 <IconArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
-              <Link href="/contact" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-7 py-3.5 text-base font-bold text-[#F5F5F0] hover:bg-white/[0.06] transition-colors">
+              <Link href="/contact" className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-black/[0.03] px-7 py-3.5 text-base font-bold text-[#1A1A18] hover:bg-black/[0.06] transition-colors">
                 <IconMail className="w-4 h-4 text-[#14B8A6]" />
                 Contact Sales
               </Link>
@@ -515,45 +515,45 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════════════════ FOOTER ════════════════════════════════════ */}
-      <footer className="border-t border-white/[0.06] py-12">
+      <footer className="border-t border-black/[0.06] py-12">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid md:grid-cols-4 gap-10 mb-12">
             {/* Brand */}
             <div className="md:col-span-1">
-              <img src="/levelai-logo.png" alt="Level AI" className="h-8 mb-4" draggable={false} />
-              <p className="text-sm text-[#525252] leading-relaxed">
+              <img src="/levelai-logo-dark.png" alt="Level AI" className="h-8 mb-4" draggable={false} />
+              <p className="text-sm text-[#A3A3A3] leading-relaxed">
                 AI-powered dental insurance verification and benefits management.
               </p>
             </div>
             {/* Links */}
             <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-[#525252] mb-4">Product</div>
+              <div className="text-xs font-bold uppercase tracking-wider text-[#A3A3A3] mb-4">Product</div>
               <ul className="space-y-2 text-sm">
-                <li><a href="#features" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Features</a></li>
-                <li><a href="#pricing" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Pricing</a></li>
-                <li><a href="#how-it-works" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">How It Works</a></li>
-                <li><Link href="/dashboard" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Sandbox Demo</Link></li>
+                <li><a href="#features" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Features</a></li>
+                <li><a href="#pricing" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Pricing</a></li>
+                <li><a href="#how-it-works" className="text-[#525252] hover:text-[#1A1A18] transition-colors">How It Works</a></li>
+                <li><Link href="/dashboard" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Sandbox Demo</Link></li>
               </ul>
             </div>
             <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-[#525252] mb-4">Company</div>
+              <div className="text-xs font-bold uppercase tracking-wider text-[#A3A3A3] mb-4">Company</div>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/contact" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Contact</Link></li>
-                <li><a href="mailto:support@levelai.app" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Support</a></li>
+                <li><Link href="/contact" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Contact</Link></li>
+                <li><a href="mailto:support@levelai.app" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Support</a></li>
               </ul>
             </div>
             <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-[#525252] mb-4">Legal</div>
+              <div className="text-xs font-bold uppercase tracking-wider text-[#A3A3A3] mb-4">Legal</div>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/privacy" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Privacy Policy</Link></li>
-                <li><Link href="/terms" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Terms of Service</Link></li>
-                <li><Link href="/hipaa" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">HIPAA Compliance</Link></li>
+                <li><Link href="/privacy" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Privacy Policy</Link></li>
+                <li><Link href="/terms" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Terms of Service</Link></li>
+                <li><Link href="/hipaa" className="text-[#525252] hover:text-[#1A1A18] transition-colors">HIPAA Compliance</Link></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-white/[0.06] pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-[#525252]">&copy; {new Date().getFullYear()} Level AI. All rights reserved.</div>
-            <div className="text-sm text-[#525252]">HIPAA compliant &middot; SOC 2 Type II &middot; BAA available</div>
+          <div className="border-t border-black/[0.06] pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="text-sm text-[#A3A3A3]">&copy; {new Date().getFullYear()} Level AI. All rights reserved.</div>
+            <div className="text-sm text-[#A3A3A3]">HIPAA compliant &middot; SOC 2 Type II &middot; BAA available</div>
           </div>
         </div>
       </footer>

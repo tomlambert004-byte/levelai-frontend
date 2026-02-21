@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 /* ─────────────────────────────────────────────────────────────────────────────
  *  Terms of Service — Level AI
- *  Matches the dark-first marketing site aesthetic
+ *  Light-mode marketing site aesthetic
  * ───────────────────────────────────────────────────────────────────────────── */
 
 function IconArrowLeft({ className }: { className?: string }) {
@@ -21,14 +21,14 @@ function IconArrowLeft({ className }: { className?: string }) {
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F0] font-sans">
+    <div className="min-h-screen bg-[#F5F5F0] text-[#1A1A18] font-sans">
       {/* Nav */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.06] bg-[#0A0A0A]/80 backdrop-blur-xl">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-black/[0.06] bg-[#F5F5F0]/80 backdrop-blur-xl">
         <div className="mx-auto max-w-7xl flex items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-3">
-            <img src="/levelai-logo.png" alt="Level AI" className="h-9" draggable={false} />
+            <img src="/levelai-logo-dark.png" alt="Level AI" className="h-9" draggable={false} />
           </Link>
-          <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">
+          <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-[#525252] hover:text-[#1A1A18] transition-colors">
             <IconArrowLeft className="w-4 h-4" />
             Back to Home
           </Link>
@@ -39,9 +39,9 @@ export default function TermsPage() {
       <main className="pt-28 pb-24">
         <div className="mx-auto max-w-3xl px-6">
           <div className="mb-12">
-            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#14B8A6] mb-4">Legal</div>
+            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#0D9488] mb-4">Legal</div>
             <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">Terms of Service</h1>
-            <p className="text-[#A3A3A3] text-lg">Last updated: February 2025</p>
+            <p className="text-[#525252] text-lg">Last updated: February 2025</p>
           </div>
 
           <div className="prose-custom space-y-8">
@@ -116,8 +116,8 @@ export default function TermsPage() {
 
             <Section title="6. Data and Privacy">
               <p>
-                Your use of the Service is also governed by our <Link href="/privacy" className="text-[#14B8A6] hover:text-[#5EEAD4] transition-colors underline">Privacy Policy</Link> and
-                our <Link href="/hipaa" className="text-[#14B8A6] hover:text-[#5EEAD4] transition-colors underline">HIPAA Compliance</Link> commitments.
+                Your use of the Service is also governed by our <Link href="/privacy" className="text-[#0D9488] hover:text-[#0F766E] transition-colors underline">Privacy Policy</Link> and
+                our <Link href="/hipaa" className="text-[#0D9488] hover:text-[#0F766E] transition-colors underline">HIPAA Compliance</Link> commitments.
               </p>
               <p>
                 We take the protection of patient health information (PHI) extremely seriously.
@@ -207,9 +207,9 @@ export default function TermsPage() {
                 If you have any questions about these Terms, please contact us:
               </p>
               <ul>
-                <li>Email: <a href="mailto:thomas@lvlai.app" className="text-[#14B8A6] hover:text-[#5EEAD4] transition-colors">thomas@lvlai.app</a></li>
-                <li>Phone: <a href="tel:+15123955633" className="text-[#14B8A6] hover:text-[#5EEAD4] transition-colors">(512) 395-5633</a></li>
-                <li>Support: <a href="mailto:support@levelai.app" className="text-[#14B8A6] hover:text-[#5EEAD4] transition-colors">support@levelai.app</a></li>
+                <li>Email: <a href="mailto:thomas@lvlai.app" className="text-[#0D9488] hover:text-[#0F766E] transition-colors">thomas@lvlai.app</a></li>
+                <li>Phone: <a href="tel:+15123955633" className="text-[#0D9488] hover:text-[#0F766E] transition-colors">(512) 395-5633</a></li>
+                <li>Support: <a href="mailto:support@levelai.app" className="text-[#0D9488] hover:text-[#0F766E] transition-colors">support@levelai.app</a></li>
               </ul>
             </Section>
           </div>
@@ -217,13 +217,13 @@ export default function TermsPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-white/[0.06] py-10">
+      <footer className="border-t border-black/[0.06] py-10">
         <div className="mx-auto max-w-3xl px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="text-sm text-[#525252]">&copy; {new Date().getFullYear()} Level AI. All rights reserved.</div>
+          <div className="text-sm text-[#A3A3A3]">&copy; {new Date().getFullYear()} Level AI. All rights reserved.</div>
           <div className="flex gap-6 text-sm">
-            <Link href="/privacy" className="text-[#525252] hover:text-[#A3A3A3] transition-colors">Privacy Policy</Link>
-            <Link href="/hipaa" className="text-[#525252] hover:text-[#A3A3A3] transition-colors">HIPAA</Link>
-            <Link href="/contact" className="text-[#525252] hover:text-[#A3A3A3] transition-colors">Contact</Link>
+            <Link href="/privacy" className="text-[#A3A3A3] hover:text-[#525252] transition-colors">Privacy Policy</Link>
+            <Link href="/hipaa" className="text-[#A3A3A3] hover:text-[#525252] transition-colors">HIPAA</Link>
+            <Link href="/contact" className="text-[#A3A3A3] hover:text-[#525252] transition-colors">Contact</Link>
           </div>
         </div>
       </footer>
@@ -235,8 +235,8 @@ export default function TermsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h2 className="text-xl font-bold text-[#F5F5F0] mb-4">{title}</h2>
-      <div className="space-y-3 text-[#A3A3A3] text-[15px] leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-2 [&_strong]:text-[#F5F5F0] [&_strong]:font-semibold">
+      <h2 className="text-xl font-bold text-[#1A1A18] mb-4">{title}</h2>
+      <div className="space-y-3 text-[#525252] text-[15px] leading-relaxed [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-2 [&_strong]:text-[#1A1A18] [&_strong]:font-semibold">
         {children}
       </div>
     </div>
