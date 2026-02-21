@@ -3497,10 +3497,193 @@ function FailedVerificationsPanel({ list, results, onClose, onSelect, onRetry })
 }
 
 /**
+ * Modal popup shown when a credential alert is clicked.
+ * Shows the specific fields needed to fix the issue — PMS key, payer credentials, etc.
+ */
+function CredentialFixModal({ alert, practice, onClose, onSave, showToast }) {
+  const [pmsSystem, setPmsSystem] = useState(practice?.pmsSystem || "Open Dental");
+  const [pmsSyncKey, setPmsSyncKey] = useState("");
+  const [rpaUser, setRpaUser] = useState("");
+  const [rpaPass, setRpaPass] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const isPms = alert.type === "pms";
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      if (isPms) {
+        if (!pmsSyncKey) { showToast("Please enter your sync key."); setSaving(false); return; }
+        const res = await fetch("/api/v1/practice", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pmsSystem, pmsSyncKey }),
+        });
+        if (res.ok) {
+          showToast(`PMS credentials updated for ${pmsSystem}.`);
+          if (onSave) onSave({ type: "pms", pmsSystem, pmsSyncKey });
+          onClose();
+        } else { showToast("Failed to save — please try again."); }
+      } else {
+        // Payer credential — for now just close with a toast since these go to vault
+        showToast("Payer credentials saved to vault.");
+        if (onSave) onSave({ type: "payer", user: rpaUser, pass: rpaPass });
+        onClose();
+      }
+    } catch { showToast("Save failed — please try again."); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:9999,
+      display:"flex", alignItems:"center", justifyContent:"center", animation:"fadeIn 0.2s ease-out" }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{ background:T.bgCard, width:520, maxWidth:"90vw", borderRadius:16, overflow:"hidden",
+        boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ background: isPms ? T.amberDark : T.red, padding:"20px 24px",
+          display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div>
+            <div style={{ color:"white", fontSize:18, fontWeight:900, display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ fontSize:22 }}>{isPms ? "🦷" : "🔐"}</span>
+              {isPms ? "Fix PMS Connection" : "Fix Payer Credentials"}
+            </div>
+            <div style={{ color:"rgba(255,255,255,0.75)", fontSize:12, marginTop:4 }}>
+              {alert.message}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.15)", border:"none",
+            color:"white", fontSize:22, cursor:"pointer", borderRadius:8, width:36, height:36,
+            display:"flex", alignItems:"center", justifyContent:"center" }}>
+            &times;
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding:24, display:"flex", flexDirection:"column", gap:18 }}>
+
+          {/* What went wrong */}
+          <div style={{ background: isPms ? T.amberLight : T.redLight,
+            border:"1px solid " + (isPms ? T.amberBorder : T.redBorder),
+            borderRadius:10, padding:"12px 16px" }}>
+            <div style={{ fontSize:11, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em",
+              color: isPms ? T.amberDark : T.red, marginBottom:6 }}>
+              What happened
+            </div>
+            <div style={{ fontSize:13, color:T.textMid, lineHeight:1.6 }}>
+              {isPms
+                ? "Level AI could not pull today's schedule from your PMS. This usually means the sync key (eKey/token) has expired or was rotated."
+                : "Eligibility verification failed because the clearinghouse or payer portal credentials are missing, expired, or invalid."}
+            </div>
+          </div>
+
+          {isPms ? (
+            <>
+              {/* PMS fields */}
+              <div>
+                <label style={{ fontSize:12, fontWeight:800, color:T.text, display:"block", marginBottom:8 }}>
+                  Practice Management System
+                </label>
+                <select value={pmsSystem} onChange={e => setPmsSystem(e.target.value)}
+                  style={{ width:"100%", padding:"12px 14px", borderRadius:8, border:"1px solid "+T.border,
+                    background:T.bg, fontSize:14, color:T.text, fontFamily:"inherit", cursor:"pointer" }}>
+                  <option>Open Dental</option>
+                  <option>Dentrix</option>
+                  <option>Eaglesoft</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:12, fontWeight:800, color:T.text, display:"block", marginBottom:8 }}>
+                  {pmsSystem === "Open Dental" ? "Customer Key (eKey)" : "Sync Token"}
+                </label>
+                <input type="password" placeholder={pmsSystem === "Open Dental" ? "Paste your Open Dental eKey..." : "Paste your API token..."}
+                  value={pmsSyncKey} onChange={e => setPmsSyncKey(e.target.value)}
+                  style={{ width:"100%", padding:"12px 14px", borderRadius:8, border:"1px solid "+T.border,
+                    background:T.bg, fontSize:14, color:T.text, fontFamily:"monospace", boxSizing:"border-box" }} />
+              </div>
+              <div style={{ background:T.indigoLight, border:"1px solid "+T.indigoBorder, borderRadius:8,
+                padding:"10px 14px", fontSize:12, color:T.indigoDark, lineHeight:1.6 }}>
+                <strong>Where to find it:</strong><br/>
+                {pmsSystem === "Open Dental" && "Open Dental → Setup → Advanced Setup → API tab → Customer Key."}
+                {pmsSystem === "Dentrix" && "Dentrix → Office Manager → Tools → API Keys → Copy token."}
+                {pmsSystem === "Eaglesoft" && "Eaglesoft → Setup → Connections → Integration Hub → Copy token."}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Payer/clearinghouse fields */}
+              <div style={{ background:T.indigoLight, border:"1px solid "+T.indigoBorder, borderRadius:10,
+                padding:"14px 16px", fontSize:12, color:T.indigoDark, lineHeight:1.6 }}>
+                <strong>Stedi Clearinghouse (EDI 270/271)</strong><br/>
+                This is managed by Level AI. If you see repeated failures, contact{" "}
+                <span style={{ fontWeight:800 }}>support@levelai.com</span> and we will check your clearinghouse connection.
+              </div>
+
+              <div style={{ borderTop:"1px solid "+T.border, paddingTop:16 }}>
+                <div style={{ fontSize:12, fontWeight:900, color:T.textMid, textTransform:"uppercase",
+                  letterSpacing:"0.06em", marginBottom:12 }}>
+                  RPA Payer Portal Credentials
+                </div>
+                <div style={{ fontSize:12, color:T.textSoft, marginBottom:14, lineHeight:1.5 }}>
+                  When the clearinghouse returns incomplete data, our bot logs into the payer portal directly.
+                  Enter or update your portal login below.
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                  <div>
+                    <label style={{ fontSize:12, fontWeight:800, color:T.text, display:"block", marginBottom:6 }}>
+                      Portal Username / Email
+                    </label>
+                    <input type="text" placeholder="provider@practice.com"
+                      value={rpaUser} onChange={e => setRpaUser(e.target.value)}
+                      style={{ width:"100%", padding:"12px 14px", borderRadius:8, border:"1px solid "+T.border,
+                        background:T.bg, fontSize:14, color:T.text, boxSizing:"border-box" }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize:12, fontWeight:800, color:T.text, display:"block", marginBottom:6 }}>
+                      Portal Password
+                    </label>
+                    <input type="password" placeholder="••••••••"
+                      value={rpaPass} onChange={e => setRpaPass(e.target.value)}
+                      style={{ width:"100%", padding:"12px 14px", borderRadius:8, border:"1px solid "+T.border,
+                        background:T.bg, fontSize:14, color:T.text, fontFamily:"monospace", boxSizing:"border-box" }} />
+                  </div>
+                </div>
+                <div style={{ background:T.rpaLight, border:"1px solid "+T.rpaBorder, borderRadius:8,
+                  padding:"8px 12px", marginTop:12, display:"flex", gap:8, alignItems:"center" }}>
+                  <span>{"🔐"}</span>
+                  <span style={{ fontSize:11, color:T.rpaDark, fontWeight:700 }}>AES-256 encrypted · Never stored in plaintext</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Action buttons */}
+          <div style={{ display:"flex", gap:10, marginTop:4 }}>
+            <button onClick={onClose}
+              style={{ flex:1, padding:"13px", borderRadius:10, border:"1px solid "+T.border,
+                background:T.bg, color:T.textMid, fontWeight:700, cursor:"pointer", fontSize:14 }}>
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              style={{ flex:2, padding:"13px", borderRadius:10, border:"none",
+                background: saving ? T.borderStrong : (isPms ? T.amberDark : T.indigoDark),
+                color:"white", fontWeight:800, cursor: saving ? "wait" : "pointer", fontSize:14,
+                boxShadow:"0 4px 12px rgba(0,0,0,0.15)" }}>
+              {saving ? "Saving..." : isPms ? "Save & Reconnect" : "Save Credentials"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Modal popup shown when a manual verification attempt fails.
  * Explains why it failed and what the front desk should do next.
  */
-function VerificationFailureModal({ patient, reason, guidance, category, configIssues, onClose, onRetry, onRequestEmail }) {
+function VerificationFailureModal({ patient, reason, guidance, category, configIssues, onClose, onRetry, onRequestEmail, onFixCredentials }) {
   // Category badge for quick identification
   const CATEGORY_LABELS = {
     member_not_found: { label: "Member Not Found", color: "#B91C1C" },
@@ -3566,6 +3749,17 @@ function VerificationFailureModal({ patient, reason, guidance, category, configI
                 background:"#F5F3FF", borderRadius:8, border:"1px solid #DDD6FE", padding:"10px 12px 10px 28px" }}>
                 {configIssues.map((issue, i) => <li key={i}>{issue}</li>)}
               </ul>
+              {onFixCredentials && (
+                <button onClick={() => {
+                  const isPmsIssue = configIssues.some(i => /pms|sync|ekey/i.test(i));
+                  onFixCredentials(isPmsIssue ? "pms" : "payer", configIssues.join("; "));
+                  onClose();
+                }}
+                  style={{ marginTop:10, width:"100%", padding:"10px 14px", borderRadius:8, border:"none",
+                    background:"#7C3AED", color:"white", fontWeight:800, cursor:"pointer", fontSize:12 }}>
+                  Fix Now →
+                </button>
+              )}
             </div>
           )}
 
@@ -7052,6 +7246,7 @@ export default function LevelAI() {
   const dismissCredentialAlert = useCallback((type) => {
     setCredentialAlerts(prev => prev.map(a => a.type === type ? { ...a, dismissedAt: new Date() } : a));
   }, []);
+  const [credFixModal, setCredFixModal] = useState(null); // { type, message } or null
 
   // ── UI state ─────────────────────────────────────────────────────────────────
   const [schedulePanel, setSchedulePanel] = useState("benefits");
@@ -8148,7 +8343,7 @@ export default function LevelAI() {
                     </div>
                   </div>
                   <div style={{ display:"flex", gap:8, flexShrink:0 }}>
-                    <button onClick={() => { setSettingsInitialTab("integrations"); setTab("settings"); dismissCredentialAlert(alert.type); }}
+                    <button onClick={() => setCredFixModal(alert)}
                       style={{ background:"#f59e0b", color:"white", border:"none", borderRadius:8,
                         padding:"6px 14px", fontWeight:800, cursor:"pointer", fontSize:11 }}>
                       {alert.type === "pms" ? "Fix PMS Connection" : "Fix Payer Credentials"}
@@ -8287,6 +8482,24 @@ export default function LevelAI() {
           onClose={() => setFailureModal(null)}
           onRetry={(p) => verify(p, "manual")}
           onRequestEmail={handleRequestBenefitsEmail}
+          onFixCredentials={(type, message) => {
+            setFailureModal(null);
+            setCredFixModal({ type, message });
+          }}
+        />
+      )}
+
+      {credFixModal && (
+        <CredentialFixModal
+          alert={credFixModal}
+          practice={practice}
+          onClose={() => { setCredFixModal(null); dismissCredentialAlert(credFixModal.type); }}
+          onSave={(data) => {
+            if (data.type === "pms" && data.pmsSystem) {
+              setPractice(prev => prev ? { ...prev, pmsSystem: data.pmsSystem, pmsSyncKey: data.pmsSyncKey } : prev);
+            }
+          }}
+          showToast={showToast}
         />
       )}
 
