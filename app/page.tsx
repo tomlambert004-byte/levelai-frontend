@@ -507,7 +507,7 @@ export default function LandingPage() {
                 key={plan.name}
                 className={`relative rounded-2xl border p-8 flex flex-col ${
                   plan.highlighted
-                    ? "border-[#14B8A6]/40 bg-gradient-to-b from-[#14B8A6]/[0.06] to-[#1A1A1A] shadow-xl shadow-[#14B8A6]/10"
+                    ? "border-[#14B8A6]/40 bg-white shadow-xl shadow-[#14B8A6]/10 ring-1 ring-[#14B8A6]/20"
                     : "border-black/[0.06] bg-white"
                 }`}
               >
