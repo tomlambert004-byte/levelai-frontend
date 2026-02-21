@@ -50,7 +50,7 @@ const pct = (n) => n != null ? n + "%" : "--";
 
 const STATUS = { VERIFIED:"verified", ACTION_REQUIRED:"action_required", INACTIVE:"inactive", ERROR:"error" };
 const TRIAGE = { CLEAR:"CLEAR", NOTICE:"NOTICE", WARNING:"WARNING", CRITICAL:"CRITICAL" };
-const ACTION = { VERIFIED:"insurance_verified", RESCHEDULE:"reschedule_proposed", APPROVED:"reschedule_approved", DISMISSED:"reschedule_dismissed", OUTREACH:"outreach_queued" };
+const ACTION = { VERIFIED:"insurance_verified", RESCHEDULE:"reschedule_proposed", APPROVED:"reschedule_approved", DISMISSED:"reschedule_dismissed", OUTREACH:"outreach_queued", EMAIL_PAYER:"email_payer_inquiry" };
 
 // ── Helper: Date Generation ───────────────────────────────────────────
 function getDaysInMonth(year, month) { return new Date(year, month + 1, 0).getDate(); }
@@ -658,6 +658,25 @@ function buildOutreachEntry(p, t, practiceName, practicePhone) {
     payer: p.insurance, awaitingApproval: true,
     draftMessage: buildNotifyDraft(p, t.notify||[], practiceName, practicePhone),
     _draftLoading: true, // will be replaced by LLM draft
+  };
+}
+
+function buildEmailPayerEntry(p, failReason, practice) {
+  return {
+    id: `eml_${Date.now()}_${p.id}`,
+    time: new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),
+    patient: p.name, patientId: p.id, action: ACTION.EMAIL_PAYER, trigger: "manual",
+    status: "email_draft_pending", triage: TRIAGE.WARNING,
+    reason: `Benefits inquiry email — ${failReason || "verification failed"}`,
+    payer: p.insurance, awaitingApproval: true,
+    appointmentDate: p.appointmentDate, appointmentTime: p.appointmentTime,
+    procedure: p.procedure,
+    recipientEmail: null, // Will be set when draft comes back
+    emailSubject: null,
+    emailBody: null,
+    _draftLoading: true,
+    _emailDraft: true, // flag for email vs SMS
+    _practiceEmail: practice?.email || null,
   };
 }
 
@@ -3481,7 +3500,7 @@ function FailedVerificationsPanel({ list, results, onClose, onSelect, onRetry })
  * Modal popup shown when a manual verification attempt fails.
  * Explains why it failed and what the front desk should do next.
  */
-function VerificationFailureModal({ patient, reason, guidance, category, configIssues, onClose, onRetry }) {
+function VerificationFailureModal({ patient, reason, guidance, category, configIssues, onClose, onRetry, onRequestEmail }) {
   // Category badge for quick identification
   const CATEGORY_LABELS = {
     member_not_found: { label: "Member Not Found", color: "#B91C1C" },
@@ -3559,6 +3578,25 @@ function VerificationFailureModal({ patient, reason, guidance, category, configI
             </div>
           </div>
 
+          {/* Email payer option — shown for appointments 5+ days out */}
+          {onRequestEmail && patient.hoursUntil > 120 && (
+            <div style={{ marginBottom:16, padding:"10px 12px", background:"#EFF6FF", borderRadius:8, border:"1px solid #BFDBFE", display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ fontSize:18, flexShrink:0 }}>📧</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, fontWeight:800, color:"#1E40AF" }}>Appointment is {Math.round(patient.hoursUntil / 24)} days away</div>
+                <div style={{ fontSize:11, color:"#3B82F6", marginTop:2 }}>Send a benefits inquiry email to {patient.insurance || "the payer"} — response usually takes 1-3 business days.</div>
+              </div>
+              <button
+                onClick={() => { onRequestEmail(patient); onClose(); }}
+                style={{ padding:"8px 14px", borderRadius:6, border:"none", background:"#2563EB", color:"#fff",
+                  fontWeight:800, cursor:"pointer", fontSize:11, whiteSpace:"nowrap", transition:"all 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.background="#1D4ED8"}
+                onMouseLeave={e => e.currentTarget.style.background="#2563EB"}>
+                Request Benefits
+              </button>
+            </div>
+          )}
+
           {/* Actions */}
           <div style={{ display:"flex", gap:10 }}>
             <button
@@ -3595,7 +3633,8 @@ function AlertsPanel({ list, agentLog, onApprove, onDismiss, onClose, onSelect, 
        </div>
        <div style={{ flex:1, overflowY:"auto", padding:"16px 20px", display:"flex", flexDirection:"column", gap:12, minHeight: 0 }}>
            {list.map(({p, t}) => {
-               const entry = agentLog.find(e => e.patientId === p.id && e.awaitingApproval && e.action === ACTION.RESCHEDULE);
+               const smsEntry = agentLog.find(e => e.patientId === p.id && e.awaitingApproval && e.action === ACTION.RESCHEDULE);
+               const emailEntry = agentLog.find(e => e.patientId === p.id && e.awaitingApproval && e._emailDraft);
                return (
                  <div key={p.id} onClick={()=>onSelect(p)} style={{border:"1px solid "+T.redBorder, background:T.redLight, borderRadius:10, padding:14, cursor:"pointer", transition:"0.15s", boxShadow:"0 1px 3px rgba(0,0,0,0.02)", display:"flex", flexDirection:"column", flexShrink: 0}}
                       onMouseEnter={e=>e.currentTarget.style.borderColor=T.red} onMouseLeave={e=>e.currentTarget.style.borderColor=T.redBorder}>
@@ -3606,17 +3645,33 @@ function AlertsPanel({ list, agentLog, onApprove, onDismiss, onClose, onSelect, 
                      <div style={{fontSize:11, color:T.textMid, marginBottom:8}}>{p.appointmentTime} &middot; {p.procedure}</div>
                      {t.block.map((m, i) => <div key={i} style={{fontSize:11, color:T.red, fontWeight:700, lineHeight:"1.4", marginTop:4}}>• {m}</div>)}
 
-                     {entry && (
+                     {smsEntry && (
                        <div style={{ marginTop: 12, display:"flex", flexDirection:"column" }}>
                          <div style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:8, padding:"10px 12px", marginBottom: 12 }}>
                            <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>
-                             AI SMS Draft {entry._draftLoading && <span style={{ color:T.indigo, fontWeight:700, fontSize:9, marginLeft:6 }}>✨ Polishing with AI…</span>}
+                             AI SMS Draft {smsEntry._draftLoading && <span style={{ color:T.indigo, fontWeight:700, fontSize:9, marginLeft:6 }}>Polishing with AI...</span>}
                            </div>
-                           <div style={{ color:T.textMid, fontSize:12, lineHeight:"1.5", fontStyle:"italic", opacity: entry._draftLoading ? 0.5 : 1, transition:"opacity 0.3s" }}>&ldquo;{entry.draftMessage}&rdquo;</div>
+                           <div style={{ color:T.textMid, fontSize:12, lineHeight:"1.5", fontStyle:"italic", opacity: smsEntry._draftLoading ? 0.5 : 1, transition:"opacity 0.3s" }}>&ldquo;{smsEntry.draftMessage}&rdquo;</div>
                          </div>
                          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-                           <button onClick={(e)=>{ e.stopPropagation(); onApprove(entry); showToast("Draft sent successfully!"); }} disabled={entry._draftLoading} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"none", background: entry._draftLoading ? T.border : T.indigoDark, color:"#fff", fontWeight:800, cursor: entry._draftLoading ? "wait" : "pointer", fontSize:11 }}>Approve & Send Draft</button>
-                           <button onClick={(e)=>{ e.stopPropagation(); onDismiss(entry); showToast("Removed from AI Queue."); }} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"1px solid "+T.borderStrong, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:11 }}>I&apos;ll Handle It</button>
+                           <button onClick={(e)=>{ e.stopPropagation(); onApprove(smsEntry); showToast("Draft sent successfully!"); }} disabled={smsEntry._draftLoading} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"none", background: smsEntry._draftLoading ? T.border : T.indigoDark, color:"#fff", fontWeight:800, cursor: smsEntry._draftLoading ? "wait" : "pointer", fontSize:11 }}>Approve & Send Draft</button>
+                           <button onClick={(e)=>{ e.stopPropagation(); onDismiss(smsEntry); showToast("Removed from AI Queue."); }} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"1px solid "+T.borderStrong, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:11 }}>I&apos;ll Handle It</button>
+                         </div>
+                       </div>
+                     )}
+
+                     {emailEntry && (
+                       <div style={{ marginTop: 12, display:"flex", flexDirection:"column" }}>
+                         <div style={{ background:T.bgCard, border:"1px solid " + T.indigoBorder, borderRadius:8, padding:"10px 12px", marginBottom: 12 }}>
+                           <div style={{ color:T.indigoDark, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>
+                             Email to Payer {emailEntry._draftLoading && <span style={{ color:T.indigo, fontWeight:700, fontSize:9, marginLeft:6 }}>Drafting with AI...</span>}
+                           </div>
+                           {emailEntry.emailSubject && <div style={{ color:T.text, fontSize:11, fontWeight:700, marginBottom:4 }}>{emailEntry.emailSubject}</div>}
+                           <div style={{ color:T.textMid, fontSize:11, lineHeight:"1.5", whiteSpace:"pre-wrap", maxHeight:120, overflowY:"auto", opacity: emailEntry._draftLoading ? 0.5 : 1, transition:"opacity 0.3s" }}>{emailEntry.emailBody || "Generating email..."}</div>
+                         </div>
+                         <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+                           <button onClick={(e)=>{ e.stopPropagation(); onApprove(emailEntry); }} disabled={emailEntry._draftLoading} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"none", background: emailEntry._draftLoading ? T.border : T.indigoDark, color:"#fff", fontWeight:800, cursor: emailEntry._draftLoading ? "wait" : "pointer", fontSize:11 }}>Send to Payer</button>
+                           <button onClick={(e)=>{ e.stopPropagation(); onDismiss(emailEntry); showToast("Removed from AI Queue."); }} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"1px solid "+T.borderStrong, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:11 }}>I&apos;ll Handle It</button>
                          </div>
                        </div>
                      )}
@@ -4696,8 +4751,9 @@ function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast, res
   const outreach = log.filter(e => e.action === ACTION.OUTREACH);
   const reschedules = log.filter(e => [ACTION.RESCHEDULE,ACTION.APPROVED,ACTION.DISMISSED].includes(e.action));
   const verifications = log.filter(e => e.action === ACTION.VERIFIED);
+  const emailInquiries = log.filter(e => e.action === ACTION.EMAIL_PAYER || e.action === "email_sent");
 
-  const attentionLog = log.filter(e => e.awaitingApproval || e.action === ACTION.OUTREACH);
+  const attentionLog = log.filter(e => e.awaitingApproval || e.action === ACTION.OUTREACH || e.action === ACTION.EMAIL_PAYER);
   const displayLog = !showAttentionPanel ? log : attentionLog;
 
   const ACfg = {
@@ -4706,6 +4762,8 @@ function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast, res
     [ACTION.APPROVED]:   { icon:"Check", label:"Reschedule Approved", color:T.limeDark, bg:T.limeLight,   border:T.limeBorder  },
     [ACTION.DISMISSED]:  { icon:"Back",  label:"Handled Manually",    color:T.slate,    bg:T.slateLight,  border:T.border      },
     [ACTION.OUTREACH]:   { icon:"Phone", label:"Outreach Queued",     color:T.amberDark, bg:T.amberLight, border:T.amberBorder },
+    [ACTION.EMAIL_PAYER]:{ icon:"Mail",  label:"Email to Payer",      color:T.indigoDark, bg:T.indigoLight, border:T.indigoBorder },
+    "email_sent":        { icon:"Check", label:"Email Sent",          color:T.limeDark, bg:T.limeLight,   border:T.limeBorder  },
   };
 
   return (
@@ -4714,7 +4772,7 @@ function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast, res
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, flexShrink:0 }}>
         <div>
           <div style={{ color:T.text, fontSize:20, fontWeight:900 }}>&#x1F916; AI Workflow Log</div>
-          <div style={{ color:T.textSoft, fontSize:11, marginTop:2 }}>{verifications.length} verified &middot; {reschedules.length} reschedule actions &middot; {outreach.length} outreach queued</div>
+          <div style={{ color:T.textSoft, fontSize:11, marginTop:2 }}>{verifications.length} verified &middot; {reschedules.length} reschedule actions &middot; {outreach.length} outreach queued{emailInquiries.length > 0 ? ` · ${emailInquiries.length} email inquiries` : ""}</div>
         </div>
         <div style={{ display:"flex", gap:6 }}>
           <button onClick={()=>setShowAttentionPanel(true)} style={{ padding:"8px 16px", borderRadius:8, border:"1px solid " + (showAttentionPanel?T.indigoDark:T.border), background:showAttentionPanel?T.indigoLight:"transparent", color:showAttentionPanel?T.indigoDark:T.textMid, fontWeight:700, cursor:"pointer", fontSize:12 }}>
@@ -4788,34 +4846,61 @@ function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast, res
              <div style={{ flex:1, overflowY:"auto", minHeight: 0, padding:"16px", display:"flex", flexDirection:"column", gap:16 }}>
                {pending.map(entry => {
                   const isReschedule = entry.action === ACTION.RESCHEDULE;
+                  const isEmail = entry._emailDraft;
+                  const borderColor = isEmail ? T.indigoBorder : (isReschedule ? T.redBorder : T.amberBorder);
+                  const headerBg = isEmail ? T.indigoLight : (isReschedule ? T.redLight : T.amberLight);
+                  const accentColor = isEmail ? T.indigoDark : (isReschedule ? T.red : T.amberDark);
                   return (
-                     <div key={entry.id} style={{ border:"1.5px solid " + (isReschedule ? T.redBorder : T.amberBorder), borderRadius: 12, overflow:"hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", display:"flex", flexDirection:"column", flexShrink: 0 }}>
-                        <div style={{ background: isReschedule ? T.redLight : T.amberLight, padding:"12px 14px", borderBottom:"1px solid " + (isReschedule ? T.redBorder : T.amberBorder), flexShrink:0 }}>
+                     <div key={entry.id} style={{ border:"1.5px solid " + borderColor, borderRadius: 12, overflow:"hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.04)", display:"flex", flexDirection:"column", flexShrink: 0 }}>
+                        <div style={{ background: headerBg, padding:"12px 14px", borderBottom:"1px solid " + borderColor, flexShrink:0 }}>
                           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
                              <span style={{ fontSize:14, fontWeight:900, color:T.text }}>{entry.patient}</span>
-                             <span style={{ fontSize:11, fontWeight:800, color: isReschedule ? T.red : T.amberDark }}>{isReschedule ? "Reschedule Proposal" : "Courtesy Call"}</span>
+                             <span style={{ fontSize:11, fontWeight:800, color: accentColor }}>{isEmail ? "Benefits Inquiry Email" : isReschedule ? "Reschedule Proposal" : "Courtesy Call"}</span>
                           </div>
                           <div style={{ fontSize:11, color:T.textMid }}>Appt: {new Date(entry.appointmentDate+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})} &middot; {entry.procedure}</div>
                         </div>
 
                         <div style={{ padding:"14px", display:"flex", flexDirection:"column" }}>
-                           {(entry.blockReasons || entry.notifyReasons || []).map((r,i) => (
+                           {!isEmail && (entry.blockReasons || entry.notifyReasons || []).map((r,i) => (
                              <div key={i} style={{ display:"flex", gap:8, marginBottom:8 }}>
-                               <span style={{ color: isReschedule ? T.red : T.amberDark, fontSize:14 }}>•</span>
+                               <span style={{ color: accentColor, fontSize:14 }}>•</span>
                                <span style={{ color:T.textMid, fontSize:12, fontWeight:600, lineHeight:"1.4" }}>{r}</span>
                              </div>
                            ))}
 
-                           <div style={{ background:T.bg, border:"1px solid " + T.border, borderRadius:8, padding:"12px", margin:"8px 0" }}>
-                             <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>
-                               AI SMS Draft {entry._draftLoading && <span style={{ color:T.indigo, fontWeight:700, fontSize:9, marginLeft:6 }}>✨ Polishing with AI…</span>}
+                           {isEmail ? (
+                             /* ── Email draft preview ── */
+                             <div style={{ background:T.bg, border:"1px solid " + T.border, borderRadius:8, padding:"12px", margin:"8px 0" }}>
+                               <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>
+                                 Email Draft {entry._draftLoading && <span style={{ color:T.indigo, fontWeight:700, fontSize:9, marginLeft:6 }}>Drafting with AI...</span>}
+                               </div>
+                               {entry.recipientEmail && (
+                                 <div style={{ color:T.textSoft, fontSize:11, marginBottom:6 }}>
+                                   <strong>To:</strong> {entry.recipientEmail}
+                                 </div>
+                               )}
+                               {entry.emailSubject && (
+                                 <div style={{ color:T.text, fontSize:12, fontWeight:700, marginBottom:8 }}>
+                                   <strong>Subject:</strong> {entry.emailSubject}
+                                 </div>
+                               )}
+                               <div style={{ color:T.textMid, fontSize:12, lineHeight:"1.6", whiteSpace:"pre-wrap", maxHeight:200, overflowY:"auto", opacity: entry._draftLoading ? 0.5 : 1, transition:"opacity 0.3s" }}>
+                                 {entry.emailBody || "Generating email draft..."}
+                               </div>
                              </div>
-                             <div style={{ color:T.textMid, fontSize:13, lineHeight:"1.5", whiteSpace: "normal", opacity: entry._draftLoading ? 0.5 : 1, transition:"opacity 0.3s" }}>&ldquo;{entry.draftMessage}&rdquo;</div>
-                           </div>
+                           ) : (
+                             /* ── SMS draft preview ── */
+                             <div style={{ background:T.bg, border:"1px solid " + T.border, borderRadius:8, padding:"12px", margin:"8px 0" }}>
+                               <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>
+                                 AI SMS Draft {entry._draftLoading && <span style={{ color:T.indigo, fontWeight:700, fontSize:9, marginLeft:6 }}>Polishing with AI...</span>}
+                               </div>
+                               <div style={{ color:T.textMid, fontSize:13, lineHeight:"1.5", whiteSpace: "normal", opacity: entry._draftLoading ? 0.5 : 1, transition:"opacity 0.3s" }}>&ldquo;{entry.draftMessage}&rdquo;</div>
+                             </div>
+                           )}
 
                            <div style={{ display:"flex", gap:10, marginTop: 8, flexWrap:"wrap" }}>
-                             <button onClick={()=>{ onApprove(entry); showToast("Message Sent!"); }} disabled={entry._draftLoading} style={{ flex: "1 1 140px", padding:"12px 10px", borderRadius:8, border:"none", background: entry._draftLoading ? T.border : T.indigoDark, color:"#fff", fontWeight:800, cursor: entry._draftLoading ? "wait" : "pointer", fontSize:12 }}>
-                               {isReschedule ? "Approve & Send" : "Send Outreach"}
+                             <button onClick={()=>{ onApprove(entry); if (!isEmail) showToast("Message Sent!"); }} disabled={entry._draftLoading} style={{ flex: "1 1 140px", padding:"12px 10px", borderRadius:8, border:"none", background: entry._draftLoading ? T.border : T.indigoDark, color:"#fff", fontWeight:800, cursor: entry._draftLoading ? "wait" : "pointer", fontSize:12 }}>
+                               {isEmail ? "Send to Payer" : isReschedule ? "Approve & Send" : "Send Outreach"}
                              </button>
                              <button onClick={()=>{ onDismiss(entry); showToast("Removed from queue."); }} style={{ flex: "1 1 140px", padding:"12px 10px", borderRadius:8, border:"1px solid " + T.borderStrong, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:12 }}>
                                I&apos;ll Handle It
@@ -7447,6 +7532,30 @@ export default function LevelAI() {
   }, []);
 
   const handleApprove = useCallback((entry) => {
+    // Route email entries to the email send flow
+    if (entry._emailDraft) {
+      setAgentLog(log => log.map(e => e.id !== entry.id ? e : {
+        ...e, awaitingApproval: false, action: "email_sent",
+        status: "email_sent",
+        resolvedAt: new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),
+      }));
+      if (entry.emailBody && entry.emailSubject) {
+        fetch("/api/v1/email/send", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: entry.recipientEmail || "provider.services@payer.com",
+            subject: entry.emailSubject,
+            emailBody: entry.emailBody,
+            replyTo: entry._practiceEmail || null,
+          }) })
+          .then(r => r.json())
+          .then(data => {
+            if (data.sent) showToast(`✅ Benefits inquiry sent for ${entry.patient}`);
+            else if (data.queued) showToast(`📧 Email queued for ${entry.patient} — configure RESEND_API_KEY to enable delivery`);
+          })
+          .catch(() => {});
+      }
+      return;
+    }
     setAgentLog(log => log.map(e => e.id !== entry.id ? e : {
       ...e, awaitingApproval: false, action: ACTION.APPROVED,
       status: "reschedule_approved",
@@ -7458,7 +7567,7 @@ export default function LevelAI() {
         body: JSON.stringify({ recipientPhone: entry.recipientPhone, message: entry.draftMessage }) })
         .catch(() => {}); // non-blocking
     }
-  }, []);
+  }, [showToast]);
 
   const handleDismiss = useCallback((entry) => {
     setAgentLog(log => log.map(e => e.id !== entry.id ? e : {
@@ -7468,6 +7577,59 @@ export default function LevelAI() {
     }));
     // Stateless — draft only lived in agentLog state, nothing to clean up
   }, []);
+
+  // ── Request Benefits Email: generates an LLM draft to send to the payer ─────
+  const handleRequestBenefitsEmail = useCallback(async (patient) => {
+    const failResult = results[patient.id];
+    const failReason = failResult?._failReason || "Electronic verification failed";
+
+    // Create a placeholder agent log entry
+    const entry = buildEmailPayerEntry(patient, failReason, practice);
+    setAgentLog(log => [entry, ...log]);
+    showToast(`📧 Drafting benefits inquiry for ${patient.name}...`);
+
+    // Call the email draft API
+    try {
+      const res = await apiFetch("/api/v1/email/draft", {
+        method: "POST",
+        body: JSON.stringify({
+          patient_name: patient.name,
+          member_id: patient.memberId || null,
+          date_of_birth: patient.dob || null,
+          insurance_name: patient.insurance || null,
+          payer_id: patient.payerId || null,
+          procedure: patient.procedure || null,
+          appointment_date: patient.appointmentDate || null,
+          practice_name: practice?.name || null,
+          practice_npi: practice?.npi || null,
+          practice_phone: practice?.phone || null,
+          practice_email: practice?.email || null,
+          practice_address: practice?.address || null,
+          fail_reason: failReason,
+          fail_category: failResult?._failCategory || null,
+        }),
+      });
+      const draft = res.draft;
+      // Update the agent log entry with the LLM draft
+      setAgentLog(log => log.map(e =>
+        e.id === entry.id
+          ? { ...e, emailSubject: draft.subject, emailBody: draft.body,
+              recipientEmail: draft.to_label, _draftLoading: false }
+          : e
+      ));
+    } catch {
+      // Non-blocking — mark as ready with fallback text
+      setAgentLog(log => log.map(e =>
+        e.id === entry.id
+          ? { ...e, _draftLoading: false, emailSubject: `Benefits Inquiry — ${patient.name}`,
+              emailBody: "Draft generation failed. Please compose the email manually.",
+              recipientEmail: `${patient.insurance || "Payer"} Provider Services` }
+          : e
+      ));
+    }
+  }, [results, practice, showToast]);
+
+  // handleApproveEmail logic is inlined in handleApprove above (detects _emailDraft flag)
 
   // ── Derived state (same logic as before — different source array) ────────────
   const triageMap = {};
@@ -8123,6 +8285,7 @@ export default function LevelAI() {
           configIssues={failureModal.configIssues}
           onClose={() => setFailureModal(null)}
           onRetry={(p) => verify(p, "manual")}
+          onRequestEmail={handleRequestBenefitsEmail}
         />
       )}
 
