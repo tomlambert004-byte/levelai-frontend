@@ -103,6 +103,8 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes featureBackdropIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes featureModalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .feature-modal-card { scrollbar-width: none; -ms-overflow-style: none; }
+        .feature-modal-card::-webkit-scrollbar { display: none; }
       `}} />
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -151,6 +153,7 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
 
           {/* Modal card */}
           <div
+            className="feature-modal-card"
             style={{
               position: "relative",
               background: "#fff",
