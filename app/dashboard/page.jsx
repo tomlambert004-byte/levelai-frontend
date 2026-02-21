@@ -600,19 +600,36 @@ function sandboxVerify(patientId) {
 async function apiPostVerify(patientId, trigger, patientData = {}) {
   const [firstName, ...rest] = (patientData.name || "").split(" ");
   const lastName = rest.join(" ");
-  return apiFetch("/api/v1/verify", {
-    method: "POST",
-    body: JSON.stringify({
-      patient_id:     patientId,
-      trigger,
-      member_id:      patientData.memberId      || null,
-      first_name:     patientData.firstName     || firstName || null,
-      last_name:      patientData.lastName      || lastName  || null,
-      date_of_birth:  patientData.dob           || patientData.dateOfBirth || null,
-      insurance_name: patientData.insurance     || patientData.insuranceName || null,
-      payer_id:       patientData.payerId       || null,
-    }),
-  });
+  const payload = {
+    patient_id:     patientId,
+    trigger,
+    member_id:      patientData.memberId      || null,
+    first_name:     patientData.firstName     || firstName || null,
+    last_name:      patientData.lastName      || lastName  || null,
+    date_of_birth:  patientData.dob           || patientData.dateOfBirth || null,
+    insurance_name: patientData.insurance     || patientData.insuranceName || null,
+    payer_id:       patientData.payerId       || null,
+  };
+
+  // Retry with exponential backoff on 429 (rate limit) — up to 3 attempts
+  const MAX_RETRIES = 3;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      return await apiFetch("/api/v1/verify", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    } catch (e) {
+      const msg = (e.message || "").toLowerCase();
+      const isRateLimit = msg.includes("too many") || msg.includes("rate limit") || msg.includes("429");
+      if (isRateLimit && attempt < MAX_RETRIES - 1) {
+        // Wait 2s, 4s, 8s before retrying
+        await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempt)));
+        continue;
+      }
+      throw e;
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -8678,7 +8695,7 @@ export default function LevelAI() {
                         new Promise(resolve => setTimeout(async () => {
                           try { await verify(p, "batch"); } catch { batchFailed++; }
                           resolve();
-                        }, i * 300))
+                        }, i * 500))
                       );
                       await Promise.all(promises);
                       // Count failures from results (verify() stores STATUS.ERROR on failure)

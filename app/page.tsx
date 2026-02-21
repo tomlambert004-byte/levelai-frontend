@@ -142,6 +142,7 @@ const PRICING = [
     name: "Starter",
     price: "$199",
     period: "/month",
+    trial: "14-day free trial",
     description: "For solo practices getting started with AI verification.",
     features: [
       "Up to 300 verifications / month",
@@ -150,13 +151,14 @@ const PRICING = [
       "Pre-auth letter generator",
       "Email support",
     ],
-    cta: "Start Free Trial",
+    cta: "Start 14-Day Free Trial",
     highlighted: false,
   },
   {
     name: "Professional",
     price: "$399",
     period: "/month",
+    trial: "14-day free trial",
     description: "For growing practices that want the full AI experience.",
     features: [
       "Unlimited verifications",
@@ -166,13 +168,14 @@ const PRICING = [
       "Missing tooth intelligence",
       "Priority support",
     ],
-    cta: "Start Free Trial",
+    cta: "Start 14-Day Free Trial",
     highlighted: true,
   },
   {
     name: "Enterprise",
     price: "Custom",
     period: "",
+    trial: "14-day free trial",
     description: "For DSOs and multi-location groups with advanced needs.",
     features: [
       "Everything in Professional",
@@ -209,7 +212,7 @@ export default function LandingPage() {
             <a href="#features" className="hover:text-[#F5F5F0] transition-colors">Features</a>
             <a href="#how-it-works" className="hover:text-[#F5F5F0] transition-colors">How It Works</a>
             <a href="#pricing" className="hover:text-[#F5F5F0] transition-colors">Pricing</a>
-            <a href="#contact" className="hover:text-[#F5F5F0] transition-colors">Contact</a>
+            <Link href="/contact" className="hover:text-[#F5F5F0] transition-colors">Contact</Link>
           </div>
           <div className="flex items-center gap-3">
             <Link href="/dashboard" className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-bold text-[#F5F5F0] hover:bg-white/[0.08] transition-colors">
@@ -451,10 +454,13 @@ export default function LandingPage() {
                   </div>
                 )}
                 <div className="text-sm font-bold text-[#A3A3A3] uppercase tracking-wide mb-2">{plan.name}</div>
-                <div className="flex items-baseline gap-1 mb-2">
+                <div className="flex items-baseline gap-1 mb-1">
                   <span className="text-4xl font-black text-[#F5F5F0]">{plan.price}</span>
                   {plan.period && <span className="text-sm text-[#A3A3A3] font-semibold">{plan.period}</span>}
                 </div>
+                {plan.trial && (
+                  <div className="text-xs font-bold text-[#14B8A6] mb-3">{plan.trial} &middot; No credit card required</div>
+                )}
                 <p className="text-sm text-[#A3A3A3] mb-6 leading-relaxed">{plan.description}</p>
                 <ul className="space-y-3 mb-8 flex-1">
                   {plan.features.map((f) => (
@@ -465,7 +471,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Link
-                  href={plan.name === "Enterprise" ? "#contact" : "/dashboard"}
+                  href={plan.name === "Enterprise" ? "/contact" : "/dashboard"}
                   className={`block w-full text-center rounded-xl py-3 text-sm font-extrabold transition-colors ${
                     plan.highlighted
                       ? "bg-[#14B8A6] text-white hover:bg-[#0D9488] shadow-lg shadow-[#14B8A6]/20"
@@ -499,10 +505,10 @@ export default function LandingPage() {
                 Start Your Free Trial
                 <IconArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
-              <a href="mailto:hello@lvlai.app" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-7 py-3.5 text-base font-bold text-[#F5F5F0] hover:bg-white/[0.06] transition-colors">
+              <Link href="/contact" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-7 py-3.5 text-base font-bold text-[#F5F5F0] hover:bg-white/[0.06] transition-colors">
                 <IconMail className="w-4 h-4 text-[#14B8A6]" />
                 Contact Sales
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -532,16 +538,16 @@ export default function LandingPage() {
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-[#525252] mb-4">Company</div>
               <ul className="space-y-2 text-sm">
-                <li><a href="#contact" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Contact</a></li>
-                <li><a href="mailto:hello@lvlai.app" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Support</a></li>
+                <li><Link href="/contact" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Contact</Link></li>
+                <li><a href="mailto:support@levelai.app" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Support</a></li>
               </ul>
             </div>
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-[#525252] mb-4">Legal</div>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Terms of Service</a></li>
-                <li><a href="#" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">HIPAA Compliance</a></li>
+                <li><Link href="/privacy" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Privacy Policy</Link></li>
+                <li><Link href="/terms" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">Terms of Service</Link></li>
+                <li><Link href="/hipaa" className="text-[#A3A3A3] hover:text-[#F5F5F0] transition-colors">HIPAA Compliance</Link></li>
               </ul>
             </div>
           </div>

@@ -23,6 +23,12 @@ model Practice {
   pmsSyncKey    String?                        // encrypted PMS sync key / eKey
   webhookSecret String?                        // per-practice HMAC secret for PMS webhooks
   activatedAt   DateTime?                      // set when activation code is redeemed
+
+  // ── Stripe billing ──
+  stripeCustomerId       String?   @unique     // Stripe customer ID (cus_xxx)
+  stripeSubscriptionId   String?               // Stripe subscription ID (sub_xxx)
+  stripeSubscriptionStatus String?             // "trialing" | "active" | "past_due" | "canceled"
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

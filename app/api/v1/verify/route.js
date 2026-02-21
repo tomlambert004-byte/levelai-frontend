@@ -405,9 +405,9 @@ export async function POST(request) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Rate limit: 60 req/min per user (high enough for batch "Verify All" across a week)
+    // Rate limit: 120 req/min per user (supports batch "Verify All" + retries across a full week)
     if (checkRateLimit && rateLimitResponse) {
-      const rl = checkRateLimit(`verify:${userId}`, { maxRequests: 60, windowMs: 60_000 });
+      const rl = checkRateLimit(`verify:${userId}`, { maxRequests: 120, windowMs: 60_000 });
       const blocked = rateLimitResponse(rl);
       if (blocked) return blocked;
     }
