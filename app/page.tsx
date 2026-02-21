@@ -90,6 +90,7 @@ function IconMail({ className }: { className?: string }) {
 const FEATURES = [
   {
     icon: IconShield,
+    iconName: "IconShield",
     title: "Autonomous Overnight Verification",
     description: "Every patient on tomorrow\u2019s schedule is verified before your team walks in. A color-coded risk dashboard replaces the morning phone marathon.",
     detail: {
@@ -105,6 +106,7 @@ const FEATURES = [
   },
   {
     icon: IconFileText,
+    iconName: "IconFileText",
     title: "Instant Pre-Auth Generation",
     description: "One click produces a complete, payer-specific pre-authorization letter with correct CDT codes, clinical narratives, and practice credentials. No templates to fill.",
     detail: {
@@ -120,6 +122,7 @@ const FEATURES = [
   },
   {
     icon: IconSearch,
+    iconName: "IconSearch",
     title: "Clause & Limitation Intelligence",
     description: "Automatically flags missing tooth clauses, waiting periods, frequency limitations, and annual max issues \u2014 before the patient is in the chair.",
     detail: {
@@ -135,6 +138,7 @@ const FEATURES = [
   },
   {
     icon: IconBot,
+    iconName: "IconBot",
     title: "AI Benefits Analyst (Payer Pal)",
     description: "Ask plain-English questions about any patient\u2019s coverage. Our AI reads the full eligibility response and gives a straight answer in seconds.",
     detail: {
@@ -150,6 +154,7 @@ const FEATURES = [
   },
   {
     icon: IconPlug,
+    iconName: "IconPlug",
     title: "Deep PMS Integration",
     description: "Native connections to Open Dental, Dentrix, and Eaglesoft. Schedule data syncs automatically \u2014 no CSV uploads, no double-entry, no IT involvement.",
     detail: {
@@ -165,6 +170,7 @@ const FEATURES = [
   },
   {
     icon: IconPlay,
+    iconName: "IconPlay",
     title: "Risk-Free Sandbox Demo",
     description: "Try the full platform with realistic demo data before connecting your practice. No credit card, no commitment, no sales call required.",
     detail: {
@@ -443,7 +449,7 @@ export default function LandingPage() {
           </div>
 
           <FeatureGrid features={FEATURES.map(f => ({
-            iconName: f.icon.name,
+            iconName: f.iconName,
             title: f.title,
             description: f.description,
             detail: f.detail,
