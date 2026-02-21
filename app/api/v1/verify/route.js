@@ -478,25 +478,56 @@ export async function POST(request) {
 
         return Response.json({ ...normalized, _source: "stedi" });
       } catch (stediErr) {
-        console.warn("[verify] Stedi call failed, falling back to fixture:", stediErr.message);
-        // Fall through to fixture
+        console.warn("[verify] Stedi call failed:", stediErr.message);
+        // Categorize the error for the frontend
+        const errMsg = (stediErr.message || "").toLowerCase();
+        let failCategory = "unknown";
+        let failDetail = stediErr.message || "Verification call failed";
+        if (errMsg.includes("401") || errMsg.includes("unauthorized") || errMsg.includes("authentication"))
+          failCategory = "auth_failed";
+        else if (errMsg.includes("member") && errMsg.includes("not found"))
+          failCategory = "member_not_found";
+        else if (errMsg.includes("timeout") || errMsg.includes("timed out") || errMsg.includes("aborted"))
+          failCategory = "payer_timeout";
+        else if (errMsg.includes("429") || errMsg.includes("rate"))
+          failCategory = "rate_limited";
+        else if (errMsg.includes("payer") && (errMsg.includes("not supported") || errMsg.includes("unknown")))
+          failCategory = "payer_unsupported";
+        else if (errMsg.includes("dob") || errMsg.includes("date of birth") || errMsg.includes("invalid date"))
+          failCategory = "invalid_dob";
+        else if (errMsg.includes("500") || errMsg.includes("502") || errMsg.includes("503"))
+          failCategory = "payer_system_error";
+        else if (errMsg.includes("network") || errMsg.includes("econnrefused") || errMsg.includes("fetch"))
+          failCategory = "network_error";
+
+        return Response.json({
+          verification_status: "error",
+          plan_status: "unknown",
+          _source: "stedi_error",
+          _failCategory: failCategory,
+          _failReason: failDetail,
+          _failedAt: new Date().toISOString(),
+        });
       }
     }
 
-    // ── Live mode without Stedi → warn, don't silently return fake data ─────
+    // ── Live mode without Stedi → structured warning, not silent fixture ─────
     if (!isSandbox && !canUseStedi) {
       const reasons = [];
+      let failCategory = "missing_config";
       if (!stediKey) reasons.push("STEDI_API_KEY not configured");
-      if (!member_id && !body.memberId) reasons.push("no member ID");
-      if (!resolvedPayerId) reasons.push("unknown payer");
-      console.warn(`[verify] Live mode but can't use Stedi: ${reasons.join(", ")}. Returning fixture with warning.`);
-      // Still return fixture data but flag it clearly so the UI can warn
-      const fixture = FIXTURES[patient_id] || FIXTURES["p1"];
-      const result = normalize271(fixture);
+      if (!member_id && !body.memberId) { reasons.push("no member ID on file"); failCategory = "missing_member_id"; }
+      if (!resolvedPayerId) { reasons.push("payer not recognized"); failCategory = "payer_unsupported"; }
+      console.warn(`[verify] Live mode but can't use Stedi: ${reasons.join(", ")}.`);
+
       return Response.json({
-        ...result,
-        _source: "fixture_warning",
-        _warning: `Live mode: returned demo data because ${reasons.join(", ")}. Configure Stedi credentials in Settings for real verification.`,
+        verification_status: "error",
+        plan_status: "unknown",
+        _source: "config_error",
+        _failCategory: failCategory,
+        _failReason: reasons.join("; "),
+        _failedAt: new Date().toISOString(),
+        _configIssues: reasons,
       });
     }
 

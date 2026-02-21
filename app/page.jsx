@@ -312,43 +312,71 @@ async function apiSearchDirectory(query) {
 // Maps raw API error messages to short, human-readable reasons for the Failed panel.
 function friendlyFailReason(errMsg, patient) {
   const m = (errMsg || "").toLowerCase();
-  if (m.includes("unauthorized") || m.includes("401")) return "Authentication failed — the payer rejected our credentials.";
-  if (m.includes("timeout") || m.includes("timed out") || m.includes("aborted")) return "Verification timed out — the payer portal didn't respond in time. Try again shortly.";
-  if (m.includes("rate limit") || m.includes("429") || m.includes("too many")) return "Rate limited — too many requests sent. Wait a minute and retry.";
-  if (m.includes("member") && m.includes("not found")) return `Member ID "${patient.memberId || "unknown"}" was not found by the payer. Verify the member ID and payer are correct.`;
-  if (m.includes("payer") && (m.includes("not supported") || m.includes("unknown"))) return `Payer "${patient.insurance || "unknown"}" is not yet supported for electronic verification.`;
-  if (m.includes("credential") || m.includes("login") || m.includes("password")) return "Payer portal credentials are invalid or expired.";
-  if (m.includes("network") || m.includes("fetch") || m.includes("econnrefused")) return "Network error — couldn't reach the verification service. Check your internet connection.";
-  if (m.includes("500") || m.includes("server")) return "The verification service had a temporary error. Try again in a moment.";
-  if (m.includes("stedi")) return "Clearinghouse returned an unexpected response. The payer may be temporarily unavailable.";
+  const payer = patient?.insurance || "the payer";
+  const memberId = patient?.memberId || "unknown";
+
+  // Structured category matches (from verify route _failCategory)
+  if (m.includes("no member id on file"))
+    return `No member ID on file for ${patient?.name || "this patient"}. A valid member ID is required to verify benefits.`;
+  if (m.includes("payer not recognized"))
+    return `"${payer}" is not recognized by our clearinghouse. The payer name may be misspelled or not in our network.`;
+  if (m.includes("stedi_api_key not configured"))
+    return "Clearinghouse API is not configured. Your admin needs to set up Stedi credentials.";
+
+  // Error message pattern matches
+  if (m.includes("unauthorized") || m.includes("401"))
+    return `Authentication failed — ${payer} rejected our credentials.`;
+  if (m.includes("timeout") || m.includes("timed out") || m.includes("aborted"))
+    return `Verification timed out — ${payer} didn't respond in time.`;
+  if (m.includes("rate limit") || m.includes("429") || m.includes("too many"))
+    return "Rate limited — too many verification requests. Wait a minute and retry.";
+  if (m.includes("member") && m.includes("not found"))
+    return `Member ID "${memberId}" was not found by ${payer}. The ID may be incorrect or the patient's coverage may have changed.`;
+  if (m.includes("payer") && (m.includes("not supported") || m.includes("unknown")))
+    return `"${payer}" is not yet supported for electronic verification.`;
+  if (m.includes("invalid") && m.includes("dob"))
+    return `Date of birth mismatch — ${payer} couldn't match the patient with the DOB on file.`;
+  if (m.includes("credential") || m.includes("login") || m.includes("password"))
+    return "Payer portal credentials are invalid or expired.";
+  if (m.includes("network") || m.includes("fetch") || m.includes("econnrefused"))
+    return "Network error — couldn't reach the verification service.";
+  if (m.includes("500") || m.includes("502") || m.includes("503") || m.includes("server"))
+    return `${payer}'s system returned a server error. This is on their end — try again shortly.`;
+  if (m.includes("stedi"))
+    return "Clearinghouse returned an unexpected response. The payer may be temporarily unavailable.";
   return errMsg ? `Verification error: ${errMsg.slice(0, 120)}` : "Verification failed for an unknown reason.";
 }
 
 /**
  * Builds user-friendly action guidance based on the failure reason.
- * Tells the front desk what to do next so they don't have to guess.
+ * Tells the front desk exactly what to do — no guesswork.
  */
 function failureActionGuidance(failReason) {
   const m = (failReason || "").toLowerCase();
-  if (m.includes("member id") && m.includes("not found"))
-    return "Ask the patient for their current insurance card. The member ID or payer may have changed.";
-  if (m.includes("not yet supported"))
-    return "This payer doesn't support electronic verification. You'll need to call the payer directly to verify benefits.";
+
+  if (m.includes("no member id on file"))
+    return "Ask the patient for their insurance card and enter the member ID, group number, and payer name into the PMS. Then click Retry.";
+  if (m.includes("member id") && (m.includes("not found") || m.includes("incorrect")))
+    return "Ask the patient for their current insurance card. Compare the member ID, group number, and payer name with what's in the PMS. Update if different, then Retry.";
+  if (m.includes("not recognized") || m.includes("not yet supported") || m.includes("not in our network"))
+    return "This payer doesn't support electronic verification yet. Call the payer's provider services line (on the back of the patient's insurance card) to verify benefits by phone.";
+  if (m.includes("dob") || m.includes("date of birth"))
+    return "Check the patient's date of birth in the PMS against their insurance card or ID. If it's wrong, correct it and click Retry.";
   if (m.includes("timed out"))
-    return "The payer portal is slow right now. Click Retry — it usually works on the second attempt.";
+    return "The payer's system is slow right now. Click Retry — it usually works on the second attempt. If it keeps timing out, try again in 15 minutes.";
   if (m.includes("rate limit"))
-    return "We sent too many requests at once. Wait 60 seconds, then click Retry.";
-  if (m.includes("credential"))
-    return "Your payer portal login needs updating. Go to Settings → Credentials to fix this.";
-  if (m.includes("authentication failed"))
-    return "Our connection to the clearinghouse needs re-authentication. Contact support if this persists.";
+    return "Too many requests were sent at once. Wait 60 seconds, then click Retry.";
+  if (m.includes("credential") || m.includes("payer portal"))
+    return "The payer portal login needs updating. Go to Settings → Integrations → RPA Vault and re-enter the credentials for this payer.";
+  if (m.includes("authentication failed") || m.includes("clearinghouse") && m.includes("credential"))
+    return "The clearinghouse connection needs re-authentication. Contact your account admin or Level AI support.";
+  if (m.includes("api is not configured") || m.includes("stedi"))
+    return "The clearinghouse API hasn't been configured yet. Your admin needs to complete setup in Settings → Integrations.";
   if (m.includes("network error"))
-    return "Check your internet connection and click Retry. If it keeps failing, the payer site may be down.";
-  if (m.includes("temporary error") || m.includes("service had"))
-    return "This is a temporary issue on the payer's end. Click Retry in a minute or two.";
-  if (m.includes("clearinghouse"))
-    return "The payer's electronic system may be down. Try again later, or call the payer directly.";
-  return "Click Retry to try again. If it keeps failing, you may need to call the payer to verify benefits manually.";
+    return "Check your internet connection and click Retry. If it persists, the verification service may be experiencing an outage.";
+  if (m.includes("server error") || m.includes("on their end"))
+    return "This is a temporary issue on the payer's end. Click Retry in a few minutes. If the appointment is today, call the payer directly.";
+  return "Click Retry to try again. If it keeps failing, call the payer's provider services line (number on the back of the patient's insurance card) to verify benefits by phone.";
 }
 
 // ── Sandbox verification fixtures (client-side — no API call needed) ──────────
@@ -3453,25 +3481,50 @@ function FailedVerificationsPanel({ list, results, onClose, onSelect, onRetry })
  * Modal popup shown when a manual verification attempt fails.
  * Explains why it failed and what the front desk should do next.
  */
-function VerificationFailureModal({ patient, reason, guidance, onClose, onRetry }) {
+function VerificationFailureModal({ patient, reason, guidance, category, configIssues, onClose, onRetry }) {
+  // Category badge for quick identification
+  const CATEGORY_LABELS = {
+    member_not_found: { label: "Member Not Found", color: "#B91C1C" },
+    payer_timeout: { label: "Payer Timeout", color: "#D97706" },
+    payer_unsupported: { label: "Unsupported Payer", color: "#7C3AED" },
+    auth_failed: { label: "Auth Failed", color: "#B91C1C" },
+    invalid_dob: { label: "DOB Mismatch", color: "#D97706" },
+    payer_system_error: { label: "Payer System Error", color: "#64748B" },
+    rate_limited: { label: "Rate Limited", color: "#D97706" },
+    network_error: { label: "Network Error", color: "#64748B" },
+    missing_config: { label: "Setup Incomplete", color: "#7C3AED" },
+    missing_member_id: { label: "Missing Member ID", color: "#D97706" },
+  };
+  const catInfo = CATEGORY_LABELS[category] || null;
+
   return (
     <div style={{
       position:"fixed", inset:0, zIndex:9999, background:"rgba(0,0,0,0.6)",
       display:"flex", alignItems:"center", justifyContent:"center", padding:20,
     }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
-        background:T.bgCard, borderRadius:16, maxWidth:460, width:"100%",
+        background:T.bgCard, borderRadius:16, maxWidth:480, width:"100%",
         border:"1px solid #FECACA", boxShadow:"0 20px 60px rgba(0,0,0,0.4)",
         overflow:"hidden", animation:"slideIn 0.2s ease-out",
       }}>
         {/* Header */}
         <div style={{ padding:"20px 24px 16px", borderBottom:"1px solid " + T.border, display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
           <div>
-            <div style={{ fontSize:16, fontWeight:900, color:"#B91C1C", display:"flex", alignItems:"center", gap:8 }}>
-              <span style={{ fontSize:20 }}>&#10060;</span> Verification Failed
+            <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+              <span style={{ fontSize:18, color:"#B91C1C" }}>&#10060;</span>
+              <span style={{ fontSize:16, fontWeight:900, color:"#B91C1C" }}>Verification Failed</span>
+              {catInfo && (
+                <span style={{ fontSize:10, fontWeight:800, color:"white", background:catInfo.color,
+                  padding:"2px 8px", borderRadius:4, letterSpacing:"0.03em" }}>
+                  {catInfo.label}
+                </span>
+              )}
             </div>
-            <div style={{ fontSize:14, fontWeight:800, color:T.text, marginTop:6 }}>{patient.name}</div>
-            <div style={{ fontSize:12, color:T.text, marginTop:2 }}>{patient.appointmentTime} &middot; {patient.procedure} &middot; {patient.insurance}</div>
+            <div style={{ fontSize:14, fontWeight:800, color:T.text }}>{patient.name}</div>
+            <div style={{ fontSize:12, color:T.textMid, marginTop:2 }}>
+              {patient.appointmentTime} &middot; {patient.procedure} &middot; {patient.insurance}
+              {patient.memberId && <> &middot; ID: {patient.memberId}</>}
+            </div>
           </div>
           <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", fontSize:22, color:T.textSoft, lineHeight:1 }}>&times;</button>
         </div>
@@ -3485,6 +3538,17 @@ function VerificationFailureModal({ patient, reason, guidance, onClose, onRetry 
               {reason}
             </div>
           </div>
+
+          {/* Config issues (if any) */}
+          {configIssues && configIssues.length > 0 && (
+            <div style={{ marginBottom:16 }}>
+              <div style={{ fontSize:11, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", color:"#7C3AED", marginBottom:8 }}>Configuration Issues</div>
+              <ul style={{ margin:0, paddingLeft:16, fontSize:12, color:"#5B21B6", fontWeight:600, lineHeight:"1.7",
+                background:"#F5F3FF", borderRadius:8, border:"1px solid #DDD6FE", padding:"10px 12px 10px 28px" }}>
+                {configIssues.map((issue, i) => <li key={i}>{issue}</li>)}
+              </ul>
+            </div>
+          )}
 
           {/* What to do */}
           <div style={{ marginBottom:20 }}>
@@ -7189,6 +7253,36 @@ export default function LevelAI() {
       return;
     }
     runPhases.push("api");
+
+    // ── Handle structured errors from the verify route (Stedi failure, config issues) ──
+    if (apiResult.verification_status === "error" || apiResult._failCategory) {
+      const failReason = apiResult._failReason
+        ? friendlyFailReason(apiResult._failReason, patient)
+        : "Verification failed — the clearinghouse could not process this request.";
+      setResults(prev => ({ ...prev, [patient.id]: {
+        ...apiResult,
+        verification_status: STATUS.ERROR,
+        _failReason: failReason,
+        _failCategory: apiResult._failCategory || "unknown",
+      }}));
+      setPhase(patient.id, { phase: "error", error: failReason });
+      if (trigger === "manual") {
+        setFailureModal({
+          patient,
+          reason: failReason,
+          guidance: failureActionGuidance(failReason),
+          category: apiResult._failCategory,
+          configIssues: apiResult._configIssues,
+        });
+      }
+      // Detect credential/config issues and surface them
+      const cat = apiResult._failCategory || "";
+      if (cat === "auth_failed" || cat === "missing_config") {
+        addCredentialAlert("payer", "Clearinghouse credentials may need updating. Check Settings → Integrations.");
+      }
+      return;
+    }
+
     setResults(prev => ({ ...prev, [patient.id]: apiResult }));
 
     const thin = detectThinData(apiResult);
@@ -8025,6 +8119,8 @@ export default function LevelAI() {
           patient={failureModal.patient}
           reason={failureModal.reason}
           guidance={failureModal.guidance}
+          category={failureModal.category}
+          configIssues={failureModal.configIssues}
           onClose={() => setFailureModal(null)}
           onRetry={(p) => verify(p, "manual")}
         />
