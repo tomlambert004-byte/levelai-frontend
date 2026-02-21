@@ -643,35 +643,44 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
     if (code.length !== 6) return;
     try {
       const res = await signUp.attemptEmailAddressVerification({ code });
+      console.log("[Clerk verify] status:", res.status, "session:", res.createdSessionId, "missingFields:", res.missingFields, "unverifiedFields:", res.unverifiedFields);
       if (res.status === "complete") {
-        // Flag that this is a new user who needs onboarding
         if (typeof window !== "undefined") localStorage.setItem("pulp_needs_onboarding", "1");
         await setSignUpActive({ session: res.createdSessionId });
-        // isSignedIn flips → LevelAI renders → OnboardingWizard overlay shows
-      } else if (res.status === "missing_requirements") {
-        // Email verified but Clerk needs more (e.g. phone). Complete if session exists.
-        if (res.createdSessionId) {
-          if (typeof window !== "undefined") localStorage.setItem("pulp_needs_onboarding", "1");
-          await setSignUpActive({ session: res.createdSessionId });
-        } else {
-          setAuthErr("Additional verification required. Please contact support.");
-        }
+      } else if (res.createdSessionId) {
+        // Session exists even though status isn't "complete" — activate it
+        if (typeof window !== "undefined") localStorage.setItem("pulp_needs_onboarding", "1");
+        await setSignUpActive({ session: res.createdSessionId });
       } else {
-        setAuthErr(`Verification status: ${res.status}. Please try again.`);
+        // No session yet — show what Clerk is waiting for
+        const missing = res.missingFields?.join(", ") || res.unverifiedFields?.join(", ") || "unknown";
+        console.log("[Clerk verify] Cannot complete. Missing:", missing);
+        setAuthErr(`Almost there! Additional verification needed: ${missing}. Please contact support.`);
       }
     } catch (err) {
+      console.log("[Clerk verify] Error:", err.errors?.[0]?.code, err.errors?.[0]?.message, "signUp.status:", signUp?.status);
       const msg = err.errors?.[0]?.message || "";
       const errCode = err.errors?.[0]?.code || "";
       // Handle "already verified" — complete the sign-up if possible
-      if (errCode === "form_code_already_verified" || msg.toLowerCase().includes("already verified")) {
+      if (errCode === "form_code_already_verified" || msg.toLowerCase().includes("already verified") || msg.toLowerCase().includes("already been verified")) {
         try {
-          if (signUp.status === "complete" && signUp.createdSessionId) {
+          // Refresh signUp object to get latest state
+          const current = signUp;
+          console.log("[Clerk verify] Already verified. signUp status:", current?.status, "session:", current?.createdSessionId);
+          if (current?.createdSessionId) {
             if (typeof window !== "undefined") localStorage.setItem("pulp_needs_onboarding", "1");
-            await setSignUpActive({ session: signUp.createdSessionId });
+            await setSignUpActive({ session: current.createdSessionId });
             return;
           }
-        } catch {}
-        setAuthErr("Email already verified. Please go back and sign in instead.");
+          if (current?.status === "complete") {
+            if (typeof window !== "undefined") localStorage.setItem("pulp_needs_onboarding", "1");
+            await setSignUpActive({ session: current.createdSessionId });
+            return;
+          }
+        } catch (e2) {
+          console.log("[Clerk verify] Recovery failed:", e2);
+        }
+        setAuthErr("Email verified but sign-up couldn't complete. Please sign in instead.");
         return;
       }
       setAuthErr(msg || "Invalid code. Please try again.");
