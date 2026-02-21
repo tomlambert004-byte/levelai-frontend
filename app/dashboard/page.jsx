@@ -7649,15 +7649,17 @@ export default function LevelAI() {
   }, [isSignedIn, resetIdle]);
 
   // ── Sandbox mode (no login required) ─────────────────────────────────────────
-  // Check for ?sandbox=1 query param (from /login page sandbox button)
-  const [sandboxMode, setSandboxMode]     = useState(() => {
-    if (typeof window === "undefined") return false;
-    return new URLSearchParams(window.location.search).get("sandbox") === "1";
-  });
-  const [accountMode, setAccountMode]     = useState(() => {
-    if (typeof window === "undefined") return "live";
-    return new URLSearchParams(window.location.search).get("sandbox") === "1" ? "sandbox" : "live";
-  });
+  // Detect ?sandbox=1 in a client-only useEffect to avoid SSR/hydration race
+  // conditions. sandboxChecked gates the auth redirect so we never redirect
+  // to /login before the client has read the URL params.
+  const [sandboxMode, setSandboxMode]     = useState(false);
+  const [sandboxChecked, setSandboxChecked] = useState(false);
+  const [accountMode, setAccountMode]     = useState("live");
+  useEffect(() => {
+    const isSandbox = new URLSearchParams(window.location.search).get("sandbox") === "1";
+    if (isSandbox) { setSandboxMode(true); setAccountMode("sandbox"); }
+    setSandboxChecked(true);
+  }, []);
   const handleLogout = useCallback(() => {
     if (sandboxMode) { setSandboxMode(false); setAccountMode("live"); }
     else signOut();
@@ -8545,7 +8547,10 @@ export default function LevelAI() {
   );
 
   // ── Auth gate ─────────────────────────────────────────────────────────────────
-  if (!isLoaded) {
+  // Wait for BOTH Clerk to load AND the client-side sandbox check to complete.
+  // This eliminates the SSR → hydration race condition that previously caused
+  // sandbox users to be momentarily redirected to /login.
+  if (!isLoaded || !sandboxChecked) {
     return (
       <div style={{ height: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ color: T.textSoft, fontSize: 14, fontWeight: 700 }}>Loading…</div>
@@ -8553,22 +8558,7 @@ export default function LevelAI() {
     );
   }
   if (!isSignedIn && !sandboxMode) {
-    // Re-check URL params defensively — sandboxMode state may not have been set
-    // during SSR (no window) or during hydration race conditions
-    if (typeof window !== "undefined") {
-      const urlSandbox = new URLSearchParams(window.location.search).get("sandbox") === "1";
-      if (urlSandbox) {
-        setSandboxMode(true);
-        setAccountMode("sandbox");
-        return (
-          <div style={{ height: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ color: T.textSoft, fontSize: 14, fontWeight: 700 }}>Loading…</div>
-          </div>
-        );
-      }
-      // Not sandbox — redirect to login
-      window.location.href = "/login";
-    }
+    if (typeof window !== "undefined") window.location.href = "/login";
     return (
       <div style={{ height: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ color: T.textSoft, fontSize: 14, fontWeight: 700 }}>Redirecting to login...</div>
