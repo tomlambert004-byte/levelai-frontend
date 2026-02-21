@@ -94,7 +94,7 @@ export async function POST(request) {
     } catch { /* unauthenticated — sandbox mode */ }
 
     if (userId) {
-      const rl = checkRateLimit(`emaildraft:${userId}`, { maxRequests: 20, windowMs: 60_000 });
+      const rl = await checkRateLimit(`emaildraft:${userId}`, { maxRequests: 20, windowMs: 60_000 });
       const blocked = rateLimitResponse(rl);
       if (blocked) return blocked;
     }

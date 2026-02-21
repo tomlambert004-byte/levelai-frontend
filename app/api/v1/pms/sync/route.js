@@ -17,6 +17,7 @@ import { syncDailySchedule as dentrixSync } from "../../../../../lib/dentrix.js"
 import { syncDailySchedule as eaglesoftSync } from "../../../../../lib/eaglesoft.js";
 import { setCachedSchedule } from "../../../../../lib/patientCache.js";
 import { checkPracticeActive } from "../../../../../lib/practiceGate.js";
+import { recordSuccess, recordFailure } from "../../../../../lib/outageDetector.js";
 
 const PMS_ADAPTERS = {
   "Open Dental": syncDailySchedule,
@@ -54,7 +55,20 @@ export async function POST(request) {
     const practiceKey = practice?.pmsSyncKey || null;
 
     // Pull from the PMS
-    const patients = await adapter(date, practiceKey);
+    let patients;
+    try {
+      patients = await adapter(date, practiceKey);
+      await recordSuccess("opendental").catch(() => {});
+    } catch (pmsErr) {
+      await recordFailure("opendental").catch(() => {});
+      console.error("[pms/sync] PMS adapter failed:", pmsErr.message);
+      return Response.json({
+        status: "system_outage",
+        service: "opendental",
+        message: "Practice management system is temporarily unavailable. Please try again later.",
+        error: pmsErr.message,
+      }, { status: 502 });
+    }
 
     if (patients.length === 0) {
       return Response.json({
@@ -96,7 +110,7 @@ export async function POST(request) {
 
     // Store in cache (NOT Postgres)
     if (practice && normalized.length > 0) {
-      setCachedSchedule(practice.id, date, normalized);
+      await setCachedSchedule(practice.id, date, normalized);
     }
 
     // Audit log — no PHI, just counts

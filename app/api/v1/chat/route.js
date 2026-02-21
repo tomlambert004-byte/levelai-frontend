@@ -12,6 +12,7 @@
  */
 import { auth } from "@clerk/nextjs/server";
 import { checkRateLimit, rateLimitResponse } from "../../../../lib/rateLimit.js";
+import { recordSuccess, recordFailure } from "../../../../lib/outageDetector.js";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-20250514";
@@ -135,7 +136,7 @@ export async function POST(request) {
     }
 
     // Rate limit: 20 chat messages per minute per user
-    const rl = checkRateLimit(`chat:${userId}`, { maxRequests: 20, windowMs: 60_000 });
+    const rl = await checkRateLimit(`chat:${userId}`, { maxRequests: 20, windowMs: 60_000 });
     const blocked = rateLimitResponse(rl);
     if (blocked) return blocked;
 
@@ -200,17 +201,23 @@ export async function POST(request) {
     const data = await anthropicRes.json();
     const answer = data.content?.[0]?.text?.trim() || "I couldn't generate a response. Please try again.";
 
+    // Record success for circuit breaker
+    await recordSuccess("anthropic").catch(() => {});
+
     return Response.json({ answer, patient_id: patientId });
   } catch (err) {
+    // Record failure for circuit breaker
+    await recordFailure("anthropic").catch(() => {});
+
     console.error("[chat] Error:", err.name);
     if (err.name === "TimeoutError" || err.name === "AbortError") {
       return Response.json(
-        { error: "Payer Pal took too long to respond. Please try again.", error_type: "timeout" },
+        { error: "Payer Pal took too long to respond. Please try again.", error_type: "timeout", status: "system_outage", service: "anthropic" },
         { status: 504 }
       );
     }
     return Response.json(
-      { error: "Something went wrong. Please try again.", error_type: "unknown" },
+      { error: "Something went wrong. Please try again.", error_type: "unknown", status: "system_outage", service: "anthropic" },
       { status: 500 }
     );
   }

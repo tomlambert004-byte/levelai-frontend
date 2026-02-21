@@ -86,7 +86,7 @@ export async function POST(request) {
 
     // Merge into cache per date
     for (const [dateStr, newPatients] of Object.entries(byDate)) {
-      const existing = getCachedSchedule(practice.id, dateStr) || [];
+      const existing = (await getCachedSchedule(practice.id, dateStr)) || [];
       // Deduplicate by lowercase name
       const seen = new Set(existing.map(p => p.name.toLowerCase()));
       const merged = [...existing];
@@ -97,7 +97,7 @@ export async function POST(request) {
           merged.push(p);
         }
       }
-      setCachedSchedule(practice.id, dateStr, merged);
+      await setCachedSchedule(practice.id, dateStr, merged);
     }
 
     // Audit log — no PHI, just counts

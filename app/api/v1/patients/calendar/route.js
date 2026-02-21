@@ -72,7 +72,7 @@ export async function GET(request) {
       if (dow === 0 || dow === 6) continue;
 
       // Read from patient cache (null if not loaded for this date)
-      const cached = getCachedSchedule(practice.id, dateStr);
+      const cached = await getCachedSchedule(practice.id, dateStr);
       const count = cached ? cached.length : 0;
 
       summaries.push({

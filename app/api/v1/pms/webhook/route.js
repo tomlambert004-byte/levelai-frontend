@@ -47,7 +47,7 @@ async function verifyHmacSignature(secret, timestamp, rawBody, providedSignature
 export async function POST(request) {
   try {
     const ip = getClientIp(request);
-    const rl = checkRateLimit(`webhook:${ip}`, { maxRequests: 60, windowMs: 60_000 });
+    const rl = await checkRateLimit(`webhook:${ip}`, { maxRequests: 60, windowMs: 60_000 });
     const blocked = rateLimitResponse(rl);
     if (blocked) return blocked;
 
@@ -108,7 +108,7 @@ export async function POST(request) {
     if (event_type === "appointment.cancelled") {
       // Remove from cache if it exists
       if (data.external_id && data.appointment_date) {
-        removeCachePatient(practice_id, data.appointment_date, data.external_id);
+        await removeCachePatient(practice_id, data.appointment_date, data.external_id);
       }
       logAudit({
         practiceId: practice_id,
@@ -151,7 +151,7 @@ export async function POST(request) {
 
       // Merge into cache if it exists for this date
       if (appointment_date) {
-        mergeCachePatient(practice_id, appointment_date, patient);
+        await mergeCachePatient(practice_id, appointment_date, patient);
       }
 
       logAudit({

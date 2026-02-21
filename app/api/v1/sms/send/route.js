@@ -21,7 +21,7 @@ export async function POST(request) {
     if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     // Rate limit: 10 SMS sends per minute per user
-    const rl = checkRateLimit(`sms:${userId}`, { maxRequests: 10, windowMs: 60_000 });
+    const rl = await checkRateLimit(`sms:${userId}`, { maxRequests: 10, windowMs: 60_000 });
     const blocked = rateLimitResponse(rl);
     if (blocked) return blocked;
 

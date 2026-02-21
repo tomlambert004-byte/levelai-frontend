@@ -23,7 +23,7 @@ export async function POST(request) {
     if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     // Rate limit: 5 emails per minute per user
-    const rl = checkRateLimit(`email:${userId}`, { maxRequests: 5, windowMs: 60_000 });
+    const rl = await checkRateLimit(`email:${userId}`, { maxRequests: 5, windowMs: 60_000 });
     const blocked = rateLimitResponse(rl);
     if (blocked) return blocked;
 

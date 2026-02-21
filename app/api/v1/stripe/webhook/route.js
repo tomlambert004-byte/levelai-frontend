@@ -20,6 +20,12 @@ function getStripe() {
 }
 
 export async function POST(request) {
+  // ── Production safety: require webhook secret ────────────────────────────
+  if (process.env.NODE_ENV === "production" && !process.env.STRIPE_WEBHOOK_SECRET) {
+    console.error("[stripe/webhook] FATAL: STRIPE_WEBHOOK_SECRET missing in production");
+    return Response.json({ error: "Server misconfiguration" }, { status: 500 });
+  }
+
   const body = await request.text();
   const sig = request.headers.get("stripe-signature");
 

@@ -157,7 +157,7 @@ export async function GET(request) {
   // ── Live mode: cache-first, PMS fallback ────────────────────────────────────
 
   // 1. Check cache
-  const cached = getCachedSchedule(practice.id, date);
+  const cached = await getCachedSchedule(practice.id, date);
   if (cached && cached.length > 0) {
     return Response.json(sortByTime(recomputeHoursUntil(cached, date)));
   }
@@ -167,7 +167,7 @@ export async function GET(request) {
     const pmsPatients = await syncDailySchedule(date, practiceKey);
     if (pmsPatients && pmsPatients.length > 0) {
       const normalized = normalizePmsPatients(pmsPatients, date);
-      setCachedSchedule(practice.id, date, normalized);
+      await setCachedSchedule(practice.id, date, normalized);
       return Response.json(sortByTime(normalized));
     }
   } catch (pmsErr) {

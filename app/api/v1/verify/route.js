@@ -395,6 +395,8 @@ try {
   rateLimitResponse = rlMod.rateLimitResponse;
 } catch (_) { /* graceful degradation */ }
 import { checkPracticeActive } from "../../../../lib/practiceGate.js";
+import { recordSuccess, recordFailure, getServiceStatus } from "../../../../lib/outageDetector.js";
+import { enqueueRetry } from "../../../../lib/retryQueue.js";
 
 // ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(request) {
@@ -407,7 +409,7 @@ export async function POST(request) {
 
     // Rate limit: 120 req/min per user (supports batch "Verify All" + retries across a full week)
     if (checkRateLimit && rateLimitResponse) {
-      const rl = checkRateLimit(`verify:${userId}`, { maxRequests: 120, windowMs: 60_000 });
+      const rl = await checkRateLimit(`verify:${userId}`, { maxRequests: 120, windowMs: 60_000 });
       const blocked = rateLimitResponse(rl);
       if (blocked) return blocked;
     }
@@ -452,6 +454,36 @@ export async function POST(request) {
     const canUseStedi = !isSandbox && stediKey && (member_id || body.memberId) && resolvedPayerId && stediVerify;
 
     if (canUseStedi) {
+      // ── Check if Stedi is known-degraded (skip call to avoid piling up timeouts) ──
+      const stediStatus = await getServiceStatus("stedi");
+      if (stediStatus.status === "degraded") {
+        console.warn("[verify] Stedi is degraded — skipping call, queueing retry");
+
+        // Enqueue for automatic retry
+        const patientData = {
+          patient_id, member_id: member_id || body.memberId,
+          firstName: first_name || body.firstName || "",
+          lastName: last_name || body.lastName || "",
+          dob: date_of_birth || body.dob || "",
+          payerId: resolvedPayerId,
+          insurance: insurance_name || body.insurance || "",
+        };
+        const { queued } = await enqueueRetry(practice?.id || "unknown", patientData, "stedi is degraded");
+
+        return Response.json({
+          status: "system_outage",
+          service: "stedi",
+          retryQueued: queued,
+          degradedSince: stediStatus.degradedSince,
+          message: "Insurance verification service is temporarily unavailable." +
+            (queued ? " Verification has been queued for automatic retry." : " Please try again later."),
+          verification_status: "pending_retry",
+          plan_status: "unknown",
+          _source: "outage",
+          _failedAt: new Date().toISOString(),
+        });
+      }
+
       try {
         const t0 = Date.now();
         const { normalized, raw, durationMs } = await stediVerify({
@@ -462,6 +494,9 @@ export async function POST(request) {
           payerId:       resolvedPayerId,
           insuranceName: insurance_name || body.insurance || "",
         });
+
+        // Record success for circuit breaker
+        await recordSuccess("stedi").catch(() => {});
 
         // ZERO PHI AT REST: Verification results are returned directly to the
         // frontend and stored in React state only. No Postgres persistence.
@@ -500,6 +535,40 @@ export async function POST(request) {
         else if (errMsg.includes("network") || errMsg.includes("econnrefused") || errMsg.includes("fetch"))
           failCategory = "network_error";
 
+        // Determine if this is a system error (should trigger retry) vs user error
+        const isSystemError = ["payer_timeout", "payer_system_error", "network_error", "rate_limited", "unknown"].includes(failCategory);
+
+        if (isSystemError) {
+          // Record failure for circuit breaker
+          await recordFailure("stedi").catch(() => {});
+
+          // Enqueue for automatic retry
+          const patientData = {
+            patient_id, member_id: member_id || body.memberId,
+            firstName: first_name || body.firstName || "",
+            lastName: last_name || body.lastName || "",
+            dob: date_of_birth || body.dob || "",
+            payerId: resolvedPayerId,
+            insurance: insurance_name || body.insurance || "",
+          };
+          const { queued } = await enqueueRetry(practice?.id || "unknown", patientData, failDetail);
+
+          return Response.json({
+            status: "system_outage",
+            service: "stedi",
+            retryQueued: queued,
+            verification_status: "pending_retry",
+            plan_status: "unknown",
+            _source: "stedi_error",
+            _failCategory: failCategory,
+            _failReason: failDetail,
+            _failedAt: new Date().toISOString(),
+            message: "Insurance verification service is temporarily unavailable." +
+              (queued ? " Verification has been queued for automatic retry." : " Please try again later."),
+          });
+        }
+
+        // User/data errors — return as-is (no retry, no outage detection)
         return Response.json({
           verification_status: "error",
           plan_status: "unknown",

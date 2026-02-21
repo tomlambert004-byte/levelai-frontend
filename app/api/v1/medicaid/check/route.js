@@ -24,7 +24,7 @@ export async function POST(request) {
 
     // Rate limit: 30 req/min per user (userId, not IP — prevents cross-tenant collisions)
     const ip = getClientIp(request);
-    const rl = checkRateLimit(`medicaid:${userId}`, { maxRequests: 30, windowMs: 60_000 });
+    const rl = await checkRateLimit(`medicaid:${userId}`, { maxRequests: 30, windowMs: 60_000 });
     const blocked = rateLimitResponse(rl);
     if (blocked) return blocked;
 
