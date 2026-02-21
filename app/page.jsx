@@ -5233,8 +5233,8 @@ const SInput = ({ label, type = "text", placeholder, value, onChange, validate, 
   );
 };
 
-function Settings({ showToast, sandboxMode, practice, onSyncComplete }) {
-  const [activeTab, setActiveTab]   = useState("general");
+function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab }) {
+  const [activeTab, setActiveTab]   = useState(initialTab || "general");
 
   // General — load from practice object if available, otherwise empty
   const [pracName, setPracName]     = useState(practice?.name || "");
@@ -6748,6 +6748,9 @@ export default function LevelAI() {
   // { patient, reason, guidance } or null
   const [failureModal, setFailureModal] = useState(null);
 
+  // ── Settings deep-link — which sub-tab to open when switching to settings ─
+  const [settingsInitialTab, setSettingsInitialTab] = useState(null);
+
   // ── Practice data (for superbill NPI/TaxID/address) ──────────────────────────
   const [practice, setPractice] = useState(null);
 
@@ -7391,7 +7394,7 @@ export default function LevelAI() {
             { id:"settings",  label:"Settings",        emoji:"\u2699\uFE0F" },
           ].map(tItem => (
             <button key={tItem.id}
-              onClick={() => { setTab(tItem.id); setSelectedDayDate(null); }}
+              onClick={() => { setTab(tItem.id); setSelectedDayDate(null); if (tItem.id !== "settings") setSettingsInitialTab(null); }}
               style={{
                 display:"flex", alignItems:"center", gap:10,
                 padding: sidebarOpen ? "10px 14px" : "10px 0",
@@ -7575,7 +7578,10 @@ export default function LevelAI() {
 
         {tab === "settings" && (
           <div key="settings" style={{ animation:"fadeIn 0.3s ease-out", height:"100%", display:"flex", flexDirection:"column" }}>
-          <Settings showToast={showToast} sandboxMode={sandboxMode} practice={practice} onSyncComplete={() => loadWeekSchedule(new Date().toISOString().split("T")[0])} />
+          <Settings showToast={showToast} sandboxMode={sandboxMode} practice={practice}
+            onSyncComplete={() => loadWeekSchedule(new Date().toISOString().split("T")[0])}
+            initialTab={settingsInitialTab}
+            key={settingsInitialTab || "default"} />
           </div>
         )}
 
@@ -7686,10 +7692,10 @@ export default function LevelAI() {
                     </div>
                   </div>
                   <div style={{ display:"flex", gap:8, flexShrink:0 }}>
-                    <button onClick={() => { setTab("settings"); dismissCredentialAlert(alert.type); }}
+                    <button onClick={() => { setSettingsInitialTab("integrations"); setTab("settings"); dismissCredentialAlert(alert.type); }}
                       style={{ background:"#f59e0b", color:"white", border:"none", borderRadius:8,
                         padding:"6px 14px", fontWeight:800, cursor:"pointer", fontSize:11 }}>
-                      Open Settings
+                      {alert.type === "pms" ? "Fix PMS Connection" : "Fix Payer Credentials"}
                     </button>
                     <button onClick={() => dismissCredentialAlert(alert.type)}
                       style={{ background:"transparent", color:"#a16207", border:"1px solid #f59e0b", borderRadius:8,
