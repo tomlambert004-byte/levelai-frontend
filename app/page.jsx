@@ -6,30 +6,42 @@ import { useState, useCallback, useEffect, useRef } from "react";
 const themes = {
   dark: {
     bg:"#0A0A0A", bgCard:"#111111", border:"#1C1C1C", borderStrong:"#2A2A2A",
+    // Success / Verified — brand teal
     lime:"#14B8A6", limeLight:"#0A1F1C", limeBorder:"#134E48", limeDark:"#5EEAD4",
     text:"#F5F5F0", textMid:"#A3A3A3", textSoft:"#525252",
-    amber:"#FBBF24", amberLight:"#1A1708", amberBorder:"#78350F", amberDark:"#FCD34D",
-    red:"#EF4444", redLight:"#1C0A0A", redBorder:"#7F1D1D",
-    slate:"#94A3B8", slateLight:"#151515",
+    // Warning / Action Required — warm gold (cooler than orange, complements teal)
+    amber:"#D4A031", amberLight:"#1A170D", amberBorder:"#5C4417", amberDark:"#E8C560",
+    // Error / Failed — muted rose (cooler than fire-red, more refined on dark)
+    red:"#E05C6B", redLight:"#1C0F11", redBorder:"#6B2832",
+    // Neutral / Pending
+    slate:"#8896A7", slateLight:"#141618",
+    // Verification process — brand teal (same family)
     indigo:"#14B8A6", indigoLight:"#0A1F1C", indigoBorder:"#134E48",
     indigoDark:"#5EEAD4",
-    rpa:"#38BDF8", rpaLight:"#0A1628", rpaBorder:"#0C4A6E", rpaDark:"#7DD3FC",
+    // RPA / AI automation — sky blue (natural teal companion)
+    rpa:"#38BDF8", rpaLight:"#0B1521", rpaBorder:"#1A3A5C", rpaDark:"#7DD3FC",
     shadow:"rgba(0,0,0,0.4)", shadowStrong:"rgba(0,0,0,0.6)",
-    // Brand-specific
+    // Brand
     accent:"#14B8A6", accentLight:"#5EEAD4", accentBg:"#0A1F1C",
   },
   light: {
     bg:"#F5F5F0", bgCard:"#FFFFFF", border:"#E5E5E5", borderStrong:"#D4D4D4",
+    // Success / Verified — brand teal
     lime:"#0D9488", limeLight:"#F0FDFA", limeBorder:"#99F6E4", limeDark:"#0F766E",
     text:"#1A1A18", textMid:"#525252", textSoft:"#A3A3A3",
-    amber:"#D97706", amberLight:"#FFFBEB", amberBorder:"#FCD34D", amberDark:"#B45309",
-    red:"#DC2626", redLight:"#FEF2F2", redBorder:"#FECACA",
-    slate:"#64748B", slateLight:"#F8FAFC",
+    // Warning / Action Required — warm gold
+    amber:"#B8860B", amberLight:"#FDF8EC", amberBorder:"#E8D5A0", amberDark:"#8B6914",
+    // Error / Failed — muted rose
+    red:"#C0394F", redLight:"#FDF0F2", redBorder:"#F0C4CB",
+    // Neutral / Pending
+    slate:"#64748B", slateLight:"#F6F7F8",
+    // Verification process — brand teal
     indigo:"#0D9488", indigoLight:"#F0FDFA", indigoBorder:"#99F6E4",
     indigoDark:"#0F766E",
-    rpa:"#0EA5E9", rpaLight:"#F0F9FF", rpaBorder:"#BAE6FD", rpaDark:"#0369A1",
+    // RPA / AI automation — sky blue
+    rpa:"#0C87C9", rpaLight:"#EFF8FF", rpaBorder:"#A8D8F0", rpaDark:"#085D8C",
     shadow:"rgba(0,0,0,0.04)", shadowStrong:"rgba(0,0,0,0.08)",
-    // Brand-specific
+    // Brand
     accent:"#0D9488", accentLight:"#0F766E", accentBg:"#F0FDFA",
   },
 };
@@ -53,16 +65,19 @@ const wholeDollars = (c) => c != null ? "$" + Math.round(Number(c)).toLocaleStri
 const pct = (n) => n != null ? n + "%" : "--";
 
 // ── Brand Logo Component ─────────────────────────────────────────────────────
-// Uses the actual logo PNG (transparent background, extracted from original JPEG).
-// Simple <img> tag — no blend modes, no SVG reconstruction. Just the real logo.
+// Uses the actual logo PNGs (transparent background).
+// White version for dark mode, dark version for light mode. Auto-switches via T.bg.
 //
 // Props:
 //   size      — controls height of the logo (default 20)
 //   showText  — when false, shows only the tooth/v icon portion (for collapsed sidebar)
 //   subtitle  — optional subtitle text below the logo
 //   subtitleColor — color for the subtitle
-function BrandLogo({ size = 20, showText = true, subtitle, subtitleColor }) {
+//   forceDark — override: always use white-on-dark logo (e.g. auth panel always dark)
+function BrandLogo({ size = 20, showText = true, subtitle, subtitleColor, forceDark = false }) {
   const h = size;
+  const isDark = forceDark || T.bg === "#0A0A0A";
+  const logoSrc = isDark ? "/levelai-logo.png" : "/levelai-logo-dark.png";
 
   // Collapsed mode — show the favicon SVG (tooth outline + teal checkmark)
   if (!showText) {
@@ -83,7 +98,7 @@ function BrandLogo({ size = 20, showText = true, subtitle, subtitleColor }) {
   return (
     <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-start" }}>
       <img
-        src="/levelai-logo.png"
+        src={logoSrc}
         alt="Level AI"
         style={{
           height: h,
@@ -998,46 +1013,22 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
 
       {/* ── Left brand panel ── */}
       <div style={{ width: 420, flexShrink: 0, background: "#0A0A0A", color: "white", padding: "56px 48px",
-        display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative", overflow: "hidden" }}>
+        display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "flex-start", position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: -80, right: -80, width: 360, height: 360, background: "#14B8A6",
           opacity: 0.08, borderRadius: "50%", filter: "blur(80px)" }} />
         <div style={{ position: "absolute", bottom: -60, left: -60, width: 280, height: 280, background: "#14B8A6",
           opacity: 0.05, borderRadius: "50%", filter: "blur(80px)" }} />
 
         <div style={{ position: "relative", zIndex: 10 }}>
-          <div style={{ marginBottom: 52 }}>
-            <BrandLogo size={52} />
+          <div style={{ marginBottom: 36 }}>
+            <BrandLogo size={52} forceDark />
           </div>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase",
-            color: "#14B8A6", marginBottom: 16 }}>White-Glove SaaS</div>
-          <h1 style={{ fontSize: 38, fontWeight: 900, lineHeight: 1.15, marginBottom: 20, maxWidth: 340 }}>
-            The zero-touch dental billing engine.
+          <h1 style={{ fontSize: 36, fontWeight: 900, lineHeight: 1.18, marginBottom: 22, maxWidth: 340 }}>
+            Insurance verification on autopilot.
           </h1>
-          <p style={{ fontSize: 15, lineHeight: 1.65, opacity: 0.8, maxWidth: 340 }}>
-            We manage Stedi, Twilio, and the clearinghouse infrastructure. You just connect your PMS and payer portals — we do the rest.
+          <p style={{ fontSize: 15, lineHeight: 1.75, opacity: 0.75, maxWidth: 340 }}>
+            Level AI verifies every patient&apos;s insurance before they walk in the door, so your front desk never has to chase down benefits again. We handle the clearinghouse connections, payer portal automation, and patient outreach behind the scenes. Just connect your practice management system and let us do the heavy lifting.
           </p>
-        </div>
-
-        {/* stat cards */}
-        <div style={{ position: "relative", zIndex: 10, display: "flex", flexDirection: "column", gap: 12 }}>
-          {[
-            { emoji: "⚡", label: "Stedi Clearinghouse", sub: "Managed by Level AI" },
-            { emoji: "💬", label: "Twilio SMS",          sub: "Managed by Level AI" },
-            { emoji: "🤖", label: "RPA Bot Engine",      sub: "Your payer credentials, our automation" },
-          ].map(c => (
-            <div key={c.label} style={{ display: "flex", alignItems: "center", gap: 14, background: "rgba(0,0,0,0.2)",
-              padding: "14px 18px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)" }}>
-              <span style={{ fontSize: 22 }}>{c.emoji}</span>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 800 }}>{c.label}</div>
-                <div style={{ fontSize: 11, opacity: 0.7, marginTop: 1 }}>{c.sub}</div>
-              </div>
-              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: T.lime }} />
-                <span style={{ fontSize: 11, color: T.lime, fontWeight: 700 }}>Live</span>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
 
@@ -1438,7 +1429,7 @@ function OnboardingWizard({ onComplete, showToast }) {
 
         {/* Logo */}
         <div style={{ position:"relative", zIndex:1, marginBottom:52 }}>
-          <BrandLogo size={44} subtitle="Practice Setup" subtitleColor="#14B8A6" />
+          <BrandLogo size={44} subtitle="Practice Setup" subtitleColor="#14B8A6" forceDark />
         </div>
 
         {/* Progress dots */}
@@ -3021,15 +3012,15 @@ function PayerPalChat({ patient, result }) {
                   maxWidth:"85%", padding:"8px 12px", borderRadius:10, fontSize:12, lineHeight:"1.55",
                   fontWeight: msg.role === "user" ? 700 : 400,
                   background: msg.role === "user" ? T.indigoLight
-                    : msg.isError ? "#FEF2F2"
+                    : msg.isError ? T.redLight
                     : msg.isEscalation ? "#F0FDF4"
                     : T.bgCard,
                   color: msg.role === "user" ? T.indigoDark
-                    : msg.isError ? "#991B1B"
+                    : msg.isError ? T.red
                     : msg.isEscalation ? "#166534"
                     : T.text,
                   border: "1px solid " + (msg.role === "user" ? T.indigoBorder
-                    : msg.isError ? "#FECACA"
+                    : msg.isError ? T.redBorder
                     : msg.isEscalation ? "#BBF7D0"
                     : T.border),
                 }}>
@@ -3506,7 +3497,7 @@ function FailedVerificationsPanel({ list, results, onClose, onSelect, onRetry })
     <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden" }}>
       <div style={{ padding:"16px 20px", borderBottom:"1px solid "+T.border, display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
         <div>
-          <div style={{ fontSize:18, fontWeight:900, color:"#B91C1C" }}>Failed Verifications</div>
+          <div style={{ fontSize:18, fontWeight:900, color:T.red }}>Failed Verifications</div>
           <div style={{ fontSize:12, color:T.text, marginTop:2 }}>{list.length} patient{list.length !== 1 ? "s" : ""} couldn&apos;t be verified. Review reasons below and retry.</div>
         </div>
         <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", fontSize:24, color:T.textSoft }}>&times;</button>
@@ -3521,31 +3512,31 @@ function FailedVerificationsPanel({ list, results, onClose, onSelect, onRetry })
           const failedAt = r?._failedAt ? new Date(r._failedAt).toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit" }) : "";
           return (
             <div key={p.id}
-              style={{ border:"1px solid #FECACA", background:"#FEF2F2", borderRadius:10, padding:14, cursor:"pointer", transition:"0.15s" }}
-              onMouseEnter={e => e.currentTarget.style.borderColor="#B91C1C"}
-              onMouseLeave={e => e.currentTarget.style.borderColor="#FECACA"}>
+              style={{ border:"1px solid "+T.redBorder, background:T.redLight, borderRadius:10, padding:14, cursor:"pointer", transition:"0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.borderColor=T.red}
+              onMouseLeave={e => e.currentTarget.style.borderColor=T.redBorder}>
               <div onClick={() => onSelect(p)} style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
                 <span style={{ fontWeight:800, fontSize:14, color:T.text }}>{p.name}</span>
-                <span style={{ fontSize:11, color:"#7f1d1d", fontWeight:600 }}>{failedAt}</span>
+                <span style={{ fontSize:11, color:T.red, opacity:0.7, fontWeight:600 }}>{failedAt}</span>
               </div>
               <div onClick={() => onSelect(p)} style={{ fontSize:12, color:T.text, marginBottom:6, fontWeight:600 }}>{p.appointmentTime} &middot; {p.procedure} &middot; {p.insurance}</div>
 
               {/* Why it failed */}
-              <div style={{ fontSize:12, color:"#B91C1C", fontWeight:700, lineHeight:"1.4", marginBottom:6, padding:"8px 10px", background:"#fff", borderRadius:6, border:"1px solid #FECACA" }}>
+              <div style={{ fontSize:12, color:T.red, fontWeight:700, lineHeight:"1.4", marginBottom:6, padding:"8px 10px", background:T.bgCard, borderRadius:6, border:"1px solid "+T.redBorder }}>
                 {reason}
               </div>
 
               {/* What to do about it */}
-              <div style={{ fontSize:11, color:"#92400e", fontWeight:600, lineHeight:"1.5", marginBottom:10, padding:"8px 10px", background:"#fffbeb", borderRadius:6, border:"1px solid #fde68a", display:"flex", gap:6 }}>
+              <div style={{ fontSize:11, color:T.amber, fontWeight:600, lineHeight:"1.5", marginBottom:10, padding:"8px 10px", background:T.amberLight, borderRadius:6, border:"1px solid "+T.amberBorder, display:"flex", gap:6 }}>
                 <span style={{ flexShrink:0, fontSize:13 }}>&#128161;</span>
                 <span>{guidance}</span>
               </div>
 
               <button
                 onClick={(e) => { e.stopPropagation(); onRetry(p); }}
-                style={{ padding:"7px 14px", borderRadius:7, border:"1px solid #FECACA", background:"#fff", color:"#B91C1C", fontWeight:800, cursor:"pointer", fontSize:11, transition:"all 0.15s" }}
-                onMouseEnter={e => { e.currentTarget.style.background="#B91C1C"; e.currentTarget.style.color="#fff"; }}
-                onMouseLeave={e => { e.currentTarget.style.background="#fff"; e.currentTarget.style.color="#B91C1C"; }}>
+                style={{ padding:"7px 14px", borderRadius:7, border:"1px solid "+T.redBorder, background:T.bgCard, color:T.red, fontWeight:800, cursor:"pointer", fontSize:11, transition:"all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background=T.red; e.currentTarget.style.color="#fff"; }}
+                onMouseLeave={e => { e.currentTarget.style.background=T.bgCard; e.currentTarget.style.color=T.red; }}>
                 Retry Verification
               </button>
             </div>
@@ -3864,10 +3855,10 @@ function CredentialFixModal({ alert, practice, onClose, onSave, showToast }) {
 function VerificationFailureModal({ patient, reason, guidance, category, configIssues, onClose, onRetry, onRequestEmail, onFixCredentials }) {
   // Category badge for quick identification
   const CATEGORY_LABELS = {
-    member_not_found: { label: "Member Not Found", color: "#B91C1C" },
+    member_not_found: { label: "Member Not Found", color: "#C0394F" },
     payer_timeout: { label: "Payer Timeout", color: "#D97706" },
     payer_unsupported: { label: "Unsupported Payer", color: "#7C3AED" },
-    auth_failed: { label: "Auth Failed", color: "#B91C1C" },
+    auth_failed: { label: "Auth Failed", color: "#C0394F" },
     invalid_dob: { label: "DOB Mismatch", color: "#D97706" },
     payer_system_error: { label: "Payer System Error", color: "#64748B" },
     rate_limited: { label: "Rate Limited", color: "#D97706" },
@@ -3884,15 +3875,15 @@ function VerificationFailureModal({ patient, reason, guidance, category, configI
     }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         background:T.bgCard, borderRadius:16, maxWidth:480, width:"100%",
-        border:"1px solid #FECACA", boxShadow:"0 20px 60px rgba(0,0,0,0.4)",
+        border:"1px solid "+T.redBorder, boxShadow:"0 20px 60px rgba(0,0,0,0.4)",
         overflow:"hidden", animation:"slideIn 0.2s ease-out",
       }}>
         {/* Header */}
         <div style={{ padding:"20px 24px 16px", borderBottom:"1px solid " + T.border, display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
           <div>
             <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-              <span style={{ fontSize:18, color:"#B91C1C" }}>&#10060;</span>
-              <span style={{ fontSize:16, fontWeight:900, color:"#B91C1C" }}>Verification Failed</span>
+              <span style={{ fontSize:18, color:T.red }}>&#10060;</span>
+              <span style={{ fontSize:16, fontWeight:900, color:T.red }}>Verification Failed</span>
               {catInfo && (
                 <span style={{ fontSize:10, fontWeight:800, color:"white", background:catInfo.color,
                   padding:"2px 8px", borderRadius:4, letterSpacing:"0.03em" }}>
@@ -3913,8 +3904,8 @@ function VerificationFailureModal({ patient, reason, guidance, category, configI
         <div style={{ padding:"16px 24px 20px" }}>
           {/* Why it failed */}
           <div style={{ marginBottom:16 }}>
-            <div style={{ fontSize:11, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", color:"#B91C1C", marginBottom:8 }}>Why It Failed</div>
-            <div style={{ fontSize:13, color:T.text, fontWeight:600, lineHeight:"1.5", padding:"10px 12px", background:"#FEF2F2", borderRadius:8, border:"1px solid #FECACA" }}>
+            <div style={{ fontSize:11, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", color:T.red, marginBottom:8 }}>Why It Failed</div>
+            <div style={{ fontSize:13, color:T.text, fontWeight:600, lineHeight:"1.5", padding:"10px 12px", background:T.redLight, borderRadius:8, border:"1px solid "+T.redBorder }}>
               {reason}
             </div>
           </div>
@@ -3973,9 +3964,9 @@ function VerificationFailureModal({ patient, reason, guidance, category, configI
           <div style={{ display:"flex", gap:10 }}>
             <button
               onClick={() => { onRetry(patient); onClose(); }}
-              style={{ flex:1, padding:"10px 16px", borderRadius:8, border:"none", background:"#B91C1C", color:"#fff", fontWeight:800, cursor:"pointer", fontSize:12, transition:"all 0.15s" }}
-              onMouseEnter={e => e.currentTarget.style.background="#991b1b"}
-              onMouseLeave={e => e.currentTarget.style.background="#B91C1C"}>
+              style={{ flex:1, padding:"10px 16px", borderRadius:8, border:"none", background:T.red, color:"#fff", fontWeight:800, cursor:"pointer", fontSize:12, transition:"all 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.opacity="0.85"}
+              onMouseLeave={e => e.currentTarget.style.opacity="1"}>
               Retry Verification
             </button>
             <button
@@ -4149,15 +4140,15 @@ function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, failedCo
       </div>
       {failedCount > 0 && (
         <div onClick={onOpenFailed}
-             style={{ flex:"1 1 180px", cursor:"pointer", background:"#FEF2F2", border:"1px solid #FECACA",
+             style={{ flex:"1 1 180px", cursor:"pointer", background:T.redLight, border:"1px solid "+T.redBorder,
                padding:"14px 18px", borderRadius:12, display:"flex", alignItems:"center", gap:12,
-               transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }}
-             onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(185,28,28,0.15)"; e.currentTarget.style.borderColor="#B91C1C"; }}
-             onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor="#FECACA"; }}>
+               transition:"all 0.2s", boxShadow:"0 2px 4px "+T.shadow }}
+             onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(192,57,79,0.15)"; e.currentTarget.style.borderColor=T.red; }}
+             onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px "+T.shadow; e.currentTarget.style.borderColor=T.redBorder; }}>
           <span style={{fontSize:24}}>❌</span>
           <div>
-            <div style={{fontSize:15, fontWeight:900, color:"#B91C1C"}}>{failedCount} Failed</div>
-            <div style={{fontSize:12, color:"#B91C1C", opacity:0.8, fontWeight:600, marginTop:2}}>Review &amp; retry →</div>
+            <div style={{fontSize:15, fontWeight:900, color:T.red}}>{failedCount} Failed</div>
+            <div style={{fontSize:12, color:T.red, opacity:0.8, fontWeight:600, marginTop:2}}>Review &amp; retry →</div>
           </div>
         </div>
       )}
@@ -4184,7 +4175,7 @@ function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, i
       onMouseLeave={e=>{ if(!isSelected){ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.boxShadow="0 1px 3px "+T.shadow; e.currentTarget.style.transform="translateY(0)"; }}}>
       <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:5, flexWrap:"wrap" }}>
         <span style={{ color:T.text, fontSize:13, fontWeight:800, flex:1 }}>{patient.name}</span>
-        {isFailed && <Badge label="FAILED" color="#B91C1C" bg="#FEF2F2" border="#FECACA" />}
+        {isFailed && <Badge label="FAILED" color={T.red} bg={T.redLight} border={T.redBorder} />}
         {isUnverified && <Badge label="NEEDS REVIEW" color={T.amber} bg={T.amberLight} border={T.amberBorder} />}
         {isMedicaid && <Badge label={medicaidState ? `MEDICAID · ${medicaidState}` : "MEDICAID"} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />}
         {isOON  && <Badge label={`OON · ${patient.insurance || result?.payer_name || "OON"}`} color={T.amberDark} bg={T.amberLight} border={T.amberBorder} />}
@@ -8216,7 +8207,7 @@ export default function LevelAI() {
     { key:"action_required", label:"Action Required", color:T.amber,   bg:T.amberLight, border:T.amberBorder, filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.ACTION_REQUIRED },
     { key:"verified",        label:"Verified",        color:T.limeDark,bg:T.limeLight,  border:T.limeBorder,  filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.VERIFIED        },
     { key:"inactive",        label:"Inactive",        color:T.red,     bg:T.redLight,   border:T.redBorder,   filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.INACTIVE        },
-    { key:"failed",          label:"Failed",          color:"#B91C1C", bg:"#FEF2F2",    border:"#FECACA",     filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.ERROR            },
+    { key:"failed",          label:"Failed",          color:T.red,     bg:T.redLight,   border:T.redBorder,   filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.ERROR            },
     { key:"pending",         label:"Needs Review",    color:T.slate,   bg:T.slateLight, border:T.border,      filter:p=>!results[p.id]||isLoading(p.id)                                              },
   ];
 
@@ -8539,7 +8530,7 @@ export default function LevelAI() {
                 { label:"Verified",     count:verifiedCount, color:T.limeDark, bg:T.limeLight,  border:T.limeBorder  },
                 { label:"Action",       count:actionCount,   color:T.amber,    bg:T.amberLight, border:T.amberBorder },
                 { label:"Inactive",     count:inactiveCount, color:T.red,      bg:T.redLight,   border:T.redBorder   },
-                { label:"Failed",       count:failedCount,   color:"#B91C1C",  bg:"#FEF2F2",    border:"#FECACA", onClick: failedCount > 0 ? () => { setSchedulePanel("failed"); setPrevPanel(null); } : undefined },
+                { label:"Failed",       count:failedCount,   color:T.red,      bg:T.redLight,   border:T.redBorder, onClick: failedCount > 0 ? () => { setSchedulePanel("failed"); setPrevPanel(null); } : undefined },
                 { label:"Needs Review", count:pendingCount,  color:T.slate,    bg:T.slateLight, border:T.border      },
               ].map(({label,count,color,bg,border,onClick}) => (
                 <div key={label} onClick={onClick}
