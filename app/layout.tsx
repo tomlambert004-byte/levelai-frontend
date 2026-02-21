@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   description: 'AI-powered dental insurance verification and benefits management',
   icons: {
     icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
       { url: '/favicon-32.png', type: 'image/png', sizes: '32x32' },
       { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
     ],
