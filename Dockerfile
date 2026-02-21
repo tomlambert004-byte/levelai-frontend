@@ -25,7 +25,9 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-RUN npm run build
+# Run ONLY next build — prisma generate already ran in deps stage.
+# prisma migrate deploy runs at container startup (needs live DB connection).
+RUN npx next build
 
 # ── Stage 3: Production runner ───────────────────────────────────────────────
 FROM node:20-alpine AS runner
@@ -37,6 +39,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Don't run as root
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
+
+# Install prisma CLI for runtime migrations
+RUN npm install -g prisma@5
 
 # Copy only what's needed to run
 COPY --from=builder /app/public ./public
@@ -53,6 +58,5 @@ ENV PORT=8080
 ENV HOSTNAME="0.0.0.0"
 EXPOSE 8080
 
-# Run Prisma migrations then start the server
-# In production, migrations run on deploy (not on every container start)
-CMD ["node", "server.js"]
+# Run migrations then start server
+CMD ["sh", "-c", "prisma migrate deploy --schema=./prisma/schema.prisma && node server.js"]
