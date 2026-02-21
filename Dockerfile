@@ -2,8 +2,8 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Install libc6-compat for Alpine compatibility with some npm packages
-RUN apk add --no-cache libc6-compat
+# Install libc6-compat + OpenSSL for Prisma engine compatibility
+RUN apk add --no-cache libc6-compat openssl
 
 COPY package.json package-lock.json* ./
 RUN npm ci --ignore-scripts
@@ -16,12 +16,18 @@ RUN npx prisma generate
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# OpenSSL needed for Prisma during build
+RUN apk add --no-cache openssl
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/prisma ./prisma
 COPY . .
 
-# Build args for any env vars needed at build time
-# (runtime secrets are injected via Cloud Run environment variables)
+# Clerk publishable key is needed at build time for page pre-rendering.
+# This is a PUBLIC key (safe to embed in client bundles).
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
@@ -32,6 +38,9 @@ RUN npx next build
 # ── Stage 3: Production runner ───────────────────────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
+
+# OpenSSL for Prisma runtime
+RUN apk add --no-cache openssl
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

@@ -38,6 +38,7 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
+            --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }} \
             -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/levelai/${{ env.SERVICE_NAME }}:${{ github.sha }} \
             -t ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/levelai/${{ env.SERVICE_NAME }}:latest \
             .
