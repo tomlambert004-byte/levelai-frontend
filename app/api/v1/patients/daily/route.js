@@ -33,12 +33,14 @@ const ALL_PATIENTS = [
   { id:"p8", name:"Marvin Medicaid", gender:"M", dob:"1978-08-22", memberId:"TMHP-990-221-08", insurance:"Texas Medicaid (TMHP)",  procedure:"Crown, PFM (D2750)",                 provider:"Dr. Patel", fee:75000,  phone:"555-888-4401", email:"marvin.m@email.com",   payerId:"77037" },
 ];
 
+// Each weekday has 7 patients — mirrors a realistic single-provider dental practice.
+// Mix: ~4 verified, ~2 action-required, ~1 notable (OON/Medicaid/inactive).
 const WEEKLY_SCHEDULE = {
-  1: [["p1","8:00 AM"],["p8","9:00 AM"],["p7","10:00 AM"],["p4","11:00 AM"],["p5","1:00 PM"],["p6","2:30 PM"]],
-  2: [["p2","8:00 AM"],["p4","9:00 AM"],["p8","10:00 AM"],["p1","11:00 AM"],["p7","1:00 PM"],["p3","2:00 PM"],["p5","3:30 PM"]],
-  3: [["p6","8:00 AM"],["p8","9:00 AM"],["p2","10:00 AM"],["p7","11:00 AM"],["p4","1:00 PM"],["p1","2:30 PM"]],
-  4: [["p5","8:00 AM"],["p7","9:00 AM"],["p8","10:00 AM"],["p3","11:00 AM"],["p6","12:30 PM"],["p2","2:00 PM"],["p4","3:30 PM"]],
-  5: [["p1","8:00 AM"],["p8","9:00 AM"],["p4","10:00 AM"],["p7","11:00 AM"],["p5","1:00 PM"],["p6","2:30 PM"]],
+  1: [["p1","8:00 AM"],["p5","9:00 AM"],["p8","10:00 AM"],["p2","11:00 AM"],["p7","1:00 PM"],["p4","2:00 PM"],["p6","3:30 PM"]],
+  2: [["p5","8:00 AM"],["p1","9:00 AM"],["p3","10:00 AM"],["p8","11:00 AM"],["p6","1:00 PM"],["p7","2:00 PM"],["p2","3:30 PM"]],
+  3: [["p8","8:00 AM"],["p2","9:00 AM"],["p5","10:00 AM"],["p7","11:00 AM"],["p1","1:00 PM"],["p4","2:00 PM"],["p6","3:30 PM"]],
+  4: [["p1","8:00 AM"],["p7","9:00 AM"],["p8","10:00 AM"],["p5","11:00 AM"],["p6","1:00 PM"],["p2","2:00 PM"],["p4","3:30 PM"]],
+  5: [["p5","8:00 AM"],["p8","9:00 AM"],["p1","10:00 AM"],["p4","11:00 AM"],["p7","1:00 PM"],["p2","2:00 PM"],["p3","3:30 PM"]],
 };
 
 function parseTime(timeStr) {
@@ -147,24 +149,9 @@ export async function GET(request) {
   const gate = checkPracticeActive(practice);
   if (gate) return gate;
 
-  // ── Sandbox mode: fixtures (available 24/7) ─────────────────────────────────
+  // ── Sandbox mode: fixtures only (available 24/7, no PMS merge) ──────────────
   if (accountMode === "sandbox" || !practice) {
-    const fixtures = fixtureForDate(date);
-
-    // In sandbox mode, also layer in OD API results for a rich demo
-    let odResults = [];
-    try {
-      odResults = normalizePmsPatients(await syncDailySchedule(date, practiceKey), date);
-    } catch { /* OD not available — fixtures only */ }
-
-    // Merge: OD first (higher priority), fixtures fill gaps, deduplicate by name
-    const seen = new Set();
-    const merged = [];
-    for (const p of [...odResults, ...fixtures]) {
-      const key = p.name.toLowerCase();
-      if (!seen.has(key)) { seen.add(key); merged.push(p); }
-    }
-    return Response.json(sortByTime(merged));
+    return Response.json(sortByTime(fixtureForDate(date)));
   }
 
   // ── Live mode: cache-first, PMS fallback ────────────────────────────────────

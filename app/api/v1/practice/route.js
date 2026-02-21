@@ -28,6 +28,7 @@ export async function POST(request) {
     // Upsert — create if not exists, update fields if provided
     const updateData = {};
     if (body.name)        updateData.name        = body.name;
+    if (body.email)       updateData.email       = body.email;
     if (body.npi)         updateData.npi         = body.npi;
     if (body.taxId)       updateData.taxId       = body.taxId;
     if (body.accountMode) updateData.accountMode = body.accountMode;
@@ -42,6 +43,7 @@ export async function POST(request) {
       create: {
         clerkUserId: userId,
         name:        practiceName,
+        email:       body.email       || null,
         npi:         body.npi         || null,
         taxId:       body.taxId       || null,
         accountMode: body.accountMode || "sandbox",

@@ -12,6 +12,7 @@ model Practice {
   id          String   @id @default(cuid())
   clerkUserId String   @unique
   name        String
+  email       String?                          // primary contact / outbox email (required after onboarding)
   npi         String?
   taxId       String?
   accountMode String   @default("sandbox")  // "sandbox" | "live"

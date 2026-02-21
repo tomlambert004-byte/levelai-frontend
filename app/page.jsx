@@ -351,6 +351,146 @@ function failureActionGuidance(failReason) {
   return "Click Retry to try again. If it keeps failing, you may need to call the payer to verify benefits manually.";
 }
 
+// ── Sandbox verification fixtures (client-side — no API call needed) ──────────
+// These produce the same results as the server-side verify route fixtures.
+// In sandbox mode there is no Clerk auth, so we resolve verification locally.
+//
+// Distribution per day (~7 patients):
+//   p1 → verified (clean PPO)
+//   p2 → action_required (composite downgrade + low annual max)
+//   p3 → inactive (employment terminated)
+//   p4 → action_required (missing tooth clause + waiting period)
+//   p5 → verified (deductible not met — informational, not a flag)
+//   p6 → action_required (frequency limit exceeded)
+//   p7 → verified (OON — flagged in triage, not in verification status)
+//   p8 → verified (Medicaid — active plan)
+const SANDBOX_VERIFY_FIXTURES = {
+  p1: { verification_status:"verified", plan_status:"active", payer_name:"Delta Dental PPO", payer_id:"DELTA_PPO",
+    insurance_type:"PPO", in_network:true, plan_begin_date:"2024-01-01", plan_end_date:"2026-12-31",
+    annual_maximum_cents:200000, annual_used_cents:55000, annual_remaining_cents:145000,
+    individual_deductible_cents:5000, individual_deductible_met_cents:5000,
+    deductible_waived_for:["preventive"],
+    preventive:{ coverage_pct:100, copay_cents:null, deductible_applies:false,
+      cleaning_frequency:{ times_per_period:2, used_this_period:1, period:"calendar_year", last_service_date:"2026-08-15", next_eligible_date:null },
+      bitewing_frequency:{ times_per_period:1, used_this_period:0, next_eligible_date:null } },
+    restorative:{ coverage_pct:80, copay_cents:null, deductible_applies:true, composite_posterior_downgrade:false, composite_posterior_note:null, crown_waiting_period_months:0 },
+    missing_tooth_clause:{ applies:false, affected_teeth:[], excluded_services:[], exception_pathway:null, extraction_date:null },
+    action_flags:[],
+    subscriber:{ member_id:"DD00112233", first_name:"Margaret", last_name:"Holloway", dob:"1978-04-22", group:"GRP-001122", plan_name:"Delta Dental PPO Plus Premier" },
+    _source:"fixture", _fixture_id:"271_active_clean", _normalized_at:new Date().toISOString() },
+
+  p2: { verification_status:"action_required", plan_status:"active", payer_name:"Cigna Dental", payer_id:"CIGNA",
+    insurance_type:"PPO", in_network:true, plan_begin_date:"2026-01-01", plan_end_date:"2026-12-31",
+    annual_maximum_cents:100000, annual_used_cents:78000, annual_remaining_cents:22000,
+    individual_deductible_cents:5000, individual_deductible_met_cents:5000,
+    deductible_waived_for:["preventive"],
+    preventive:{ coverage_pct:100, copay_cents:null, deductible_applies:false,
+      cleaning_frequency:{ times_per_period:2, used_this_period:1, period:"calendar_year" } },
+    restorative:{ coverage_pct:80, copay_cents:null, deductible_applies:true,
+      composite_posterior_downgrade:true, composite_posterior_note:"Posterior composites reimbursed at amalgam rate.", crown_waiting_period_months:0 },
+    missing_tooth_clause:{ applies:false, affected_teeth:[], excluded_services:[] },
+    action_flags:["annual_max_low","composite_downgrade"],
+    subscriber:{ member_id:"CIG98765432", first_name:"Carlos", last_name:"Reyes", dob:"1991-11-03", group:"GRP-098765", plan_name:"Cigna Dental 1000" },
+    _source:"fixture", _fixture_id:"271_composite_downgrade_low_max", _normalized_at:new Date().toISOString() },
+
+  p3: { verification_status:"inactive", plan_status:"inactive", payer_name:"MetLife Dental", payer_id:"METLIFE",
+    insurance_type:"PPO", in_network:false, plan_begin_date:"2023-01-01", plan_end_date:"2026-01-31",
+    termination_reason:"employment_terminated",
+    annual_maximum_cents:150000, annual_used_cents:150000, annual_remaining_cents:0,
+    individual_deductible_cents:5000, individual_deductible_met_cents:5000,
+    preventive:{ coverage_pct:null }, restorative:{ coverage_pct:null },
+    missing_tooth_clause:{ applies:false },
+    action_flags:["plan_inactive"],
+    subscriber:{ member_id:"MET44412222", first_name:"Diane", last_name:"Okafor", dob:"1965-07-18", group:"GRP-044412", plan_name:"MetLife PDP Plus" },
+    _source:"fixture", _fixture_id:"271_inactive_plan", _normalized_at:new Date().toISOString() },
+
+  p4: { verification_status:"action_required", plan_status:"active", payer_name:"Aetna DMO", payer_id:"AETNA_DMO",
+    insurance_type:"DMO", in_network:true, plan_begin_date:"2025-06-01", plan_end_date:"2026-05-31",
+    annual_maximum_cents:200000, annual_used_cents:100000, annual_remaining_cents:100000,
+    individual_deductible_cents:5000, individual_deductible_met_cents:0,
+    deductible_waived_for:["preventive"],
+    preventive:{ coverage_pct:100, copay_cents:null, deductible_applies:false,
+      cleaning_frequency:{ times_per_period:2, used_this_period:0, period:"calendar_year" } },
+    restorative:{ coverage_pct:80, copay_cents:null, deductible_applies:true, composite_posterior_downgrade:false, crown_waiting_period_months:12 },
+    missing_tooth_clause:{ applies:true, affected_teeth:["#14"], excluded_services:["D6010 — Implant body placement","D6056 — Implant supported crown (titanium)","D6750 — Crown, porcelain fused to high noble metal"],
+      exception_pathway:"Submit pre-authorization with dated extraction records and clinical notes. Carrier review takes 5–7 business days.", extraction_date:"2024-03-10" },
+    action_flags:["missing_tooth_clause","pre_auth_required","waiting_period_active"],
+    subscriber:{ member_id:"AET77700011", first_name:"James", last_name:"Whitfield", dob:"2002-01-30", group:"GRP-077700", plan_name:"Aetna DMO Essential" },
+    _source:"fixture", _fixture_id:"271_missing_tooth_clause", _normalized_at:new Date().toISOString() },
+
+  p5: { verification_status:"verified", plan_status:"active", payer_name:"Guardian Dental", payer_id:"GUARDIAN",
+    insurance_type:"PPO", in_network:true, plan_begin_date:"2026-01-01", plan_end_date:"2026-12-31",
+    annual_maximum_cents:200000, annual_used_cents:55000, annual_remaining_cents:145000,
+    individual_deductible_cents:5000, individual_deductible_met_cents:0,
+    deductible_waived_for:["preventive"],
+    preventive:{ coverage_pct:100, copay_cents:null, deductible_applies:false,
+      cleaning_frequency:{ times_per_period:2, used_this_period:0, period:"calendar_year" } },
+    restorative:{ coverage_pct:80, copay_cents:null, deductible_applies:true, composite_posterior_downgrade:false, crown_waiting_period_months:0 },
+    missing_tooth_clause:{ applies:false, affected_teeth:[], excluded_services:[] },
+    action_flags:[],
+    subscriber:{ member_id:"GRD55566677", first_name:"Susan", last_name:"Nakamura", dob:"1983-09-14", group:"GRP-055566", plan_name:"Guardian DentalGuard Preferred" },
+    _source:"fixture", _fixture_id:"271_active_deductible_not_met", _normalized_at:new Date().toISOString() },
+
+  p6: { verification_status:"action_required", plan_status:"active", payer_name:"Delta Dental PPO", payer_id:"DELTA_PPO",
+    insurance_type:"PPO", in_network:true, plan_begin_date:"2025-01-01", plan_end_date:"2026-12-31",
+    annual_maximum_cents:200000, annual_used_cents:112000, annual_remaining_cents:88000,
+    individual_deductible_cents:5000, individual_deductible_met_cents:5000,
+    deductible_waived_for:["preventive"],
+    preventive:{ coverage_pct:100, copay_cents:null, deductible_applies:false,
+      cleaning_frequency:{ times_per_period:2, used_this_period:2, period:"calendar_year", last_service_date:"2026-02-01", next_eligible_date:"2027-01-01" },
+      bitewing_frequency:{ times_per_period:1, used_this_period:1, next_eligible_date:"2027-01-01" } },
+    restorative:{ coverage_pct:80, copay_cents:null, deductible_applies:true, composite_posterior_downgrade:false, crown_waiting_period_months:0 },
+    missing_tooth_clause:{ applies:false, affected_teeth:[], excluded_services:[] },
+    action_flags:["frequency_limit"],
+    subscriber:{ member_id:"DD00998877", first_name:"Derek", last_name:"Fontaine", dob:"1970-03-28", group:"GRP-009988", plan_name:"Delta Dental PPO Plus Premier" },
+    _source:"fixture", _fixture_id:"271_frequency_limit", _normalized_at:new Date().toISOString() },
+
+  p7: { verification_status:"verified", plan_status:"active", payer_name:"Humana Dental", payer_id:"HUMANA",
+    insurance_type:"PPO", in_network:false, plan_begin_date:"2026-01-01", plan_end_date:"2026-12-31",
+    annual_maximum_cents:100000, annual_used_cents:0, annual_remaining_cents:100000,
+    individual_deductible_cents:10000, individual_deductible_met_cents:0,
+    preventive:{ coverage_pct:50, copay_cents:null, deductible_applies:true,
+      cleaning_frequency:{ times_per_period:2, used_this_period:0, period:"calendar_year" } },
+    restorative:{ coverage_pct:50, copay_cents:null, deductible_applies:true, composite_posterior_downgrade:false, crown_waiting_period_months:0 },
+    missing_tooth_clause:{ applies:false, affected_teeth:[], excluded_services:[] },
+    action_flags:[],
+    oon_estimate:{ network_status:"out_of_network", procedure_code:"D2750", office_fee_cents:145000, allowable_amount_cents:98000,
+      data_source:"historical_claims", data_source_label:"⚡ Sourced via Historical Claims Data", oon_coverage_pct:50,
+      remaining_deductible_cents:10000, estimated_insurance_payment_cents:44000, patient_responsibility_cents:101000,
+      waterfall_steps:[
+        { step:1, name:"Network Check", status:"complete", result:"Out-of-Network — Humana not in provider credentialing list" },
+        { step:2, name:"Historical Scrubbing", status:"complete", result:"Found 7 historical ERAs for D2750 / Humana — avg allowed: $980" },
+        { step:3, name:"RPA Scrape", status:"skipped", result:"Not needed — history data sufficient" },
+        { step:4, name:"Calculation", status:"complete", result:"($980 − $100 ded) × 50% = $440 est. insurance pmt" },
+      ] },
+    assignment_of_benefits:{ assigned_to_provider:false, entity:"subscriber", method:"reimbursement", raw_indicator:"N" },
+    subscriber:{ member_id:"HUM-334-227-LC", first_name:"Lisa", last_name:"Chen", dob:"1987-06-12", group:"GRP-334227", plan_name:"Humana Dental Value PPO" },
+    _source:"fixture", _fixture_id:"271_oon_patient", _normalized_at:new Date().toISOString() },
+
+  p8: { verification_status:"verified", plan_status:"active", payer_name:"Texas Medicaid (TMHP)", payer_id:"77037",
+    insurance_type:"Medicaid", in_network:true, plan_begin_date:"2025-01-01", plan_end_date:"2026-12-31",
+    annual_maximum_cents:null, annual_used_cents:null, annual_remaining_cents:null,
+    individual_deductible_cents:0, individual_deductible_met_cents:0,
+    deductible_waived_for:["all"],
+    preventive:{ coverage_pct:100, copay_cents:0, deductible_applies:false,
+      cleaning_frequency:{ times_per_period:2, used_this_period:1, period:"calendar_year", last_service_date:"2026-06-15" } },
+    restorative:{ coverage_pct:100, copay_cents:300, deductible_applies:false, composite_posterior_downgrade:false, crown_waiting_period_months:0 },
+    missing_tooth_clause:{ applies:false },
+    action_flags:[],
+    _is_medicaid:true, _medicaid_state:"TX", _medicaid_program:"Texas Medicaid (TMHP)",
+    medicaid_info:{ state:"TX", program_name:"Texas Medicaid (TMHP)",
+      prior_auth_required:["D2750","D2751","D3310","D3320","D3330","D4341","D5110","D5120"],
+      frequency_limits:{ D1110:{ max:2, periodMonths:12, used:1 }, D0120:{ max:2, periodMonths:12, used:1 }, D0274:{ max:1, periodMonths:12, used:0 }, D2750:{ max:1, periodMonths:60, perTooth:true, used:0 } },
+      copays_cents:{ D0120:0, D1110:0, D2750:300, D3310:300 } },
+    subscriber:{ member_id:"TMHP-990-221-08", first_name:"Marvin", last_name:"Medicaid", dob:"1978-08-22", group:"TX-MEDICAID", plan_name:"Texas Medicaid (TMHP)" },
+    _source:"fixture", _fixture_id:"271_medicaid_tx", _normalized_at:new Date().toISOString() },
+};
+
+/** Resolve sandbox fixture by patient ID — returns pre-normalized result or null */
+function sandboxVerify(patientId) {
+  return SANDBOX_VERIFY_FIXTURES[patientId] || null;
+}
+
 // POST /api/v1/verify  { patient_id, member_id, first_name, last_name, date_of_birth, insurance_name, payer_id, trigger }
 // Sends full patient data so the route can attempt a real Stedi call before falling back to fixtures.
 // Returns: NormalizedVerificationResult
@@ -1083,6 +1223,7 @@ function OnboardingWizard({ onComplete, showToast }) {
 
   // Step 1 – Practice Identity
   const [pracName, setPracName]       = useState("");
+  const [pracEmail, setPracEmail]     = useState("");
   const [npi, setNpi]                 = useState("");
   const [taxId, setTaxId]             = useState("");
   const [pracAddress, setPracAddress] = useState("");
@@ -1399,6 +1540,11 @@ function OnboardingWizard({ onComplete, showToast }) {
                   value={pracAddress} onChange={e => setPracAddress(e.target.value)} required validate="required" />
                 <OInput label="Office Phone" placeholder="e.g. (801) 555-1234" type="tel"
                   value={pracPhone} onChange={e => setPracPhone(e.target.value)} required validate="phone" />
+                <OInput label="Practice Email" placeholder="e.g. frontdesk@yourpractice.com" type="email"
+                  value={pracEmail} onChange={e => setPracEmail(e.target.value)} required validate="email" />
+                <div style={{ fontSize:11, color:T.textSoft, marginTop:-10 }}>
+                  Used as the sender for payer benefit request emails and patient correspondence.
+                </div>
 
                 {/* Reassurance */}
                 <div style={{ display:"flex", gap:10, alignItems:"center", background:"#f0f9ff",
@@ -1410,7 +1556,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                 </div>
 
                 <NextBtn label="Next: Connect PMS →"
-                  disabled={!pracName || !npi || !taxId || !pracAddress || !pracPhone}
+                  disabled={!pracName || !npi || !taxId || !pracAddress || !pracPhone || !pracEmail}
                   onClick={() => advance("pms")} />
               </div>
             </div>
@@ -1753,6 +1899,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         name: pracName || undefined,
+                        email: pracEmail || undefined,
                         npi: npi || undefined,
                         taxId: taxId || undefined,
                         address: pracAddress || undefined,
@@ -5641,7 +5788,26 @@ function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab
                 </div>
                 <SInput label="Primary Contact Email" type="email" value={emailVal}
                   onChange={e => setEmailVal(e.target.value)} validate="email" required />
-                <button onClick={() => showToast("Practice profile saved.")}
+                <div style={{ fontSize:11, color:T.textSoft, marginTop:-10 }}>
+                  Used as the sender for payer benefit request emails and patient correspondence.
+                </div>
+                <button onClick={async () => {
+                  try {
+                    await fetch("/api/v1/practice", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        name: pracName || undefined,
+                        email: emailVal || undefined,
+                        npi: npiVal || undefined,
+                        taxId: taxIdVal || undefined,
+                      }),
+                    });
+                    showToast("Practice profile saved.");
+                  } catch {
+                    showToast("Failed to save — please try again.");
+                  }
+                }}
                   style={{ background: T.indigoDark, color: "white", padding: "11px 24px",
                     border: "none", borderRadius: 8, fontWeight: 800, cursor: "pointer",
                     alignSelf: "flex-start", fontSize: 14,
@@ -6944,7 +7110,7 @@ export default function LevelAI() {
     return () => clearInterval(intervalId);
   }, [isMounted, loadWeekSchedule]);
 
-  // ── Verify: calls real API — same phase logic, no setTimeout ────────────────
+  // ── Verify: calls real API (live) or resolves fixture (sandbox) ──────────────
   const verify = useCallback(async (patient, trigger = "manual") => {
     if (isLoading(patient.id)) return;
     const runPhases = [];
@@ -6961,6 +7127,39 @@ export default function LevelAI() {
     });
 
     setPhase(patient.id, { phase: "api" });
+
+    // ── Sandbox path: resolve from client-side fixtures (no API call) ─────────
+    if (sandboxMode) {
+      // Brief delay to show the loading animation (feels like real verification)
+      await new Promise(r => setTimeout(r, 400 + Math.random() * 600));
+      const fixtureResult = sandboxVerify(patient.id);
+      if (fixtureResult) {
+        runPhases.push("api");
+        const finalResult = { ...fixtureResult, _normalized_at: new Date().toISOString() };
+        setResults(prev => ({ ...prev, [patient.id]: finalResult }));
+        setPhase(patient.id, { phase: "complete", phases: runPhases });
+        const triage = triagePatient(patient, finalResult);
+        if (trigger === "manual") {
+          if (finalResult.plan_status !== "active") showToast(`⚠️ ${patient.name} — Coverage inactive.`);
+          else if (triage.block?.length > 0) showToast(`🔴 ${patient.name} — ${triage.block[0]}`);
+          else if (triage.notify?.length > 0) showToast(`🟡 ${patient.name} — ${triage.notify[0]}`);
+          else showToast(`✅ ${patient.name} verified — All clear.`);
+        }
+        const logTrigger = trigger === "batch" ? "manual" : trigger;
+        const newEntries = [buildVerifyEntry(patient, finalResult, logTrigger, runPhases)];
+        setAgentLog(log => [...newEntries.reverse(), ...log]);
+        return;
+      }
+      // No fixture for this ID → fall through to generic verified
+      const genericResult = { ...SANDBOX_VERIFY_FIXTURES.p1, _source: "fixture_generic", _normalized_at: new Date().toISOString() };
+      setResults(prev => ({ ...prev, [patient.id]: genericResult }));
+      setPhase(patient.id, { phase: "complete", phases: ["api"] });
+      const logTrigger = trigger === "batch" ? "manual" : trigger;
+      setAgentLog(log => [buildVerifyEntry(patient, genericResult, logTrigger, ["api"]), ...log]);
+      return;
+    }
+
+    // ── Live path: real API call ──────────────────────────────────────────────
     let apiResult;
     try {
       apiResult = await apiPostVerify(patient.id, trigger, patient);
@@ -7090,9 +7289,9 @@ export default function LevelAI() {
   }, [isLoading, setPhase, showToast, sandboxMode, preauthCache, addCredentialAlert, practice]);
 
   // ── Auto-verify: fires on schedule load for today, 24h, and 7d windows ───────
-  // Skipped for admin users and sandbox mode (no auth session → API returns 401).
+  // Skipped for admin users only. Sandbox mode now resolves from client-side fixtures.
   useEffect(() => {
-    if (isAdmin || sandboxMode) return;
+    if (isAdmin) return;
     const todayISO = new Date().toISOString().split("T")[0];
     patients.forEach((patient, idx) => {
       const h = patient.hoursUntil;
