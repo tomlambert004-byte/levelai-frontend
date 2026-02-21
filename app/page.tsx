@@ -89,33 +89,33 @@ function IconMail({ className }: { className?: string }) {
 const FEATURES = [
   {
     icon: IconShield,
-    title: "Daily Insurance Risk Snapshot",
-    description: "Every patient on tomorrow\u2019s schedule is automatically verified overnight. Walk in to a color-coded dashboard showing exactly who needs attention.",
+    title: "Autonomous Overnight Verification",
+    description: "Every patient on tomorrow\u2019s schedule is verified before your team walks in. A color-coded risk dashboard replaces the morning phone marathon.",
   },
   {
     icon: IconFileText,
-    title: "Smart Pre-Auth Letter Generator",
-    description: "One click generates a complete, payer-specific pre-authorization letter with correct CDT codes, clinical narratives, and practice credentials.",
+    title: "Instant Pre-Auth Generation",
+    description: "One click produces a complete, payer-specific pre-authorization letter with correct CDT codes, clinical narratives, and practice credentials. No templates to fill.",
   },
   {
     icon: IconSearch,
-    title: "Missing Tooth Clause Intelligence",
-    description: "Automatically flags plans with missing tooth clauses and cross-references against the patient\u2019s history so nothing slips through the cracks.",
+    title: "Clause & Limitation Intelligence",
+    description: "Automatically flags missing tooth clauses, waiting periods, frequency limitations, and annual max issues \u2014 before the patient is in the chair.",
   },
   {
     icon: IconBot,
-    title: "Payer Pal AI Assistant",
-    description: "Ask plain-English questions about any patient\u2019s benefits. Payer Pal reads the 271 response and gives you a straight answer in seconds.",
+    title: "AI Benefits Analyst (Payer Pal)",
+    description: "Ask plain-English questions about any patient\u2019s coverage. Our AI reads the full eligibility response and gives a straight answer in seconds.",
   },
   {
     icon: IconPlug,
-    title: "Real PMS Integration",
-    description: "Native connections to Open Dental, Dentrix, and Eaglesoft. Patient data syncs automatically \u2014 no CSV uploads, no double-entry.",
+    title: "Deep PMS Integration",
+    description: "Native connections to Open Dental, Dentrix, and Eaglesoft. Schedule data syncs automatically \u2014 no CSV uploads, no double-entry, no IT involvement.",
   },
   {
     icon: IconPlay,
-    title: "Powerful Sandbox Demo",
-    description: "Try the full platform with realistic demo data before connecting your practice. No credit card, no commitment \u2014 just click and explore.",
+    title: "Risk-Free Sandbox Demo",
+    description: "Try the full platform with realistic demo data before connecting your practice. No credit card, no commitment, no sales call required.",
   },
 ];
 
@@ -128,7 +128,7 @@ const STEPS = [
   {
     num: "02",
     title: "AI verifies every patient",
-    description: "Level AI runs real-time eligibility checks through the Stedi clearinghouse and flags risks before patients arrive.",
+    description: "Level AI runs real-time eligibility checks through our clearinghouse integration and flags risks before patients arrive.",
   },
   {
     num: "03",
@@ -215,10 +215,10 @@ export default function LandingPage() {
             <Link href="/contact" className="hover:text-[#1A1A18] transition-colors">Contact</Link>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-black/10 bg-black/[0.03] px-4 py-2 text-sm font-bold text-[#1A1A18] hover:bg-black/[0.06] transition-colors">
+            <Link href="/login" className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-black/10 bg-black/[0.03] px-4 py-2 text-sm font-bold text-[#1A1A18] hover:bg-black/[0.06] transition-colors">
               Sign In
             </Link>
-            <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-lg bg-[#14B8A6] px-4 py-2 text-sm font-bold text-white hover:bg-[#0D9488] transition-colors shadow-lg shadow-[#14B8A6]/20">
+            <Link href="/login" className="inline-flex items-center gap-2 rounded-lg bg-[#14B8A6] px-4 py-2 text-sm font-bold text-white hover:bg-[#0D9488] transition-colors shadow-lg shadow-[#14B8A6]/20">
               Get Started Free
             </Link>
           </div>
@@ -235,26 +235,26 @@ export default function LandingPage() {
           {/* Badge */}
           <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#14B8A6]/30 bg-[#14B8A6]/[0.08] px-4 py-1.5 text-xs font-bold text-[#0D9488] tracking-wide uppercase">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#14B8A6] animate-pulse" />
-            Now in early access
+            Zero Data Retention Architecture
           </div>
 
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-black leading-[0.95] tracking-tight mb-6">
-            Insurance verification
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black leading-[0.95] tracking-tight mb-6">
+            Stop paying your staff to sit on hold
             <br />
-            <span className="bg-gradient-to-r from-[#0D9488] to-[#14B8A6] bg-clip-text text-transparent">on autopilot.</span>
+            <span className="bg-gradient-to-r from-[#0D9488] to-[#14B8A6] bg-clip-text text-transparent">with insurance companies.</span>
           </h1>
 
           <p className="mx-auto max-w-2xl text-lg md:text-xl text-[#525252] leading-relaxed mb-10">
-            Level AI eliminates the insurance chaos that burns out dental front desks.
-            Every patient verified before they walk in the door &mdash; automatically.
+            Level AI is the first autonomous dental insurance verification platform built with Zero Data Retention.
+            We do the portal scraping and the pre-auths instantly. You just treat the patient.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/dashboard" className="group inline-flex items-center gap-2 rounded-xl bg-[#14B8A6] px-7 py-3.5 text-base font-extrabold text-white shadow-xl shadow-[#14B8A6]/25 hover:shadow-[#14B8A6]/40 hover:bg-[#0D9488] transition-all">
+            <Link href="/login" className="group inline-flex items-center gap-2 rounded-xl bg-[#14B8A6] px-7 py-3.5 text-base font-extrabold text-white shadow-xl shadow-[#14B8A6]/25 hover:shadow-[#14B8A6]/40 hover:bg-[#0D9488] transition-all">
               Get Started Free
               <IconArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-black/[0.03] px-7 py-3.5 text-base font-bold text-[#1A1A18] hover:bg-black/[0.06] transition-colors">
+            <Link href="/login" className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-black/[0.03] px-7 py-3.5 text-base font-bold text-[#1A1A18] hover:bg-black/[0.06] transition-colors">
               <IconPlay className="w-4 h-4 text-[#14B8A6]" />
               Try the Sandbox
             </Link>
@@ -274,45 +274,46 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ═══════════════════════════ THE PROBLEM ══════════════════════════════ */}
+      {/* ═══════════════════════════ TRUST INDICATOR (ZDR) ══════════════════ */}
       <section className="py-24 md:py-36">
         <div className="mx-auto max-w-6xl px-6">
           <div className="text-center mb-16">
-            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#D97706] mb-4">The problem</div>
+            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#14B8A6] mb-4">Zero Data Retention</div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
-              Insurance chaos is costing you
-              <br className="hidden md:block" /> time, money, and sanity.
+              Zero patient data stored.
+              <br className="hidden md:block" /> Ever.
             </h2>
             <p className="mx-auto max-w-2xl text-[#525252] text-lg">
-              Dental front desks spend hours every day on the phone with insurance companies.
-              The process is manual, error-prone, and soul-crushing.
+              Legacy platforms hoard your patient data in vulnerable databases. We don&apos;t. Our stateless
+              edge workers process your pre-auths and vanish. 100% HIPAA compliant. 0% data liability.
             </p>
           </div>
 
+          {/* VALUE PILLARS */}
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                icon: IconClock,
-                stat: "8+ hours/week",
-                title: "Wasted on hold",
-                body: "Front desk staff spend an average of 8 hours per week calling insurance companies to verify benefits manually.",
+                icon: IconZap,
+                stat: "Ops Managers",
+                title: "Eliminate the workflow, not organize it",
+                body: "Most software just organizes manual work. Level AI eliminates it. Our AI reads your schedule, scrapes payer portals, and flags coverage gaps automatically \u2014 before the morning huddle.",
               },
               {
                 icon: IconShield,
-                stat: "30% of claims",
-                title: "Denied on first pass",
-                body: "Missing or incorrect insurance data causes nearly a third of dental claims to be denied, delaying revenue by weeks.",
+                stat: "IT & Compliance",
+                title: "Stateless architecture, zero attack surface",
+                body: "Our stateless architecture shrinks your attack surface to near zero. Protected Health Information is never stored at rest on our servers. No data at rest means no data to breach.",
               },
               {
-                icon: IconZap,
-                stat: "#1 reason",
-                title: "Staff burnout",
-                body: "Insurance verification is the number one source of front-desk frustration and the leading cause of staff turnover in dental practices.",
+                icon: IconClock,
+                stat: "Practice Owners",
+                title: "Stop chair-side surprises cold",
+                body: "We catch claim denials before the patient sits in the chair. AI-parsed breakdowns flag missing tooth clauses, annual max issues, and frequency limitations so you never eat a write-off.",
               },
             ].map((card) => (
               <div key={card.title} className="group rounded-2xl border border-black/[0.06] bg-white p-8 hover:border-[#14B8A6]/30 transition-colors">
                 <card.icon className="w-8 h-8 text-[#14B8A6] mb-5" />
-                <div className="text-2xl font-black text-[#14B8A6] mb-1">{card.stat}</div>
+                <div className="text-xs font-extrabold text-[#14B8A6] uppercase tracking-wider mb-2">{card.stat}</div>
                 <div className="text-base font-bold text-[#1A1A18] mb-3">{card.title}</div>
                 <p className="text-sm text-[#525252] leading-relaxed">{card.body}</p>
               </div>
@@ -325,32 +326,32 @@ export default function LandingPage() {
       <section className="py-24 md:py-36 bg-gradient-to-b from-transparent via-[#14B8A6]/[0.02] to-transparent">
         <div className="mx-auto max-w-6xl px-6">
           <div className="text-center mb-16">
-            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#14B8A6] mb-4">The solution</div>
+            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#14B8A6] mb-4">Legacy vs. Level</div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
-              Meet your AI-powered
-              <br className="hidden md:block" /> insurance co-pilot.
+              Your current vendor is a
+              <br className="hidden md:block" /> slow, risky liability.
             </h2>
             <p className="mx-auto max-w-2xl text-[#525252] text-lg">
-              Level AI plugs into your practice management system and handles insurance verification,
-              pre-authorization, and patient outreach &mdash; automatically.
+              Legacy verification platforms store your patient data indefinitely, charge per-claim fees,
+              and still require manual phone calls. Level AI is a different category entirely.
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {[
-              { label: "Before Level AI", color: "text-[#F87171]", border: "border-[#F87171]/20", items: [
-                "Hours on the phone with insurance companies",
-                "Manually entering data into spreadsheets",
-                "Claim denials catching you off guard",
-                "Staff burning out from repetitive work",
-                "No visibility until patient walks in",
+              { label: "Legacy Platforms", color: "text-[#F87171]", border: "border-[#F87171]/20", items: [
+                "Patient data stored in vulnerable databases",
+                "Manual phone calls still required for exceptions",
+                "Batch processing \u2014 results arrive hours late",
+                "Per-claim fees that scale against you",
+                "No pre-auth automation, just eligibility checks",
               ]},
-              { label: "After Level AI", color: "text-[#14B8A6]", border: "border-[#14B8A6]/20", items: [
-                "Every patient verified automatically overnight",
-                "PMS syncs in real-time \u2014 zero data entry",
-                "Denials flagged and resolved before they happen",
-                "Front desk focuses on patient experience",
-                "Full visibility 24 hours before every appointment",
+              { label: "Level AI", color: "text-[#14B8A6]", border: "border-[#14B8A6]/20", items: [
+                "Zero Data Retention \u2014 PHI never stored at rest",
+                "Fully autonomous portal scraping, no phone calls",
+                "Real-time results before the morning huddle",
+                "Flat monthly pricing, unlimited verifications",
+                "Pre-auths, eligibility, and outreach \u2014 all automated",
               ]},
             ].map((col) => (
               <div key={col.label} className={`rounded-2xl border ${col.border} bg-white p-8`}>
@@ -375,8 +376,8 @@ export default function LandingPage() {
           <div className="text-center mb-16">
             <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#14B8A6] mb-4">Features</div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
-              Everything your front desk needs.
-              <br className="hidden md:block" /> Nothing it doesn&apos;t.
+              Built for practices that
+              <br className="hidden md:block" /> refuse to settle.
             </h2>
           </div>
 
@@ -471,7 +472,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Link
-                  href={plan.name === "Enterprise" ? "/contact" : "/dashboard"}
+                  href={plan.name === "Enterprise" ? "/contact" : "/login"}
                   className={`block w-full text-center rounded-xl py-3 text-sm font-extrabold transition-colors ${
                     plan.highlighted
                       ? "bg-[#14B8A6] text-white hover:bg-[#0D9488] shadow-lg shadow-[#14B8A6]/20"
@@ -494,14 +495,14 @@ export default function LandingPage() {
               <IconMail className="w-6 h-6 text-[#14B8A6]" />
             </div>
             <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-4">
-              Ready to eliminate insurance chaos?
+              Ready to stop leaving money on the table?
             </h2>
             <p className="mx-auto max-w-xl text-[#525252] text-lg mb-8">
-              Whether you&apos;re a solo practice or a 50-location DSO, we&apos;d love to show you how Level AI can
-              transform your insurance workflow.
+              Whether you&apos;re a solo practice or a 50-location DSO, Level AI eliminates insurance busywork
+              and protects your revenue from day one. Zero risk. Zero data stored.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/dashboard" className="group inline-flex items-center gap-2 rounded-xl bg-[#14B8A6] px-7 py-3.5 text-base font-extrabold text-white shadow-xl shadow-[#14B8A6]/25 hover:shadow-[#14B8A6]/40 hover:bg-[#0D9488] transition-all">
+              <Link href="/login" className="group inline-flex items-center gap-2 rounded-xl bg-[#14B8A6] px-7 py-3.5 text-base font-extrabold text-white shadow-xl shadow-[#14B8A6]/25 hover:shadow-[#14B8A6]/40 hover:bg-[#0D9488] transition-all">
                 Start Your Free Trial
                 <IconArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
@@ -532,7 +533,7 @@ export default function LandingPage() {
                 <li><a href="#features" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Features</a></li>
                 <li><a href="#pricing" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Pricing</a></li>
                 <li><a href="#how-it-works" className="text-[#525252] hover:text-[#1A1A18] transition-colors">How It Works</a></li>
-                <li><Link href="/dashboard" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Sandbox Demo</Link></li>
+                <li><Link href="/login" className="text-[#525252] hover:text-[#1A1A18] transition-colors">Sandbox Demo</Link></li>
               </ul>
             </div>
             <div>

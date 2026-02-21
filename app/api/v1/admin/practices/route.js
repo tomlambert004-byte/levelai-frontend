@@ -45,8 +45,12 @@ export async function GET() {
         createdAt: true,
         accountMode: true,
         npi: true,
+        email: true,
         phone: true,
         pmsSystem: true,
+        planTier: true,
+        stripeSubscriptionStatus: true,
+        status: true,
       },
     });
 

@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 /**
  * Public routes that do NOT require Clerk auth checks.
@@ -7,6 +8,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
  */
 const isPublicRoute = createRouteMatcher([
   "/",
+  "/login(.*)",
   "/terms(.*)",
   "/hipaa(.*)",
   "/privacy(.*)",
@@ -21,8 +23,16 @@ export default clerkMiddleware(async (auth, req) => {
   // Skip auth enforcement on public marketing & legal pages
   if (isPublicRoute(req)) return;
 
+  const { userId } = await auth();
+
+  // Unauthenticated users hitting /dashboard get redirected to /login
+  // Exception: ?sandbox=1 allows unauthenticated access for demo mode
+  if (!userId && req.nextUrl.pathname.startsWith("/dashboard") && req.nextUrl.searchParams.get("sandbox") !== "1") {
+    const loginUrl = new URL("/login", req.url);
+    return NextResponse.redirect(loginUrl);
+  }
+
   // All other routes (dashboard, API) — protect with Clerk
-  // This is a soft check: unauthenticated users get redirected to sign-in
   // API routes handle their own auth via auth() calls
 });
 

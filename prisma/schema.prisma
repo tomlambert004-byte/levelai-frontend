@@ -28,6 +28,7 @@ model Practice {
   stripeCustomerId       String?   @unique     // Stripe customer ID (cus_xxx)
   stripeSubscriptionId   String?               // Stripe subscription ID (sub_xxx)
   stripeSubscriptionStatus String?             // "trialing" | "active" | "past_due" | "canceled"
+  planTier               String?   @default("starter") // "starter" | "professional" | "enterprise"
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

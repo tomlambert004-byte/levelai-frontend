@@ -951,7 +951,7 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
       await signIn.authenticateWithRedirect({
         strategy: "oauth_google",
         redirectUrl: "/sso-callback",
-        redirectUrlComplete: "/",
+        redirectUrlComplete: "/dashboard",
       });
     } catch (err) {
       setAuthErr(err.errors?.[0]?.message || "Google sign-in failed.");
@@ -4199,7 +4199,7 @@ function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, i
       <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:5, flexWrap:"wrap" }}>
         <span style={{ color:T.text, fontSize:13, fontWeight:800, flex:1 }}>{patient.name}</span>
         {isFailed && <Badge label="FAILED" color={T.red} bg={T.redLight} border={T.redBorder} />}
-        {isUnverified && <Badge label="NEEDS REVIEW" color={T.amber} bg={T.amberLight} border={T.amberBorder} />}
+        {isUnverified && <Badge label="PENDING" color={T.amber} bg={T.amberLight} border={T.amberBorder} />}
         {isMedicaid && <Badge label={medicaidState ? `MEDICAID · ${medicaidState}` : "MEDICAID"} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />}
         {isOON  && <Badge label={`OON · ${patient.insurance || result?.payer_name || "OON"}`} color={T.amberDark} bg={T.amberLight} border={T.amberBorder} />}
         {isAuto && <Badge label="AUTO" color={T.indigo} bg={T.indigoLight} border={T.indigoBorder} icon="Bot" />}
@@ -7313,41 +7313,68 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
               ) : (
                 <div style={{ background: "#111111", borderRadius: 12, border: "1px solid #1F1F1F", overflow: "hidden" }}>
                   {/* Table header */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 160px 160px",
-                    padding: "12px 20px", borderBottom: "1px solid #1F1F1F", gap: 12 }}>
-                    {["Practice Name", "Mode", "PMS", "Activated", "Created"].map(h => (
+                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 90px 100px 100px 100px 140px 140px",
+                    padding: "12px 20px", borderBottom: "1px solid #1F1F1F", gap: 10 }}>
+                    {["Practice Name", "Plan", "Mode", "Billing", "PMS", "Activated", "Created"].map(h => (
                       <div key={h} style={{ fontSize: 10, fontWeight: 800, color: "#525252",
                         textTransform: "uppercase", letterSpacing: "0.08em" }}>{h}</div>
                     ))}
                   </div>
                   {/* Table rows */}
-                  {practices.map((p, i) => (
-                    <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 160px 160px",
-                      padding: "14px 20px", borderBottom: i < practices.length - 1 ? "1px solid #1e293b" : "none",
-                      background: i % 2 === 0 ? "transparent" : "rgba(10,10,10,0.4)", gap: 12, alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: "#F5F5F0" }}>{p.name || "Unnamed"}</div>
-                        {p.npi && <div style={{ fontSize: 10, color: "#525252", marginTop: 2 }}>NPI: {p.npi}</div>}
+                  {practices.map((p, i) => {
+                    const tierColors = {
+                      enterprise:    { bg: "rgba(139,92,246,0.12)", color: "#a78bfa", border: "rgba(139,92,246,0.2)", label: "Enterprise" },
+                      professional:  { bg: "rgba(20,184,166,0.10)", color: "#5EEAD4", border: "rgba(20,184,166,0.2)", label: "Professional" },
+                      starter:       { bg: "rgba(100,116,139,0.12)", color: "#94a3b8", border: "rgba(100,116,139,0.2)", label: "Starter" },
+                    };
+                    const tier = tierColors[p.planTier] || tierColors.starter;
+                    const billingColors = {
+                      active:   { color: "#4ade80", label: "Active" },
+                      trialing: { color: "#facc15", label: "Trial" },
+                      past_due: { color: "#f87171", label: "Past Due" },
+                      canceled: { color: "#6b7280", label: "Canceled" },
+                    };
+                    const billing = billingColors[p.stripeSubscriptionStatus] || { color: "#475569", label: p.stripeSubscriptionStatus || "\u2014" };
+                    return (
+                      <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1.2fr 90px 100px 100px 100px 140px 140px",
+                        padding: "14px 20px", borderBottom: i < practices.length - 1 ? "1px solid #1e293b" : "none",
+                        background: i % 2 === 0 ? "transparent" : "rgba(10,10,10,0.4)", gap: 10, alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: "#F5F5F0" }}>{p.name || "Unnamed"}</div>
+                          {p.email && <div style={{ fontSize: 10, color: "#525252", marginTop: 2 }}>{p.email}</div>}
+                          {p.npi && <div style={{ fontSize: 10, color: "#3f3f46", marginTop: 1 }}>NPI: {p.npi}</div>}
+                        </div>
+                        <div>
+                          <span style={{
+                            display: "inline-block", padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 800,
+                            background: tier.bg, color: tier.color, border: "1px solid " + tier.border,
+                          }}>
+                            {tier.label}
+                          </span>
+                        </div>
+                        <div>
+                          <span style={{
+                            display: "inline-block", padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 800,
+                            background: p.accountMode === "live" ? "rgba(20,184,166,0.10)" : "rgba(245,158,11,0.12)",
+                            color: p.accountMode === "live" ? "#5EEAD4" : "#fbbf24",
+                            border: "1px solid " + (p.accountMode === "live" ? "rgba(20,184,166,0.2)" : "rgba(245,158,11,0.2)"),
+                          }}>
+                            {p.accountMode === "live" ? "Live" : "Sandbox"}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: billing.color }}>
+                          {billing.label}
+                        </div>
+                        <div style={{ fontSize: 12, color: p.pmsSystem ? "#cbd5e1" : "#475569" }}>
+                          {p.pmsSystem || "\u2014"}
+                        </div>
+                        <div style={{ fontSize: 11, color: p.activatedAt ? "#4ade80" : "#475569" }}>
+                          {p.activatedAt ? fmtDate(p.activatedAt) : "Not activated"}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#525252" }}>{fmtDate(p.createdAt)}</div>
                       </div>
-                      <div>
-                        <span style={{
-                          display: "inline-block", padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 800,
-                          background: p.accountMode === "live" ? "rgba(20,184,166,0.10)" : "rgba(245,158,11,0.12)",
-                          color: p.accountMode === "live" ? "#5EEAD4" : "#fbbf24",
-                          border: `1px solid ${p.accountMode === "live" ? "rgba(20,184,166,0.2)" : "rgba(245,158,11,0.2)"}`,
-                        }}>
-                          {p.accountMode === "live" ? "Live" : "Sandbox"}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 12, color: p.pmsSystem ? "#cbd5e1" : "#475569" }}>
-                        {p.pmsSystem || "—"}
-                      </div>
-                      <div style={{ fontSize: 11, color: p.activatedAt ? "#4ade80" : "#475569" }}>
-                        {p.activatedAt ? fmtDate(p.activatedAt) : "Not activated"}
-                      </div>
-                      <div style={{ fontSize: 11, color: "#525252" }}>{fmtDate(p.createdAt)}</div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -7555,8 +7582,15 @@ export default function LevelAI() {
   }, [isSignedIn, resetIdle]);
 
   // ── Sandbox mode (no login required) ─────────────────────────────────────────
-  const [sandboxMode, setSandboxMode]     = useState(false);
-  const [accountMode, setAccountMode]     = useState("live"); // "sandbox" | "live"
+  // Check for ?sandbox=1 query param (from /login page sandbox button)
+  const [sandboxMode, setSandboxMode]     = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("sandbox") === "1";
+  });
+  const [accountMode, setAccountMode]     = useState(() => {
+    if (typeof window === "undefined") return "live";
+    return new URLSearchParams(window.location.search).get("sandbox") === "1" ? "sandbox" : "live";
+  });
   const handleLogout = useCallback(() => {
     if (sandboxMode) { setSandboxMode(false); setAccountMode("live"); }
     else signOut();
@@ -7612,6 +7646,24 @@ export default function LevelAI() {
     setCredentialAlerts(prev => prev.map(a => a.type === type ? { ...a, dismissedAt: new Date() } : a));
   }, []);
   const [credFixModal, setCredFixModal] = useState(null); // { type, message } or null
+
+  // ── Notification bell state ────────────────────────────────────────────────
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifSeen, setNotifSeen] = useState(false); // true once the user opens the bell
+  const notifRef = useRef(null);
+  const activeAlerts = credentialAlerts.filter(a => !a.dismissedAt);
+  const notifCount = activeAlerts.length;
+  // Reset "seen" when new alerts come in
+  useEffect(() => {
+    if (notifCount > 0) setNotifSeen(false);
+  }, [notifCount]);
+  // Close notification dropdown on click outside
+  useEffect(() => {
+    if (!notifOpen) return;
+    const handleClick = (e) => { if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false); };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [notifOpen]);
 
   // ── UI state ─────────────────────────────────────────────────────────────────
   const [schedulePanel, setSchedulePanel] = useState("benefits");
@@ -8052,7 +8104,7 @@ export default function LevelAI() {
     const newPhases = {};
     let changed = false;
     patients.forEach(p => {
-      if (results[p.id]) return; // already resolved
+      if (results[p.id] && results[p.id].verification_status !== STATUS.ERROR) return; // already resolved (but override errors)
       const fixture = sandboxVerify(p.id);
       const result = fixture
         ? { ...fixture, _normalized_at: new Date().toISOString() }
@@ -8264,7 +8316,6 @@ export default function LevelAI() {
     { key:"verified",        label:"Verified",        color:T.limeDark,bg:T.limeLight,  border:T.limeBorder,  filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.VERIFIED        },
     { key:"inactive",        label:"Inactive",        color:T.red,     bg:T.redLight,   border:T.redBorder,   filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.INACTIVE        },
     { key:"failed",          label:"Failed",          color:T.red,     bg:T.redLight,   border:T.redBorder,   filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.ERROR            },
-    { key:"pending",         label:"Needs Review",    color:T.slate,   bg:T.slateLight, border:T.border,      filter:p=>!results[p.id]||isLoading(p.id)                                              },
   ];
 
   const todayStrLocal = isMounted ? new Date().toISOString().split("T")[0] : "";
@@ -8340,9 +8391,11 @@ export default function LevelAI() {
     );
   }
   if (!isSignedIn && !sandboxMode) {
+    // Redirect to /login — middleware handles this server-side, but this is a client-side fallback
+    if (typeof window !== "undefined") window.location.href = "/login";
     return (
-      <div style={{ position: "relative", height: "100vh", overflow: "hidden" }}>
-        <AuthFlow onComplete={() => {}} showToast={showToast} onSandbox={() => { setSandboxMode(true); setAccountMode("sandbox"); setDailyLoading(true); }} />
+      <div style={{ height: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: T.textSoft, fontSize: 14, fontWeight: 700 }}>Redirecting to login...</div>
       </div>
     );
   }
@@ -8587,7 +8640,6 @@ export default function LevelAI() {
                 { label:"Action",       count:actionCount,   color:T.amber,    bg:T.amberLight, border:T.amberBorder },
                 { label:"Inactive",     count:inactiveCount, color:T.red,      bg:T.redLight,   border:T.redBorder   },
                 { label:"Failed",       count:failedCount,   color:T.red,      bg:T.redLight,   border:T.redBorder, onClick: failedCount > 0 ? () => { setSchedulePanel("failed"); setPrevPanel(null); } : undefined },
-                { label:"Needs Review", count:pendingCount,  color:T.slate,    bg:T.slateLight, border:T.border      },
               ].map(({label,count,color,bg,border,onClick}) => (
                 <div key={label} onClick={onClick}
                   style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px",
@@ -8607,6 +8659,86 @@ export default function LevelAI() {
                   <span>RPA</span>
                 </div>
               )}
+
+              {/* ── Notification Bell ── */}
+              <div ref={notifRef} style={{ position:"relative", marginLeft:6 }}>
+                <button
+                  onClick={() => { setNotifOpen(o => !o); setNotifSeen(true); }}
+                  style={{ position:"relative", width:32, height:32, borderRadius:"50%", border:"1px solid " + T.border,
+                    background: notifOpen ? T.indigoLight : T.bgCard, cursor:"pointer", display:"flex",
+                    alignItems:"center", justifyContent:"center", transition:"all 0.15s" }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = T.indigoDark; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; }}
+                  title="Notifications">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={notifCount > 0 && !notifSeen ? T.amber : T.textMid} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                  </svg>
+                  {notifCount > 0 && !notifSeen && (
+                    <span style={{ position:"absolute", top:-2, right:-2, width:16, height:16, borderRadius:"50%",
+                      background:T.amber, color:"#fff", fontSize:9, fontWeight:900,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      boxShadow:"0 0 0 2px " + T.bgCard, animation:"pulse 2s ease-in-out infinite" }}>
+                      {notifCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Notification dropdown */}
+                {notifOpen && (
+                  <div style={{ position:"absolute", top:"calc(100% + 8px)", right:0, width:340, maxHeight:400,
+                    background:T.bgCard, border:"1px solid " + T.border, borderRadius:12,
+                    boxShadow:"0 8px 32px " + T.shadow, zIndex:9999, overflow:"hidden",
+                    animation:"fadeIn 0.15s ease-out" }}>
+                    <div style={{ padding:"12px 16px", borderBottom:"1px solid " + T.border,
+                      display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                      <span style={{ fontSize:13, fontWeight:900, color:T.text }}>Notifications</span>
+                      {activeAlerts.length > 0 && (
+                        <span style={{ fontSize:10, fontWeight:700, color:T.textSoft }}>{activeAlerts.length} alert{activeAlerts.length !== 1 ? "s" : ""}</span>
+                      )}
+                    </div>
+                    <div style={{ maxHeight:320, overflowY:"auto" }}>
+                      {activeAlerts.length === 0 ? (
+                        <div style={{ padding:"32px 16px", textAlign:"center" }}>
+                          <div style={{ fontSize:28, marginBottom:8, opacity:0.3 }}>&#x1F514;</div>
+                          <div style={{ fontSize:12, fontWeight:700, color:T.textSoft }}>No new notifications</div>
+                          <div style={{ fontSize:11, color:T.textSoft, marginTop:4 }}>All systems operational</div>
+                        </div>
+                      ) : (
+                        activeAlerts.map(alert => (
+                          <div key={alert.type} style={{ padding:"12px 16px", borderBottom:"1px solid " + T.border,
+                            display:"flex", gap:10, alignItems:"flex-start", transition:"background 0.1s",
+                            cursor:"default" }}
+                            onMouseEnter={e => { e.currentTarget.style.background = T.bg; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+                            <span style={{ fontSize:16, flexShrink:0, marginTop:1 }}>
+                              {alert.type === "pms" ? "\u26A0\uFE0F" : alert.type === "payer" ? "\uD83D\uDCB3" : "\u26A0\uFE0F"}
+                            </span>
+                            <div style={{ flex:1, minWidth:0 }}>
+                              <div style={{ fontSize:12, fontWeight:800, color:T.text, marginBottom:3 }}>
+                                {alert.type === "pms" ? "PMS Connection Issue" : alert.type === "payer" ? "Payer Portal Issue" : "System Alert"}
+                              </div>
+                              <div style={{ fontSize:11, color:T.textMid, lineHeight:1.5 }}>{alert.message}</div>
+                              <div style={{ display:"flex", gap:6, marginTop:8 }}>
+                                <button onClick={() => { setCredFixModal(alert); setNotifOpen(false); }}
+                                  style={{ padding:"4px 10px", borderRadius:6, border:"none", fontSize:10, fontWeight:800,
+                                    background:T.indigoDark, color:"white", cursor:"pointer" }}>
+                                  {alert.type === "pms" ? "Fix Connection" : "Fix Credentials"}
+                                </button>
+                                <button onClick={() => { dismissCredentialAlert(alert.type); }}
+                                  style={{ padding:"4px 10px", borderRadius:6, border:"1px solid " + T.border,
+                                    fontSize:10, fontWeight:700, background:"transparent", color:T.textMid, cursor:"pointer" }}>
+                                  Dismiss
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -8733,34 +8865,7 @@ export default function LevelAI() {
                 </div>
               )}
 
-              {/* ── Stale Credential Alerts ── */}
-              {credentialAlerts.filter(a => !a.dismissedAt).map(alert => (
-                <div key={alert.type} style={{ background:"#fef3c7", border:"1px solid #f59e0b", borderRadius:10,
-                  padding:"12px 18px", marginBottom:12, display:"flex", justifyContent:"space-between", alignItems:"center",
-                  animation:"wizFadeIn 0.3s ease-out", flexShrink:0 }}>
-                  <div style={{ display:"flex", alignItems:"flex-start", gap:10, flex:1 }}>
-                    <span style={{ fontSize:18, flexShrink:0 }}>⚠️</span>
-                    <div>
-                      <div style={{ fontWeight:900, fontSize:13, color:"#92400e" }}>
-                        {alert.type === "pms" ? "PMS Credentials Issue" : "Payer Portal Credentials Issue"}
-                      </div>
-                      <div style={{ fontSize:12, color:"#a16207", marginTop:2 }}>{alert.message}</div>
-                    </div>
-                  </div>
-                  <div style={{ display:"flex", gap:8, flexShrink:0 }}>
-                    <button onClick={() => setCredFixModal(alert)}
-                      style={{ background:"#f59e0b", color:"white", border:"none", borderRadius:8,
-                        padding:"6px 14px", fontWeight:800, cursor:"pointer", fontSize:11 }}>
-                      {alert.type === "pms" ? "Fix PMS Connection" : "Fix Payer Credentials"}
-                    </button>
-                    <button onClick={() => dismissCredentialAlert(alert.type)}
-                      style={{ background:"transparent", color:"#a16207", border:"1px solid #f59e0b", borderRadius:8,
-                        padding:"6px 10px", fontWeight:700, cursor:"pointer", fontSize:11 }}>
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              ))}
+              {/* Credential alerts are now shown in the notification bell dropdown */}
 
               {/* MorningBanner — shown once patients are loaded (even 0 auto-verified shows the clickable bot box) */}
               {!dailyLoading && (
