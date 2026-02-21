@@ -643,43 +643,27 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
     if (code.length !== 6) return;
     try {
       const res = await signUp.attemptEmailAddressVerification({ code });
-      console.log("[Clerk verify] status:", res.status, "session:", res.createdSessionId, "missingFields:", res.missingFields, "unverifiedFields:", res.unverifiedFields);
-      if (res.status === "complete") {
-        if (typeof window !== "undefined") localStorage.setItem("pulp_needs_onboarding", "1");
-        await setSignUpActive({ session: res.createdSessionId });
-      } else if (res.createdSessionId) {
-        // Session exists even though status isn't "complete" — activate it
+      if (res.status === "complete" || res.createdSessionId) {
+        // Email verified — activate the session and proceed to onboarding
         if (typeof window !== "undefined") localStorage.setItem("pulp_needs_onboarding", "1");
         await setSignUpActive({ session: res.createdSessionId });
       } else {
         // No session yet — show what Clerk is waiting for
         const missing = res.missingFields?.join(", ") || res.unverifiedFields?.join(", ") || "unknown";
-        console.log("[Clerk verify] Cannot complete. Missing:", missing);
         setAuthErr(`Almost there! Additional verification needed: ${missing}. Please contact support.`);
       }
     } catch (err) {
-      console.log("[Clerk verify] Error:", err.errors?.[0]?.code, err.errors?.[0]?.message, "signUp.status:", signUp?.status);
       const msg = err.errors?.[0]?.message || "";
       const errCode = err.errors?.[0]?.code || "";
       // Handle "already verified" — complete the sign-up if possible
       if (errCode === "form_code_already_verified" || msg.toLowerCase().includes("already verified") || msg.toLowerCase().includes("already been verified")) {
         try {
-          // Refresh signUp object to get latest state
-          const current = signUp;
-          console.log("[Clerk verify] Already verified. signUp status:", current?.status, "session:", current?.createdSessionId);
-          if (current?.createdSessionId) {
+          if (signUp?.createdSessionId) {
             if (typeof window !== "undefined") localStorage.setItem("pulp_needs_onboarding", "1");
-            await setSignUpActive({ session: current.createdSessionId });
+            await setSignUpActive({ session: signUp.createdSessionId });
             return;
           }
-          if (current?.status === "complete") {
-            if (typeof window !== "undefined") localStorage.setItem("pulp_needs_onboarding", "1");
-            await setSignUpActive({ session: current.createdSessionId });
-            return;
-          }
-        } catch (e2) {
-          console.log("[Clerk verify] Recovery failed:", e2);
-        }
+        } catch {}
         setAuthErr("Email verified but sign-up couldn't complete. Please sign in instead.");
         return;
       }
@@ -6031,6 +6015,7 @@ export default function LevelAI() {
   }, []);
 
   // ── Initial data loads ───────────────────────────────────────────────────────
+  // Also re-fires when sandboxMode activates so the loading animation plays.
   useEffect(() => {
     if (!isMounted) return;
     const today = new Date();
@@ -6042,7 +6027,7 @@ export default function LevelAI() {
     // come from Open Dental by default — no manual sync required.
     loadWeekSchedule(todayStr);
     loadCalendar(monthStr);
-  }, [isMounted, loadWeekSchedule, loadCalendar]);
+  }, [isMounted, sandboxMode, loadWeekSchedule, loadCalendar]);
 
   // ── Auto-sync: poll PMS every 3 minutes ────────────────────────────────────
   // Keeps the schedule in sync with the PMS as appointments change throughout
@@ -6162,9 +6147,9 @@ export default function LevelAI() {
   }, [isLoading, setPhase, showToast, sandboxMode, preauthCache]);
 
   // ── Auto-verify: fires on schedule load for today, 24h, and 7d windows ───────
-  // Skipped for admin users — they use the admin console, not patient verifications.
+  // Skipped for admin users and sandbox mode (no auth session → API returns 401).
   useEffect(() => {
-    if (isAdmin) return;
+    if (isAdmin || sandboxMode) return;
     const todayISO = new Date().toISOString().split("T")[0];
     patients.forEach((patient, idx) => {
       const h = patient.hoursUntil;
@@ -6355,7 +6340,7 @@ export default function LevelAI() {
   if (!isSignedIn && !sandboxMode) {
     return (
       <div style={{ position: "relative", height: "100vh", overflow: "hidden" }}>
-        <AuthFlow onComplete={() => {}} showToast={showToast} onSandbox={() => { setSandboxMode(true); setAccountMode("sandbox"); setDailyLoading(false); }} />
+        <AuthFlow onComplete={() => {}} showToast={showToast} onSandbox={() => { setSandboxMode(true); setAccountMode("sandbox"); setDailyLoading(true); }} />
       </div>
     );
   }
