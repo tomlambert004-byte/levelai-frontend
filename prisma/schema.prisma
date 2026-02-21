@@ -60,7 +60,10 @@ model Patient {
   verificationResults VerificationResult[]
   smsQueue            SmsQueue[]
 
-  @@unique([practiceId, externalId])        // prevent duplicate patients per practice
+  // Unique constraint on (practiceId, externalId) is enforced by a partial index
+  // in migration 20260219 — only applies when externalId IS NOT NULL.
+  // This allows multiple patients without externalId per practice.
+  @@index([practiceId, externalId])
 }
 
 // ── A single eligibility verification result ─────────────────────────────────
