@@ -156,11 +156,10 @@ export async function POST(request) {
     });
 
   } catch (err) {
-    console.error("[pms/sync] Error:", err);
-    // Surface Open Dental connection errors clearly
-    if (err.message?.includes("Open Dental API")) {
-      return Response.json({ error: err.message }, { status: 502 });
+    console.error("[pms/sync] Error:", err.name, err.message?.slice(0, 80));
+    if (err.message?.includes("Open Dental")) {
+      return Response.json({ error: "Could not connect to PMS. Please check your credentials and try again." }, { status: 502 });
     }
-    return Response.json({ error: err.message }, { status: 500 });
+    return Response.json({ error: "Sync failed. Please try again." }, { status: 500 });
   }
 }

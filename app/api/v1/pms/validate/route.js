@@ -15,13 +15,16 @@
 import { auth } from "@clerk/nextjs/server";
 
 const OD_BASE = process.env.OD_API_BASE_URL || "https://api.opendental.com/api/v1";
-const OD_DEMO_DEV_KEY  = "NFF6i0KrXrxDkZHt";
-const OD_DEMO_CUST_KEY = "VzkmZEaUWOjnQX2z";
 
 async function validateOpenDental(customerKey) {
-  // Use the customer-supplied key (or fall back to env/demo)
-  const devKey  = process.env.OD_DEV_KEY || OD_DEMO_DEV_KEY;
-  const custKey = customerKey || process.env.OD_CUSTOMER_KEY || OD_DEMO_CUST_KEY;
+  const devKey  = process.env.OD_DEV_KEY;
+  const custKey = customerKey || process.env.OD_CUSTOMER_KEY;
+  if (!devKey) {
+    return { valid: false, error: "Open Dental developer key not configured. Contact your administrator." };
+  }
+  if (!custKey) {
+    return { valid: false, error: "No customer key provided." };
+  }
 
   const today = new Date().toISOString().split("T")[0];
   const url = `${OD_BASE}/appointments?dateStart=${today}&dateEnd=${today}`;
@@ -39,7 +42,8 @@ async function validateOpenDental(customerKey) {
     if (res.status === 401 || res.status === 403) {
       return { valid: false, error: "Invalid eKey — authentication failed. Please double-check the key and try again." };
     }
-    return { valid: false, error: `Open Dental returned ${res.status}: ${text.slice(0, 120)}` };
+    console.error("[pms/validate] OD error:", res.status, text.slice(0, 120));
+    return { valid: false, error: `Open Dental returned an error (${res.status}). Please try again.` };
   }
 
   return { valid: true };
@@ -86,11 +90,10 @@ export async function POST(request) {
 
     return Response.json({ valid: true, pms: pmsSystem });
   } catch (err) {
-    console.error("[pms/validate] Error:", err);
-    // Network / timeout errors
+    console.error("[pms/validate] Error:", err.name);
     if (err.name === "TimeoutError" || err.name === "AbortError") {
       return Response.json({ valid: false, error: "Connection timed out — could not reach PMS server." }, { status: 422 });
     }
-    return Response.json({ valid: false, error: err.message }, { status: 500 });
+    return Response.json({ valid: false, error: "Validation failed. Please try again." }, { status: 500 });
   }
 }

@@ -8,13 +8,20 @@
  * Response: { state, program_name, checks: [{ code, description, covered, ... }] }
  */
 
+import { auth } from "@clerk/nextjs/server";
 import { runMedicaidCheck, getStateRules, getSupportedStates } from "../../../../../lib/medicaidRules.js";
 import { getMedicaidProgramName } from "../../../../../lib/medicaidDetect.js";
 import { checkRateLimit, rateLimitResponse } from "../../../../../lib/rateLimit.js";
-import { getClientIp } from "../../../../../lib/audit.js";
+import { logAudit, getClientIp } from "../../../../../lib/audit.js";
 
 export async function POST(request) {
   try {
+    // Auth check
+    const { userId } = await auth();
+    if (!userId) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Rate limit: 30 req/min per IP
     const ip = getClientIp(request);
     const rl = checkRateLimit(`medicaid:${ip}`, { maxRequests: 30, windowMs: 60_000 });
@@ -41,6 +48,15 @@ export async function POST(request) {
 
     const result = runMedicaidCheck(state, cdt_codes, patient_age ?? null);
 
+    logAudit({
+      practiceId: null,
+      userId,
+      action: "medicaid.check",
+      resourceType: "Medicaid",
+      ipAddress: ip,
+      metadata: { state, cdt_codes },
+    });
+
     return Response.json({
       state: state.toUpperCase(),
       program_name: getMedicaidProgramName(state),
@@ -48,6 +64,7 @@ export async function POST(request) {
       ...result,
     });
   } catch (err) {
-    return Response.json({ error: err.message }, { status: 500 });
+    console.error("[medicaid/check] Error:", err.name);
+    return Response.json({ error: "Medicaid check failed. Please try again." }, { status: 500 });
   }
 }

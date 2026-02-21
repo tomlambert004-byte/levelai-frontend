@@ -90,14 +90,16 @@ export async function POST(request) {
               approvedAt:   new Date(),
             },
           });
-          return Response.json({ sent: false, error: twilioData.message }, { status: 502 });
+          console.error("[sms/send] Twilio error:", twilioData.code);
+          return Response.json({ sent: false, error: "SMS delivery failed. Please try again." }, { status: 502 });
         }
       } catch (twilioErr) {
+        console.error("[sms/send] Twilio exception:", twilioErr.name);
         await prisma.smsQueue.update({
           where: { id: smsQueueId },
-          data: { status: "failed", errorMessage: twilioErr.message },
+          data: { status: "failed", errorMessage: "Send failed" },
         });
-        return Response.json({ sent: false, error: twilioErr.message }, { status: 502 });
+        return Response.json({ sent: false, error: "SMS delivery failed. Please try again." }, { status: 502 });
       }
     } else {
       // ── Placeholder mode (no Twilio configured) ───────────────────────
@@ -116,7 +118,7 @@ export async function POST(request) {
       });
     }
   } catch (err) {
-    console.error("[sms/send] Error:", err);
-    return Response.json({ error: err.message }, { status: 500 });
+    console.error("[sms/send] Error:", err.name);
+    return Response.json({ error: "An error occurred. Please try again." }, { status: 500 });
   }
 }

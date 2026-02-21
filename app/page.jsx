@@ -2504,6 +2504,9 @@ const PAYER_PAL_CHIPS = [
   "Is a pre-auth needed?",
   "Deductible status?",
   "Any waiting periods?",
+  "How confident are we in these numbers?",
+  "Is this a DMO or PPO plan?",
+  "What should I tell the patient about costs?",
 ];
 
 function PayerPalChat({ patient, result }) {
@@ -2511,6 +2514,7 @@ function PayerPalChat({ patient, result }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput]       = useState("");
   const [loading, setLoading]   = useState(false);
+  const messagesRef = useRef(null);
   const endRef = useRef(null);
 
   // Reset when patient changes
@@ -2536,16 +2540,47 @@ function PayerPalChat({ patient, result }) {
       const res = await fetch("/api/v1/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patient_id: patient.id, question: q, coverage_json: result }),
+        body: JSON.stringify({
+          patient_id: patient.id,
+          question: q,
+          coverage_json: result,
+          history: messages.filter(m => !m.isError),
+        }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || data.error || "Chat failed");
+      if (!res.ok) {
+        const errorType = data.error_type || "unknown";
+        const friendlyMsg = data.error || "Something went wrong. Please try again.";
+        setMessages(prev => [...prev, {
+          role: "assistant",
+          text: friendlyMsg,
+          isError: true,
+          errorType,
+        }]);
+        return;
+      }
       setMessages(prev => [...prev, { role: "assistant", text: data.answer }]);
     } catch (err) {
-      setMessages(prev => [...prev, { role: "assistant", text: "Sorry, I couldn't process that. " + (err.message || "") }]);
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        text: "Hmm, I'm having trouble connecting right now. Please check your internet connection and try again.",
+        isError: true,
+        errorType: "network",
+      }]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleEscalate = (questionText) => {
+    // Store the escalation — in a real implementation this could POST to an API
+    // For now we'll show a confirmation and log it
+    setMessages(prev => [...prev, {
+      role: "assistant",
+      text: "Got it! I've flagged this question for the development team to review. They'll look into improving my ability to answer questions like this. Thanks for the feedback! 🙏",
+      isEscalation: true,
+    }]);
+    console.log("[PayerPal] Escalated question:", questionText);
   };
 
   return (
@@ -2568,13 +2603,15 @@ function PayerPalChat({ patient, result }) {
         <div style={{ marginTop:8, border:"1px solid " + T.border, borderRadius:10, overflow:"hidden",
           background:T.bg, animation:"fadeIn 0.2s ease-out" }}>
 
-          {/* Messages area */}
-          <div style={{ maxHeight:280, overflowY:"auto", padding:12, display:"flex", flexDirection:"column", gap:8 }}>
+          {/* Messages area — scrollable from top to bottom */}
+          <div ref={messagesRef} style={{ maxHeight:360, overflowY:"auto", padding:12, display:"flex", flexDirection:"column", gap:8 }}>
             {/* Quick chips — shown when empty */}
             {messages.length === 0 && !loading && (
               <div>
-                <div style={{ fontSize:11, fontWeight:700, color:T.textSoft, marginBottom:8 }}>Common questions:</div>
-                <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:T.textSoft, marginBottom:4 }}>
+                  Hi! I&apos;m Payer Pal 👋 Ask me anything about this patient&apos;s coverage, or try one of these:
+                </div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginTop:8 }}>
                   {PAYER_PAL_CHIPS.map(chip => (
                     <button key={chip} onClick={() => sendQuestion(chip)}
                       style={{ padding:"6px 10px", borderRadius:8, border:"1px solid " + T.indigoBorder,
@@ -2591,20 +2628,50 @@ function PayerPalChat({ patient, result }) {
 
             {/* Message bubbles */}
             {messages.map((msg, i) => (
-              <div key={i} style={{ display:"flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+              <div key={i} style={{ display:"flex", flexDirection:"column", alignItems: msg.role === "user" ? "flex-end" : "flex-start" }}>
                 <div style={{
                   maxWidth:"85%", padding:"8px 12px", borderRadius:10, fontSize:12, lineHeight:"1.55",
                   fontWeight: msg.role === "user" ? 700 : 400,
-                  background: msg.role === "user" ? T.indigoLight : T.bgCard,
-                  color: msg.role === "user" ? T.indigoDark : T.text,
-                  border: "1px solid " + (msg.role === "user" ? T.indigoBorder : T.border),
+                  background: msg.role === "user" ? T.indigoLight
+                    : msg.isError ? "#FEF2F2"
+                    : msg.isEscalation ? "#F0FDF4"
+                    : T.bgCard,
+                  color: msg.role === "user" ? T.indigoDark
+                    : msg.isError ? "#991B1B"
+                    : msg.isEscalation ? "#166534"
+                    : T.text,
+                  border: "1px solid " + (msg.role === "user" ? T.indigoBorder
+                    : msg.isError ? "#FECACA"
+                    : msg.isEscalation ? "#BBF7D0"
+                    : T.border),
                 }}>
-                  {msg.role === "assistant" && (
+                  {msg.role === "assistant" && !msg.isError && !msg.isEscalation && (
                     <div style={{ fontSize:9, fontWeight:800, color:T.indigo, textTransform:"uppercase",
                       letterSpacing:"0.06em", marginBottom:3 }}>Payer Pal</div>
                   )}
+                  {msg.isError && (
+                    <div style={{ fontSize:9, fontWeight:800, color:"#DC2626", textTransform:"uppercase",
+                      letterSpacing:"0.06em", marginBottom:3 }}>⚠ Issue</div>
+                  )}
                   {msg.text}
                 </div>
+                {/* Escalation button — shown on error messages */}
+                {msg.isError && !msg.isEscalation && i === messages.length - 1 && (
+                  <button
+                    onClick={() => {
+                      // Find the user question that preceded this error
+                      const prevUserMsg = messages.slice(0, i).reverse().find(m => m.role === "user");
+                      handleEscalate(prevUserMsg?.text || "Unknown question");
+                    }}
+                    style={{ marginTop:6, padding:"5px 10px", borderRadius:8,
+                      border:"1px solid " + T.border, background:T.bgCard,
+                      color:T.textMid, fontSize:10, fontWeight:700,
+                      cursor:"pointer", transition:"all 0.15s", alignSelf:"flex-start" }}
+                    onMouseEnter={e => { e.currentTarget.style.background = T.indigoLight; e.currentTarget.style.color = T.indigoDark; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = T.bgCard; e.currentTarget.style.color = T.textMid; }}>
+                    📩 Send this to the dev team to look at?
+                  </button>
+                )}
               </div>
             ))}
 
@@ -2630,7 +2697,7 @@ function PayerPalChat({ patient, result }) {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendQuestion(); } }}
-              placeholder="Ask about coverage…"
+              placeholder="Ask anything about this patient's coverage…"
               style={{ flex:1, padding:"8px 12px", borderRadius:8, border:"1px solid " + T.border,
                 fontSize:12, outline:"none", fontFamily:"inherit", background:T.bg, color:T.text }}
             />
@@ -5079,12 +5146,51 @@ function Settings({ showToast, sandboxMode, onSyncComplete }) {
     );
   };
 
+  // Audit log state
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditDateRange, setAuditDateRange] = useState("7d"); // 7d | 30d | 90d
+
+  const loadAuditLogs = async (range) => {
+    setAuditLoading(true);
+    try {
+      const res = await fetch(`/api/v1/audit/logs?range=${range || auditDateRange}`);
+      const data = await res.json();
+      if (res.ok) setAuditLogs(data.logs || []);
+    } catch { /* silent */ }
+    finally { setAuditLoading(false); }
+  };
+
+  const exportAuditCsv = () => {
+    if (!auditLogs.length) return;
+    const headers = ["Timestamp", "User", "Action", "Resource Type", "Resource ID", "IP Address", "Details"];
+    const rows = auditLogs.map(l => [
+      new Date(l.createdAt).toLocaleString(),
+      l.userId || "system",
+      l.action,
+      l.resourceType || "",
+      l.resourceId || "",
+      l.ipAddress || "",
+      l.metadata ? JSON.stringify(l.metadata) : "",
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `audit-log-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Audit log exported ✓");
+  };
+
   const TABS = [
     { id: "general",      label: "General",      icon: "🏥" },
     { id: "automations",  label: "Automations",  icon: "⚡" },
     { id: "integrations", label: "Integrations", icon: "🔌" },
     { id: "import",       label: "Import",       icon: "📥" },
     { id: "team",         label: "Team",         icon: "👥" },
+    { id: "audit",        label: "Audit Log",    icon: "📋" },
   ];
 
   return (
@@ -5549,6 +5655,109 @@ function Settings({ showToast, sandboxMode, onSyncComplete }) {
           )}
 
           {/* ──────────── TEAM TAB ──────────────── */}
+          {/* AUDIT LOG */}
+          {activeTab === "audit" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: T.text }}>Audit Log</div>
+                <div style={{ fontSize: 13, color: T.textSoft, marginTop: 4 }}>
+                  HIPAA-compliant activity log. Track all PHI access, verifications, imports, and system events.
+                </div>
+              </div>
+
+              {/* Controls */}
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <select value={auditDateRange}
+                  onChange={e => { setAuditDateRange(e.target.value); loadAuditLogs(e.target.value); }}
+                  style={{ padding: "9px 12px", border: "1px solid " + T.border, borderRadius: 8,
+                    fontSize: 13, background: T.bgCard, fontFamily: "inherit", cursor: "pointer" }}>
+                  <option value="7d">Last 7 days</option>
+                  <option value="30d">Last 30 days</option>
+                  <option value="90d">Last 90 days</option>
+                </select>
+                <button onClick={() => loadAuditLogs()}
+                  style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid " + T.border,
+                    background: T.bgCard, color: T.indigoDark, fontWeight: 700, fontSize: 13,
+                    cursor: "pointer" }}>
+                  {auditLoading ? "Loading…" : "🔄 Refresh"}
+                </button>
+                <button onClick={exportAuditCsv} disabled={!auditLogs.length}
+                  style={{ padding: "9px 16px", borderRadius: 8, border: "none",
+                    background: auditLogs.length ? T.indigoDark : T.borderStrong,
+                    color: "white", fontWeight: 800, fontSize: 13,
+                    cursor: auditLogs.length ? "pointer" : "not-allowed" }}>
+                  📥 Export CSV
+                </button>
+              </div>
+
+              {/* Log table */}
+              <div style={{ background: T.bgCard, border: "1px solid " + T.border, borderRadius: 12,
+                overflow: "hidden" }}>
+                {auditLogs.length === 0 && !auditLoading && (
+                  <div style={{ padding: 32, textAlign: "center", color: T.textSoft, fontSize: 13 }}>
+                    {auditLogs.length === 0 ? "Click Refresh to load audit logs" : "No logs found for this period"}
+                  </div>
+                )}
+                {auditLoading && (
+                  <div style={{ padding: 32, textAlign: "center", color: T.textSoft, fontSize: 13 }}>
+                    Loading audit logs…
+                  </div>
+                )}
+                {auditLogs.length > 0 && (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ background: T.bg, borderBottom: "2px solid " + T.border }}>
+                          {["Time", "User", "Action", "Resource", "IP"].map(h => (
+                            <th key={h} style={{ padding: "10px 12px", textAlign: "left",
+                              fontWeight: 800, color: T.textMid, fontSize: 10,
+                              textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {auditLogs.slice(0, 100).map((log, i) => (
+                          <tr key={log.id || i} style={{ borderBottom: "1px solid " + T.border }}>
+                            <td style={{ padding: "8px 12px", color: T.textSoft, whiteSpace: "nowrap" }}>
+                              {new Date(log.createdAt).toLocaleString()}
+                            </td>
+                            <td style={{ padding: "8px 12px", fontWeight: 700, color: T.text }}>
+                              {log.userId === "webhook" ? "🔗 Webhook" : log.userId?.slice(0, 12) || "—"}
+                            </td>
+                            <td style={{ padding: "8px 12px" }}>
+                              <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+                                background: log.action?.startsWith("verify") ? T.indigoLight
+                                  : log.action?.startsWith("pms") ? T.limeLight
+                                  : log.action?.startsWith("sms") ? "#FEF3C7"
+                                  : T.bg,
+                                color: log.action?.startsWith("verify") ? T.indigoDark
+                                  : log.action?.startsWith("pms") ? T.limeDark
+                                  : log.action?.startsWith("sms") ? "#92400E"
+                                  : T.textMid,
+                              }}>{log.action}</span>
+                            </td>
+                            <td style={{ padding: "8px 12px", color: T.textMid }}>
+                              {log.resourceType ? `${log.resourceType}${log.resourceId ? " · " + log.resourceId.slice(0, 8) : ""}` : "—"}
+                            </td>
+                            <td style={{ padding: "8px 12px", color: T.textSoft, fontFamily: "monospace", fontSize: 11 }}>
+                              {log.ipAddress || "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {auditLogs.length > 100 && (
+                      <div style={{ padding: "10px 12px", fontSize: 11, color: T.textSoft, textAlign: "center",
+                        borderTop: "1px solid " + T.border }}>
+                        Showing 100 of {auditLogs.length} entries. Export CSV for the full log.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeTab === "team" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
               <div>

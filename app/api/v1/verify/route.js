@@ -384,6 +384,7 @@ try {
 }
 
 // ── Hardening imports ─────────────────────────────────────────────────────────
+import { auth } from "@clerk/nextjs/server";
 let logAudit, getClientIp, checkRateLimit, rateLimitResponse;
 try {
   const auditMod = await import("../../../../lib/audit.js");
@@ -397,6 +398,12 @@ try {
 // ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(request) {
   try {
+    // Auth check — required for PHI access
+    const { userId } = await auth();
+    if (!userId) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Rate limit: 20 req/min per IP
     if (checkRateLimit && rateLimitResponse) {
       const ip = getClientIp(request);
@@ -426,15 +433,8 @@ export async function POST(request) {
     let isSandbox = false;
     try {
       const { prisma: _p } = await import("../../../../lib/prisma.js");
-      const { auth: _a }   = await import("@clerk/nextjs/server");
-      const { userId: _uid } = await _a();
-      if (_uid) {
-        const _prac = await _p.practice.findUnique({ where: { clerkUserId: _uid } });
-        if (_prac?.accountMode === "sandbox") isSandbox = true;
-      } else {
-        // No auth = sandbox / demo mode
-        isSandbox = true;
-      }
+      const _prac = await _p.practice.findUnique({ where: { clerkUserId: userId } });
+      if (_prac?.accountMode === "sandbox") isSandbox = true;
     } catch { /* if lookup fails, default to trying Stedi */ }
 
     // ── Try real Stedi call first ──────────────────────────────────────────────
@@ -559,7 +559,7 @@ export async function POST(request) {
     return Response.json({ ...result, _source: "fixture" });
 
   } catch (err) {
-    console.error("[verify] Error:", err);
+    console.error("[verify] Error:", err.name, err.message?.slice(0, 100));
     return Response.json(
       { error: "Verification failed. Please try again." },
       { status: 500 }

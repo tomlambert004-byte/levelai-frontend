@@ -55,7 +55,7 @@ export async function POST(request) {
     return Response.json({ practice });
   } catch (err) {
     console.error("[practice] Error:", err);
-    return Response.json({ error: err.message }, { status: 500 });
+    return Response.json({ error: "An error occurred. Please try again." }, { status: 500 });
   }
 }
 
@@ -77,6 +77,6 @@ export async function GET() {
     return Response.json({ practice });
   } catch (err) {
     console.error("[practice] Error:", err);
-    return Response.json({ error: err.message }, { status: 500 });
+    return Response.json({ error: "An error occurred. Please try again." }, { status: 500 });
   }
 }

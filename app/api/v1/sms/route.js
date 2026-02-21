@@ -28,7 +28,7 @@ export async function GET(request) {
     return Response.json({ drafts });
   } catch (err) {
     console.error("[sms] GET error:", err);
-    return Response.json({ error: err.message }, { status: 500 });
+    return Response.json({ error: "An error occurred. Please try again." }, { status: 500 });
   }
 }
 
@@ -62,7 +62,7 @@ export async function POST(request) {
     return Response.json({ draft });
   } catch (err) {
     console.error("[sms] POST error:", err);
-    return Response.json({ error: err.message }, { status: 500 });
+    return Response.json({ error: "An error occurred. Please try again." }, { status: 500 });
   }
 }
 
@@ -101,6 +101,6 @@ export async function PATCH(request) {
     return Response.json({ draft: updated });
   } catch (err) {
     console.error("[sms] PATCH error:", err);
-    return Response.json({ error: err.message }, { status: 500 });
+    return Response.json({ error: "An error occurred. Please try again." }, { status: 500 });
   }
 }

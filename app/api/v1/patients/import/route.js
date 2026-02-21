@@ -49,7 +49,7 @@ export async function POST(request) {
 
       if (!firstName || !lastName) {
         skipped++;
-        errors.push(`Skipped row — missing firstName/lastName: ${JSON.stringify(row)}`);
+        errors.push(`Row ${patients.indexOf(row) + 1}: missing firstName or lastName`);
         continue;
       }
 
@@ -75,7 +75,7 @@ export async function POST(request) {
         imported++;
       } catch (err) {
         skipped++;
-        errors.push(`Row ${patients.indexOf(row) + 1} error: ${err.message}`);
+        errors.push(`Row ${patients.indexOf(row) + 1}: import failed`);
       }
     }
 
@@ -90,7 +90,7 @@ export async function POST(request) {
 
     return Response.json({ imported, skipped, errors: errors.slice(0, 20) });
   } catch (err) {
-    console.error("[patients/import] Error:", err);
-    return Response.json({ error: err.message }, { status: 500 });
+    console.error("[patients/import] Error:", err.name);
+    return Response.json({ error: "Import failed. Please try again." }, { status: 500 });
   }
 }

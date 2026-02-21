@@ -4,6 +4,7 @@
  * Returns CalendarDaySummary[] for every weekday in the given month.
  * Counts are deterministic per date so the calendar always looks consistent.
  */
+import { auth } from "@clerk/nextjs/server";
 
 function hashStr(str) {
   let h = 0;
@@ -14,6 +15,11 @@ function hashStr(str) {
 }
 
 export async function GET(request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const month = searchParams.get("month") || new Date().toISOString().slice(0, 7);
 
