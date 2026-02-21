@@ -2,39 +2,43 @@
 export const dynamic = "force-dynamic";
 import { SignedIn, SignedOut, useAuth, useClerk, useSignIn, useSignUp, useUser } from "@clerk/nextjs";
 import { useState, useCallback, useEffect, useRef } from "react";
-// Theme — dual palettes for light/dark mode
+// Theme — dual palettes: dark-first premium aesthetic with teal accent
 const themes = {
+  dark: {
+    bg:"#0A0A0A", bgCard:"#141414", border:"#1F1F1F", borderStrong:"#2A2A2A",
+    lime:"#14B8A6", limeLight:"#0A1F1C", limeBorder:"#134E48", limeDark:"#5EEAD4",
+    text:"#F5F5F5", textMid:"#A3A3A3", textSoft:"#525252",
+    amber:"#FBBF24", amberLight:"#1A1708", amberBorder:"#78350F", amberDark:"#FCD34D",
+    red:"#EF4444", redLight:"#1C0A0A", redBorder:"#7F1D1D",
+    slate:"#94A3B8", slateLight:"#171717",
+    indigo:"#14B8A6", indigoLight:"#0A1F1C", indigoBorder:"#134E48",
+    indigoDark:"#5EEAD4",
+    rpa:"#38BDF8", rpaLight:"#0A1628", rpaBorder:"#0C4A6E", rpaDark:"#7DD3FC",
+    shadow:"rgba(0,0,0,0.4)", shadowStrong:"rgba(0,0,0,0.6)",
+    // Brand-specific
+    accent:"#14B8A6", accentLight:"#5EEAD4", accentBg:"#0A1F1C",
+  },
   light: {
-    bg:"#F5F5F0", bgCard:"#FFFFFF", border:"#E2E2DC", borderStrong:"#C8C8C0",
-    lime:"#84CC16", limeLight:"#F0FDF0", limeBorder:"#BBF7B0", limeDark:"#3F6212",
-    text:"#1A1A18", textMid:"#52525A", textSoft:"#A0A09A",
+    bg:"#FAFAFA", bgCard:"#FFFFFF", border:"#E5E5E5", borderStrong:"#D4D4D4",
+    lime:"#0D9488", limeLight:"#F0FDFA", limeBorder:"#99F6E4", limeDark:"#0F766E",
+    text:"#0A0A0A", textMid:"#525252", textSoft:"#A3A3A3",
     amber:"#D97706", amberLight:"#FFFBEB", amberBorder:"#FCD34D", amberDark:"#B45309",
     red:"#DC2626", redLight:"#FEF2F2", redBorder:"#FECACA",
     slate:"#64748B", slateLight:"#F8FAFC",
-    indigo:"#6366F1", indigoLight:"#EEF2FF", indigoBorder:"#C7D2FE",
-    indigoDark:"#4F46E5",
+    indigo:"#0D9488", indigoLight:"#F0FDFA", indigoBorder:"#99F6E4",
+    indigoDark:"#0F766E",
     rpa:"#0EA5E9", rpaLight:"#F0F9FF", rpaBorder:"#BAE6FD", rpaDark:"#0369A1",
     shadow:"rgba(0,0,0,0.04)", shadowStrong:"rgba(0,0,0,0.08)",
-  },
-  dark: {
-    bg:"#0F0F17", bgCard:"#1A1A2E", border:"#2A2A3E", borderStrong:"#3A3A50",
-    lime:"#84CC16", limeLight:"#1A2E1A", limeBorder:"#2D5A1E", limeDark:"#A3E635",
-    text:"#F0F0F0", textMid:"#B0B0BA", textSoft:"#6A6A78",
-    amber:"#FBBF24", amberLight:"#2E2A1A", amberBorder:"#7C5B1A", amberDark:"#FCD34D",
-    red:"#EF4444", redLight:"#2E1A1A", redBorder:"#7C1A1A",
-    slate:"#94A3B8", slateLight:"#1E293B",
-    indigo:"#818CF8", indigoLight:"#1E1E3E", indigoBorder:"#4338CA",
-    indigoDark:"#A5B4FC",
-    rpa:"#38BDF8", rpaLight:"#1A2E3E", rpaBorder:"#0C4A6E", rpaDark:"#7DD3FC",
-    shadow:"rgba(0,0,0,0.3)", shadowStrong:"rgba(0,0,0,0.5)",
+    // Brand-specific
+    accent:"#0D9488", accentLight:"#0F766E", accentBg:"#F0FDFA",
   },
 };
-let T = themes.light;
+let T = themes.dark;
 
 function useTheme() {
   const [mode, setMode] = useState(() => {
-    if (typeof window === "undefined") return "light";
-    return localStorage.getItem("levelai_theme") || "light";
+    if (typeof window === "undefined") return "dark";
+    return localStorage.getItem("levelai_theme") || "dark";
   });
   useEffect(() => {
     localStorage.setItem("levelai_theme", mode);
@@ -47,6 +51,33 @@ function useTheme() {
 const dollars = (c) => c != null ? "$" + (Number(c)/100).toLocaleString("en-US",{minimumFractionDigits:0}) : "--";
 const wholeDollars = (c) => c != null ? "$" + Math.round(Number(c)).toLocaleString("en-US") : "--";
 const pct = (n) => n != null ? n + "%" : "--";
+
+// ── Brand Logo Component ─────────────────────────────────────────────────────
+// White tooth icon integrated into the wordmark, matching the logo spec
+function BrandLogo({ size = 20, showText = true, textSize, subtitle, subtitleColor }) {
+  const fs = textSize || size;
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap: size * 0.5 }}>
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink:0 }}>
+        <path d="M12 2C9.5 2 7.5 3.5 6.5 5.5C5.5 7.5 5 10 5.5 13C6 16 7 19 8 21C8.5 22 9.5 22 10 21C10.5 19.5 11 17 12 17C13 17 13.5 19.5 14 21C14.5 22 15.5 22 16 21C17 19 18 16 18.5 13C19 10 18.5 7.5 17.5 5.5C16.5 3.5 14.5 2 12 2Z" fill="white"/>
+      </svg>
+      {showText && (
+        <div style={{ overflow:"hidden", whiteSpace:"nowrap" }}>
+          <div style={{ fontSize:fs, fontWeight:900, letterSpacing:"-0.03em", lineHeight:1.1 }}>
+            <span style={{ color:"#FFFFFF" }}>le</span>
+            <span style={{ color:"#14B8A6" }}>v</span>
+            <span style={{ color:"#FFFFFF" }}>el</span>
+            <span style={{ color:"rgba(255,255,255,0.4)", marginLeft:3 }}>ai</span>
+          </div>
+          {subtitle && (
+            <div style={{ fontSize: fs * 0.42, fontWeight:800, color: subtitleColor || "#14B8A6",
+              letterSpacing:"0.12em", textTransform:"uppercase", marginTop:2 }}>{subtitle}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const STATUS = { VERIFIED:"verified", ACTION_REQUIRED:"action_required", INACTIVE:"inactive", ERROR:"error" };
 const TRIAGE = { CLEAR:"CLEAR", NOTICE:"NOTICE", WARNING:"WARNING", CRITICAL:"CRITICAL" };
@@ -943,22 +974,19 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
     <div style={{ height: "100vh", display: "flex", background: T.bg, fontFamily: "'Nunito', sans-serif" }}>
 
       {/* ── Left brand panel ── */}
-      <div style={{ width: 420, flexShrink: 0, background: T.indigoDark, color: "white", padding: "56px 48px",
+      <div style={{ width: 420, flexShrink: 0, background: "#0A0A0A", color: "white", padding: "56px 48px",
         display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: -80, right: -80, width: 360, height: 360, background: T.indigo,
-          opacity: 0.3, borderRadius: "50%", filter: "blur(60px)" }} />
-        <div style={{ position: "absolute", bottom: -60, left: -60, width: 280, height: 280, background: T.rpaDark,
-          opacity: 0.4, borderRadius: "50%", filter: "blur(60px)" }} />
+        <div style={{ position: "absolute", top: -80, right: -80, width: 360, height: 360, background: "#14B8A6",
+          opacity: 0.08, borderRadius: "50%", filter: "blur(80px)" }} />
+        <div style={{ position: "absolute", bottom: -60, left: -60, width: 280, height: 280, background: "#14B8A6",
+          opacity: 0.05, borderRadius: "50%", filter: "blur(80px)" }} />
 
         <div style={{ position: "relative", zIndex: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 52 }}>
-            <div style={{ fontSize: 30 }}>&#x1F9B7;</div>
-            <div style={{ color: T.limeLight, fontSize: 26, fontWeight: 900, letterSpacing: "-0.02em" }}>
-              level<span style={{ color: "rgba(255,255,255,0.65)" }}>ai</span>
-            </div>
+          <div style={{ marginBottom: 52 }}>
+            <BrandLogo size={30} textSize={26} />
           </div>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase",
-            color: T.lime, marginBottom: 16 }}>White-Glove SaaS</div>
+            color: "#14B8A6", marginBottom: 16 }}>White-Glove SaaS</div>
           <h1 style={{ fontSize: 38, fontWeight: 900, lineHeight: 1.15, marginBottom: 20, maxWidth: 340 }}>
             The zero-touch dental billing engine.
           </h1>
@@ -1184,7 +1212,7 @@ function WizardProgressBar({ currentStep }) {
                 border: active ? "3px solid white" : "none",
                 boxShadow: active ? "0 0 0 4px rgba(255,255,255,0.25)" : "none",
                 fontSize: done ? 16 : 13, fontWeight: 900,
-                color: done ? "white" : active ? "#4f46e5" : "rgba(255,255,255,0.45)",
+                color: done ? "white" : active ? "#0D9488" : "rgba(255,255,255,0.45)",
                 transition: "all 0.3s",
               }}>
                 {done ? "✓" : s.icon}
@@ -1375,27 +1403,19 @@ function OnboardingWizard({ onComplete, showToast }) {
       {/* ── Left dark panel ── */}
       <div style={{
         width: 380, flexShrink: 0,
-        background: "linear-gradient(160deg, #312e81 0%, #1e1b4b 50%, #0f172a 100%)",
+        background: "linear-gradient(160deg, #0A0A0A 0%, #111111 50%, #0A0A0A 100%)",
         padding: "52px 40px", display: "flex", flexDirection: "column",
         position: "relative", overflow: "hidden",
       }}>
         {/* Ambient blobs */}
         <div style={{ position:"absolute", top:-100, right:-80, width:360, height:360, borderRadius:"50%",
-          background:"#6366f1", opacity:0.15, filter:"blur(80px)", pointerEvents:"none" }} />
+          background:"#14B8A6", opacity:0.06, filter:"blur(80px)", pointerEvents:"none" }} />
         <div style={{ position:"absolute", bottom:-80, left:-60, width:300, height:300, borderRadius:"50%",
-          background:"#0ea5e9", opacity:0.12, filter:"blur(80px)", pointerEvents:"none" }} />
+          background:"#14B8A6", opacity:0.04, filter:"blur(80px)", pointerEvents:"none" }} />
 
         {/* Logo */}
         <div style={{ position:"relative", zIndex:1, marginBottom:52 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <span style={{ fontSize:28 }}>🦷</span>
-            <span style={{ fontSize:24, fontWeight:900, color:"#a5f3fc", letterSpacing:"-0.02em" }}>
-              level<span style={{ color:"rgba(255,255,255,0.45)" }}>ai</span>
-            </span>
-          </div>
-          <div style={{ fontSize:11, fontWeight:800, color:"#84cc16", letterSpacing:"0.12em", textTransform:"uppercase", marginTop:8 }}>
-            Practice Setup
-          </div>
+          <BrandLogo size={28} textSize={24} subtitle="Practice Setup" subtitleColor="#14B8A6" />
         </div>
 
         {/* Progress dots */}
@@ -1467,7 +1487,7 @@ function OnboardingWizard({ onComplete, showToast }) {
           <div style={{ fontSize:11, color:"rgba(255,255,255,0.5)", fontWeight:700, marginBottom:4 }}>
             AVERAGE SETUP TIME
           </div>
-          <div style={{ fontSize:24, fontWeight:900, color:"#a5f3fc" }}>4 min 12 sec</div>
+          <div style={{ fontSize:24, fontWeight:900, color:"#5EEAD4" }}>4 min 12 sec</div>
           <div style={{ fontSize:11, color:"rgba(255,255,255,0.5)", marginTop:2 }}>
             Most practices go live before their next patient.
           </div>
@@ -1485,7 +1505,7 @@ function OnboardingWizard({ onComplete, showToast }) {
           {/* ═══ STEP 1: Activation ═══ */}
           {step === "activate" && (
             <div className="wiz-animate">
-              <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
+              <div style={{ display:"inline-flex", background:T.accentBg, color:T.accent, padding:"6px 12px",
                 borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
                 STEP 1 OF 5
               </div>
@@ -1522,7 +1542,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                       background: activationError ? "#fef2f2" : "white",
                       boxShadow: activationError ? "0 0 0 3px rgba(239,68,68,0.12)" : "none",
                     }}
-                    onFocus={e => { if (!activationError) e.target.style.borderColor = "#4f46e5"; }}
+                    onFocus={e => { if (!activationError) e.target.style.borderColor = "#14B8A6"; }}
                     onBlur={e => { if (!activationError) e.target.style.borderColor = "#c8c8c0"; }}
                   />
                 </div>
@@ -1555,7 +1575,7 @@ function OnboardingWizard({ onComplete, showToast }) {
           {/* ═══ STEP 2: Practice Identity ═══ */}
           {step === "profile" && (
             <div className="wiz-animate">
-              <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
+              <div style={{ display:"inline-flex", background:T.accentBg, color:T.accent, padding:"6px 12px",
                 borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
                 STEP 2 OF 5
               </div>
@@ -1612,7 +1632,7 @@ function OnboardingWizard({ onComplete, showToast }) {
           {/* ═══ STEP 2: Connect PMS ═══ */}
           {step === "pms" && (
             <div className="wiz-animate">
-              <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
+              <div style={{ display:"inline-flex", background:T.accentBg, color:T.accent, padding:"6px 12px",
                 borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
                 STEP 3 OF 5
               </div>
@@ -1708,7 +1728,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                             <div style={{
                               width:22, height:22, borderRadius:"50%", flexShrink:0,
                               display:"flex", alignItems:"center", justifyContent:"center",
-                              background: done ? "#22c55e" : active ? "#6366f1" : "#e2e2dc",
+                              background: done ? "#22c55e" : active ? "#14B8A6" : "#e2e2dc",
                               fontSize:11, fontWeight:900, color:"white",
                               animation: active ? "wizPulse 1s ease-in-out infinite" : "none",
                             }}>
@@ -1716,7 +1736,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                             </div>
                             <div style={{
                               fontSize:14, fontWeight: active ? 800 : done ? 700 : 400,
-                              color: done ? "#1a1a18" : active ? "#4f46e5" : "#a0a09a",
+                              color: done ? "#1a1a18" : active ? "#0D9488" : "#a0a09a",
                             }}>
                               {phase}
                             </div>
@@ -1728,7 +1748,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                     {/* Progress bar */}
                     <div style={{ marginTop:24, background:"#e2e2dc", borderRadius:4, height:6, overflow:"hidden" }}>
                       <div style={{
-                        height:"100%", borderRadius:4, background:"linear-gradient(90deg,#6366f1,#0ea5e9)",
+                        height:"100%", borderRadius:4, background:"linear-gradient(90deg,#14B8A6,#0EA5E9)",
                         width: `${Math.min(100, (syncPhase / (PMS_SYNC_PHASES.length - 1)) * 100)}%`,
                         transition:"width 0.9s ease-out",
                       }} />
@@ -1742,7 +1762,7 @@ function OnboardingWizard({ onComplete, showToast }) {
           {/* ═══ STEP 3: RPA Vault — Smart (only shows discovered payers) ═══ */}
           {step === "rpa" && (
             <div className="wiz-animate">
-              <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
+              <div style={{ display:"inline-flex", background:T.accentBg, color:T.accent, padding:"6px 12px",
                 borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
                 STEP 4 OF 5
               </div>
@@ -1751,18 +1771,18 @@ function OnboardingWizard({ onComplete, showToast }) {
               </h2>
 
               {/* Smart discovery callout */}
-              <div style={{ background:"linear-gradient(135deg,#eef2ff,#f0f9ff)", border:"1px solid #c7d2fe",
+              <div style={{ background:T.indigoLight, border:"1px solid "+T.indigoBorder,
                 borderRadius:12, padding:"16px 18px", marginBottom:24 }}>
-                <div style={{ fontSize:12, fontWeight:900, color:"#4f46e5", marginBottom:6 }}>
+                <div style={{ fontSize:12, fontWeight:900, color:T.indigoDark, marginBottom:6 }}>
                   🤖 PMS SYNC COMPLETE — INTELLIGENCE REPORT
                 </div>
-                <div style={{ fontSize:13, color:"#1e1b4b", lineHeight:1.6 }}>
+                <div style={{ fontSize:13, color:T.text, lineHeight:1.6 }}>
                   Based on your {pmsSystem || "PMS"} sync, we found{" "}
                   <strong>3,420 active patients</strong>. Your top 3 insurance networks are:{" "}
                   <strong>Delta Dental</strong>, <strong>MetLife</strong>, and{" "}
                   <strong>Cigna</strong>.
                 </div>
-                <div style={{ fontSize:11, color:"#6366f1", marginTop:8, fontWeight:700 }}>
+                <div style={{ fontSize:11, color:T.accent, marginTop:8, fontWeight:700 }}>
                   Add credentials below to enable zero-touch RPA verification for these payers.
                 </div>
               </div>
@@ -1849,7 +1869,7 @@ function OnboardingWizard({ onComplete, showToast }) {
           {/* ═══ STEP 4: Invite Team + Launch ═══ */}
           {step === "team" && (
             <div className="wiz-animate">
-              <div style={{ display:"inline-flex", background:"#eef2ff", color:"#4f46e5", padding:"6px 12px",
+              <div style={{ display:"inline-flex", background:T.accentBg, color:T.accent, padding:"6px 12px",
                 borderRadius:8, fontSize:11, fontWeight:800, letterSpacing:"0.05em", marginBottom:20 }}>
                 STEP 5 OF 5 — FINAL STEP
               </div>
@@ -1907,10 +1927,10 @@ function OnboardingWizard({ onComplete, showToast }) {
               </div>
 
               <button onClick={() => setInvites([...invites, { email:"", role:"Front Desk" }])}
-                style={{ background:"none", border:"1px dashed #c8c8c0", borderRadius:10, color:"#6366f1",
+                style={{ background:"none", border:"1px dashed #c8c8c0", borderRadius:10, color:"#14B8A6",
                   fontWeight:800, fontSize:13, cursor:"pointer", padding:"10px 16px",
                   width:"100%", marginBottom:28, transition:"0.2s" }}
-                onMouseEnter={e => e.currentTarget.style.borderColor="#6366f1"}
+                onMouseEnter={e => e.currentTarget.style.borderColor="#14B8A6"}
                 onMouseLeave={e => e.currentTarget.style.borderColor="#c8c8c0"}>
                 + Add another team member
               </button>
@@ -1959,10 +1979,10 @@ function OnboardingWizard({ onComplete, showToast }) {
                     onComplete();
                   }}
                   style={{
-                    flex:1, padding:"17px", background:"linear-gradient(135deg,#4f46e5,#7c3aed)",
+                    flex:1, padding:"17px", background:"linear-gradient(135deg,#14B8A6,#0D9488)",
                     color:"white", border:"none", borderRadius:12, fontSize:16, fontWeight:900,
                     cursor:"pointer", letterSpacing:"0.01em",
-                    boxShadow:"0 8px 24px rgba(79,70,229,0.4)",
+                    boxShadow:"0 8px 24px rgba(20,184,166,0.35)",
                     transition:"transform 0.2s, box-shadow 0.2s",
                   }}
                   onMouseEnter={e => { e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow="0 12px 32px rgba(79,70,229,0.5)"; }}
@@ -2103,7 +2123,7 @@ function PreauthWidget({ patient, result, triage, showToast, prefetched, practic
     .practice-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1a1a18; padding-bottom: 14px; margin-bottom: 28px; }
     .practice-name { font-family: Arial, sans-serif; font-size: 18pt; font-weight: 900; color: #1a1a18; }
     .practice-sub  { font-family: Arial, sans-serif; font-size: 9pt; color: #666; margin-top: 3px; }
-    .badge { font-family: Arial, sans-serif; font-size: 8pt; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; background: #4f46e5; color: white; padding: 4px 10px; border-radius: 20px; }
+    .badge { font-family: Arial, sans-serif; font-size: 8pt; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; background: #0D9488; color: white; padding: 4px 10px; border-radius: 20px; }
     .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 32px; margin-bottom: 28px; padding: 16px 20px; background: #f8f8f6; border: 1px solid #e2e2dc; border-radius: 6px; font-family: Arial, sans-serif; font-size: 10pt; }
     .meta-grid .lbl { font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.05em; font-size: 9pt; }
     .letter-body { white-space: pre-wrap; font-size: 11.5pt; line-height: 1.85; }
@@ -2111,8 +2131,8 @@ function PreauthWidget({ patient, result, triage, showToast, prefetched, practic
     .attachments h3 { font-family: Arial, sans-serif; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 900; margin-bottom: 10px; color: #555; }
     .attachments li { font-size: 10pt; font-family: Arial, sans-serif; padding: 3px 0; }
     .footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #ccc; font-size: 8.5pt; color: #999; font-family: Arial, sans-serif; display: flex; justify-content: space-between; }
-    .print-btn { position: fixed; bottom: 24px; right: 24px; background: #4f46e5; color: white; font-family: Arial, sans-serif; font-weight: 900; font-size: 14px; padding: 13px 26px; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 6px 20px rgba(79,70,229,0.35); }
-    .print-btn:hover { background: #4338ca; }
+    .print-btn { position: fixed; bottom: 24px; right: 24px; background: #0D9488; color: white; font-family: Arial, sans-serif; font-weight: 900; font-size: 14px; padding: 13px 26px; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 6px 20px rgba(13,148,136,0.35); }
+    .print-btn:hover { background: #0F766E; }
   </style>
 </head>
 <body>
@@ -5365,7 +5385,7 @@ function Analytics({ patients, results, agentLog }) {
                 </div>
                 <div style={{ width:"100%", maxWidth:52, display:"flex", flexDirection:"column", justifyContent:"flex-end", height:"100%",
                   borderRadius: isSelected||isHovered ? "6px 6px 0 0" : "4px 4px 0 0",
-                  overflow:"hidden", boxShadow: isSelected ? "0 -4px 12px rgba(99,102,241,0.3)" : "none", transition:"all 0.2s" }}>
+                  overflow:"hidden", boxShadow: isSelected ? "0 -4px 12px rgba(20,184,166,0.3)" : "none", transition:"all 0.2s" }}>
                   <div style={{ height:`${cashPct}%`, background:T.lime, borderBottom:"2px solid white" }} />
                   <div style={{ height:`${insPct}%`, background:T.indigo }} />
                 </div>
@@ -6824,31 +6844,23 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
   const usedCodes = codes.filter(c => c.used).length;
 
   return (
-    <div style={{ height: "100vh", background: "#0f172a", fontFamily: "'Nunito', sans-serif", display: "flex", overflow: "hidden" }}>
+    <div style={{ height: "100vh", background: "#0A0A0A", fontFamily: "'Nunito', sans-serif", display: "flex", overflow: "hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
         ::-webkit-scrollbar{width:5px;}
-        ::-webkit-scrollbar-thumb{background:#334155;border-radius:4px;}
-        ::-webkit-scrollbar-track{background:#0f172a;}
+        ::-webkit-scrollbar-thumb{background:#2A2A2A;border-radius:4px;}
+        ::-webkit-scrollbar-track{background:#0A0A0A;}
         @keyframes adminFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
       `}</style>
 
       {/* ── Sidebar ── */}
-      <div style={{ width: 260, background: "#1e293b", borderRight: "1px solid #334155",
+      <div style={{ width: 260, background: "#141414", borderRight: "1px solid #1F1F1F",
         display: "flex", flexDirection: "column", padding: "24px 0" }}>
 
         {/* Logo */}
         <div style={{ padding: "0 24px", marginBottom: 32 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-            <span style={{ fontSize: 24 }}>🦷</span>
-            <span style={{ fontSize: 20, fontWeight: 900, color: "#a5f3fc", letterSpacing: "-0.02em" }}>
-              level<span style={{ color: "rgba(255,255,255,0.4)" }}>ai</span>
-            </span>
-          </div>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#f97316", letterSpacing: "0.12em", textTransform: "uppercase" }}>
-            Admin Console
-          </div>
+          <BrandLogo size={22} textSize={18} subtitle="Admin Console" subtitleColor="#14B8A6" />
         </div>
 
         {/* Nav items */}
@@ -6858,8 +6870,8 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
               style={{
                 display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
                 borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700,
-                background: activeTab === t.id ? "rgba(99,102,241,0.15)" : "transparent",
-                color: activeTab === t.id ? "#a5b4fc" : "#94a3b8",
+                background: activeTab === t.id ? "rgba(20,184,166,0.12)" : "transparent",
+                color: activeTab === t.id ? "#5EEAD4" : "#A3A3A3",
                 transition: "all 0.15s",
               }}>
               <span style={{ fontSize: 16 }}>{t.icon}</span>
@@ -6872,8 +6884,8 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
         <div style={{ padding: "0 12px", display: "flex", flexDirection: "column", gap: 4 }}>
           <button onClick={onSwitchToPractice}
             style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
-              borderRadius: 8, border: "1px solid #334155", cursor: "pointer", fontSize: 12, fontWeight: 700,
-              background: "transparent", color: "#94a3b8", transition: "all 0.15s" }}>
+              borderRadius: 8, border: "1px solid #1F1F1F", cursor: "pointer", fontSize: 12, fontWeight: 700,
+              background: "transparent", color: "#A3A3A3", transition: "all 0.15s" }}>
             <span style={{ fontSize: 14 }}>📋</span> Switch to Practice View
           </button>
           <button onClick={onSignOut}
@@ -6886,7 +6898,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
       </div>
 
       {/* ── Main content ── */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "32px 48px", background: "#0f172a" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "32px 48px", background: "#0A0A0A" }}>
         <div style={{ maxWidth: 900, animation: "adminFadeIn 0.3s ease-out" }}>
 
           {/* ═══ Activation Codes Tab ═══ */}
@@ -6894,13 +6906,13 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
                 <div>
-                  <h1 style={{ fontSize: 24, fontWeight: 900, color: "#f1f5f9", marginBottom: 4 }}>Activation Codes</h1>
-                  <p style={{ fontSize: 13, color: "#64748b" }}>Generate and manage single-use license codes for new practices</p>
+                  <h1 style={{ fontSize: 24, fontWeight: 900, color: "#F5F5F5", marginBottom: 4 }}>Activation Codes</h1>
+                  <p style={{ fontSize: 13, color: "#525252" }}>Generate and manage single-use license codes for new practices</p>
                 </div>
                 <button onClick={() => setShowGenForm(!showGenForm)} disabled={generating}
                   style={{
                     padding: "12px 24px", borderRadius: 10, border: "none", cursor: generating ? "not-allowed" : "pointer",
-                    background: generating ? "#334155" : "linear-gradient(135deg, #6366f1, #4f46e5)",
+                    background: generating ? "#2A2A2A" : "linear-gradient(135deg, #14B8A6, #0D9488)",
                     color: "white", fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8,
                     transition: "all 0.15s", opacity: generating ? 0.7 : 1,
                   }}>
@@ -6910,33 +6922,33 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
 
               {/* Generate form */}
               {showGenForm && (
-                <div style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(79,70,229,0.05))",
-                  border: "1px solid rgba(99,102,241,0.2)", borderRadius: 14, padding: "24px 28px",
+                <div style={{ background: "linear-gradient(135deg, rgba(20,184,166,0.06), rgba(13,148,136,0.03))",
+                  border: "1px solid rgba(20,184,166,0.2)", borderRadius: 14, padding: "24px 28px",
                   marginBottom: 28, animation: "adminFadeIn 0.2s ease-out" }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: "#a5b4fc", marginBottom: 16 }}>New Code Details (optional)</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: "#5EEAD4", marginBottom: 16 }}>New Code Details (optional)</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Customer / Practice Name</label>
+                      <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Customer / Practice Name</label>
                       <input value={genLabel} onChange={e => setGenLabel(e.target.value)} placeholder="e.g. Dr. Smith — Smile Dental"
-                        style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #334155",
-                          background: "#0f172a", color: "#e2e8f0", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                        style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #1F1F1F",
+                          background: "#0A0A0A", color: "#F5F5F5", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Customer Email</label>
+                      <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Customer Email</label>
                       <input value={genEmail} onChange={e => setGenEmail(e.target.value)} placeholder="e.g. drsmith@smiledental.com" type="email"
-                        style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #334155",
-                          background: "#0f172a", color: "#e2e8f0", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                        style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #1F1F1F",
+                          background: "#0A0A0A", color: "#F5F5F5", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 10 }}>
                     <button onClick={handleGenerate} disabled={generating}
                       style={{ padding: "10px 24px", borderRadius: 8, border: "none", cursor: generating ? "not-allowed" : "pointer",
-                        background: "linear-gradient(135deg, #6366f1, #4f46e5)", color: "white", fontSize: 12, fontWeight: 800 }}>
+                        background: "linear-gradient(135deg, #14B8A6, #0D9488)", color: "white", fontSize: 12, fontWeight: 800 }}>
                       {generating ? "⏳ Generating…" : "Generate Code"}
                     </button>
                     <button onClick={() => { setShowGenForm(false); setGenLabel(""); setGenEmail(""); }}
-                      style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid #334155",
-                        background: "transparent", color: "#94a3b8", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid #1F1F1F",
+                        background: "transparent", color: "#A3A3A3", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                       Cancel
                     </button>
                   </div>
@@ -6945,36 +6957,36 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
 
               {/* Stats row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 28 }}>
-                <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "18px 20px" }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Total Codes</div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: "#f1f5f9" }}>{codes.length}</div>
+                <div style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Total Codes</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#F5F5F5" }}>{codes.length}</div>
                 </div>
-                <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "18px 20px" }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Available</div>
+                <div style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Available</div>
                   <div style={{ fontSize: 28, fontWeight: 900, color: "#22c55e" }}>{availableCodes}</div>
                 </div>
-                <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "18px 20px" }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Redeemed</div>
+                <div style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Redeemed</div>
                   <div style={{ fontSize: 28, fontWeight: 900, color: "#f97316" }}>{usedCodes}</div>
                 </div>
               </div>
 
               {/* Newly generated code highlight */}
               {newCode && (
-                <div style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(79,70,229,0.08))",
-                  border: "1px solid rgba(99,102,241,0.3)", borderRadius: 14, padding: "24px 28px",
+                <div style={{ background: "linear-gradient(135deg, rgba(20,184,166,0.10), rgba(13,148,136,0.06))",
+                  border: "1px solid rgba(20,184,166,0.3)", borderRadius: 14, padding: "24px 28px",
                   marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: "#a5b4fc", textTransform: "uppercase",
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#5EEAD4", textTransform: "uppercase",
                       letterSpacing: "0.08em", marginBottom: 8 }}>New Code Generated</div>
-                    <div style={{ fontSize: 32, fontWeight: 900, color: "#f1f5f9",
+                    <div style={{ fontSize: 32, fontWeight: 900, color: "#F5F5F5",
                       fontFamily: "'Courier New', Courier, monospace", letterSpacing: "0.1em" }}>
                       {newCode}
                     </div>
                   </div>
                   <button onClick={() => copyCode(newCode)}
-                    style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid rgba(99,102,241,0.4)",
-                      background: "rgba(99,102,241,0.15)", color: "#a5b4fc", fontSize: 12, fontWeight: 800,
+                    style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid rgba(20,184,166,0.4)",
+                      background: "rgba(20,184,166,0.12)", color: "#5EEAD4", fontSize: 12, fontWeight: 800,
                       cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                     📋 Copy
                   </button>
@@ -6983,19 +6995,19 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
 
               {/* Codes table */}
               {loading ? (
-                <div style={{ textAlign: "center", color: "#64748b", padding: 40 }}>Loading codes…</div>
+                <div style={{ textAlign: "center", color: "#525252", padding: 40 }}>Loading codes…</div>
               ) : codes.length === 0 ? (
-                <div style={{ textAlign: "center", color: "#64748b", padding: 40, background: "#1e293b",
-                  borderRadius: 12, border: "1px solid #334155" }}>
+                <div style={{ textAlign: "center", color: "#525252", padding: 40, background: "#141414",
+                  borderRadius: 12, border: "1px solid #1F1F1F" }}>
                   No activation codes yet. Click &quot;Generate New Code&quot; to create one.
                 </div>
               ) : (
-                <div style={{ background: "#1e293b", borderRadius: 12, border: "1px solid #334155", overflow: "hidden" }}>
+                <div style={{ background: "#141414", borderRadius: 12, border: "1px solid #1F1F1F", overflow: "hidden" }}>
                   {/* Table header */}
                   <div style={{ display: "grid", gridTemplateColumns: "180px 1fr 90px 1fr 140px 44px",
-                    padding: "12px 20px", borderBottom: "1px solid #334155", gap: 12 }}>
+                    padding: "12px 20px", borderBottom: "1px solid #1F1F1F", gap: 12 }}>
                     {["Code", "Customer", "Status", "Redeemed By", "Created", ""].map(h => (
-                      <div key={h} style={{ fontSize: 10, fontWeight: 800, color: "#475569",
+                      <div key={h} style={{ fontSize: 10, fontWeight: 800, color: "#525252",
                         textTransform: "uppercase", letterSpacing: "0.08em" }}>{h}</div>
                     ))}
                   </div>
@@ -7003,17 +7015,17 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                   {codes.map((c, i) => (
                     <div key={c.id} style={{ display: "grid", gridTemplateColumns: "180px 1fr 90px 1fr 140px 44px",
                       padding: "14px 20px", borderBottom: i < codes.length - 1 ? "1px solid #1e293b" : "none",
-                      background: i % 2 === 0 ? "transparent" : "rgba(15,23,42,0.4)", gap: 12, alignItems: "center" }}>
+                      background: i % 2 === 0 ? "transparent" : "rgba(10,10,10,0.4)", gap: 12, alignItems: "center" }}>
                       <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: 13,
-                        fontWeight: 800, color: "#e2e8f0", letterSpacing: "0.05em" }}>{c.code}</div>
+                        fontWeight: 800, color: "#F5F5F5", letterSpacing: "0.05em" }}>{c.code}</div>
                       <div style={{ overflow: "hidden" }}>
                         {c.label ? (
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#cbd5e1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.label}</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#D4D4D4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.label}</div>
                         ) : (
-                          <div style={{ fontSize: 11, color: "#475569" }}>—</div>
+                          <div style={{ fontSize: 11, color: "#525252" }}>—</div>
                         )}
                         {c.customerEmail && (
-                          <div style={{ fontSize: 10, color: "#64748b", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.customerEmail}</div>
+                          <div style={{ fontSize: 10, color: "#525252", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.customerEmail}</div>
                         )}
                       </div>
                       <div>
@@ -7028,12 +7040,12 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                       </div>
                       <div style={{ fontSize: 12, color: c.usedByName ? "#cbd5e1" : "#475569" }}>
                         {c.usedByName || (c.used ? "Unknown practice" : "—")}
-                        {c.usedAt && <div style={{ color: "#475569", fontSize: 10, marginTop: 1 }}>{fmtDate(c.usedAt)}</div>}
+                        {c.usedAt && <div style={{ color: "#525252", fontSize: 10, marginTop: 1 }}>{fmtDate(c.usedAt)}</div>}
                       </div>
-                      <div style={{ fontSize: 11, color: "#64748b" }}>{fmtDate(c.createdAt)}</div>
+                      <div style={{ fontSize: 11, color: "#525252" }}>{fmtDate(c.createdAt)}</div>
                       <button onClick={() => copyCode(c.code)}
-                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #334155",
-                          background: "transparent", color: "#64748b", fontSize: 12, cursor: "pointer" }}
+                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #1F1F1F",
+                          background: "transparent", color: "#525252", fontSize: 12, cursor: "pointer" }}
                         title="Copy code">
                         📋
                       </button>
@@ -7048,40 +7060,40 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
           {activeTab === "practices" && (
             <div>
               <div style={{ marginBottom: 32 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 900, color: "#f1f5f9", marginBottom: 4 }}>Practices</h1>
-                <p style={{ fontSize: 13, color: "#64748b" }}>All onboarded dental practices using Level AI</p>
+                <h1 style={{ fontSize: 24, fontWeight: 900, color: "#F5F5F5", marginBottom: 4 }}>Practices</h1>
+                <p style={{ fontSize: 13, color: "#525252" }}>All onboarded dental practices using Level AI</p>
               </div>
 
               {/* Stats row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 28 }}>
-                <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "18px 20px" }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Total Practices</div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: "#f1f5f9" }}>{practices.length}</div>
+                <div style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Total Practices</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#F5F5F5" }}>{practices.length}</div>
                 </div>
-                <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "18px 20px" }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Activated</div>
+                <div style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Activated</div>
                   <div style={{ fontSize: 28, fontWeight: 900, color: "#22c55e" }}>{practices.filter(p => p.activatedAt).length}</div>
                 </div>
-                <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "18px 20px" }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Live Mode</div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: "#6366f1" }}>{practices.filter(p => p.accountMode === "live").length}</div>
+                <div style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Live Mode</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#14B8A6" }}>{practices.filter(p => p.accountMode === "live").length}</div>
                 </div>
               </div>
 
               {loading ? (
-                <div style={{ textAlign: "center", color: "#64748b", padding: 40 }}>Loading practices…</div>
+                <div style={{ textAlign: "center", color: "#525252", padding: 40 }}>Loading practices…</div>
               ) : practices.length === 0 ? (
-                <div style={{ textAlign: "center", color: "#64748b", padding: 40, background: "#1e293b",
-                  borderRadius: 12, border: "1px solid #334155" }}>
+                <div style={{ textAlign: "center", color: "#525252", padding: 40, background: "#141414",
+                  borderRadius: 12, border: "1px solid #1F1F1F" }}>
                   No practices onboarded yet.
                 </div>
               ) : (
-                <div style={{ background: "#1e293b", borderRadius: 12, border: "1px solid #334155", overflow: "hidden" }}>
+                <div style={{ background: "#141414", borderRadius: 12, border: "1px solid #1F1F1F", overflow: "hidden" }}>
                   {/* Table header */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 160px 160px",
-                    padding: "12px 20px", borderBottom: "1px solid #334155", gap: 12 }}>
+                    padding: "12px 20px", borderBottom: "1px solid #1F1F1F", gap: 12 }}>
                     {["Practice Name", "Mode", "PMS", "Activated", "Created"].map(h => (
-                      <div key={h} style={{ fontSize: 10, fontWeight: 800, color: "#475569",
+                      <div key={h} style={{ fontSize: 10, fontWeight: 800, color: "#525252",
                         textTransform: "uppercase", letterSpacing: "0.08em" }}>{h}</div>
                     ))}
                   </div>
@@ -7089,17 +7101,17 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                   {practices.map((p, i) => (
                     <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 160px 160px",
                       padding: "14px 20px", borderBottom: i < practices.length - 1 ? "1px solid #1e293b" : "none",
-                      background: i % 2 === 0 ? "transparent" : "rgba(15,23,42,0.4)", gap: 12, alignItems: "center" }}>
+                      background: i % 2 === 0 ? "transparent" : "rgba(10,10,10,0.4)", gap: 12, alignItems: "center" }}>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: "#e2e8f0" }}>{p.name || "Unnamed"}</div>
-                        {p.npi && <div style={{ fontSize: 10, color: "#475569", marginTop: 2 }}>NPI: {p.npi}</div>}
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "#F5F5F5" }}>{p.name || "Unnamed"}</div>
+                        {p.npi && <div style={{ fontSize: 10, color: "#525252", marginTop: 2 }}>NPI: {p.npi}</div>}
                       </div>
                       <div>
                         <span style={{
                           display: "inline-block", padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 800,
-                          background: p.accountMode === "live" ? "rgba(99,102,241,0.12)" : "rgba(245,158,11,0.12)",
-                          color: p.accountMode === "live" ? "#a5b4fc" : "#fbbf24",
-                          border: `1px solid ${p.accountMode === "live" ? "rgba(99,102,241,0.2)" : "rgba(245,158,11,0.2)"}`,
+                          background: p.accountMode === "live" ? "rgba(20,184,166,0.10)" : "rgba(245,158,11,0.12)",
+                          color: p.accountMode === "live" ? "#5EEAD4" : "#fbbf24",
+                          border: `1px solid ${p.accountMode === "live" ? "rgba(20,184,166,0.2)" : "rgba(245,158,11,0.2)"}`,
                         }}>
                           {p.accountMode === "live" ? "Live" : "Sandbox"}
                         </span>
@@ -7110,7 +7122,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                       <div style={{ fontSize: 11, color: p.activatedAt ? "#4ade80" : "#475569" }}>
                         {p.activatedAt ? fmtDate(p.activatedAt) : "Not activated"}
                       </div>
-                      <div style={{ fontSize: 11, color: "#64748b" }}>{fmtDate(p.createdAt)}</div>
+                      <div style={{ fontSize: 11, color: "#525252" }}>{fmtDate(p.createdAt)}</div>
                     </div>
                   ))}
                 </div>
@@ -7619,47 +7631,60 @@ export default function LevelAI() {
 
     // ── Module 3: Create SMS draft for block/notify patients ────────────────
     // Uses LLM to generate natural-language patient-facing messages (no raw triage data)
-    if ((triage.block.length > 0 || triage.notify.length > 0) && patient.phone && !sandboxMode && accountMode !== "sandbox") {
+    if ((triage.block.length > 0 || triage.notify.length > 0) && patient.phone) {
       const isBlock = triage.block.length > 0;
       const draftType = isBlock ? "reschedule" : "outreach";
+      const isSandbox = sandboxMode || accountMode === "sandbox";
 
-      // Fire LLM draft + SMS queue creation in parallel
-      // The agent log entry already has a template fallback; LLM draft replaces it when ready
-      (async () => {
-        try {
-          // Get LLM-quality draft
-          const llmDraft = await fetchLLMDraft({
-            patient,
-            blockReasons: triage.block,
-            notifyReasons: triage.notify,
-            type: draftType,
-            practiceName,
-            practicePhone,
-          });
-
-          // Use LLM draft or fall back to the template already in the entry
-          const finalDraft = llmDraft || (isBlock
-            ? buildRescheduleDraft(patient, triage.block, practiceName, practicePhone)
-            : buildNotifyDraft(patient, triage.notify, practiceName, practicePhone));
-
-          // Update agent log entry with LLM-quality draft
-          setAgentLog(log => log.map(e =>
-            e.patientId === patient.id && e.awaitingApproval && e._draftLoading
-              ? { ...e, draftMessage: finalDraft, _draftLoading: false }
-              : e
-          ));
-
-          // ZERO PHI AT REST: Draft stays in agentLog React state only.
-          // No DB persistence — handleApprove sends directly via /api/v1/sms/send.
-        } catch {
-          // Non-blocking — template fallback already in agent log
+      if (isSandbox) {
+        // Sandbox: immediately resolve _draftLoading with the template already in the entry
+        // (no LLM call — template fallback is already set in buildRescheduleEntry / buildOutreachEntry)
+        setTimeout(() => {
           setAgentLog(log => log.map(e =>
             e.patientId === patient.id && e._draftLoading
               ? { ...e, _draftLoading: false }
               : e
           ));
-        }
-      })();
+        }, 800 + Math.random() * 600); // brief delay to simulate AI drafting
+      } else {
+        // Live mode: Fire LLM draft in background
+        // The agent log entry already has a template fallback; LLM draft replaces it when ready
+        (async () => {
+          try {
+            // Get LLM-quality draft
+            const llmDraft = await fetchLLMDraft({
+              patient,
+              blockReasons: triage.block,
+              notifyReasons: triage.notify,
+              type: draftType,
+              practiceName,
+              practicePhone,
+            });
+
+            // Use LLM draft or fall back to the template already in the entry
+            const finalDraft = llmDraft || (isBlock
+              ? buildRescheduleDraft(patient, triage.block, practiceName, practicePhone)
+              : buildNotifyDraft(patient, triage.notify, practiceName, practicePhone));
+
+            // Update agent log entry with LLM-quality draft
+            setAgentLog(log => log.map(e =>
+              e.patientId === patient.id && e.awaitingApproval && e._draftLoading
+                ? { ...e, draftMessage: finalDraft, _draftLoading: false }
+                : e
+            ));
+
+            // ZERO PHI AT REST: Draft stays in agentLog React state only.
+            // No DB persistence — handleApprove sends directly via /api/v1/sms/send.
+          } catch {
+            // Non-blocking — template fallback already in agent log
+            setAgentLog(log => log.map(e =>
+              e.patientId === patient.id && e._draftLoading
+                ? { ...e, _draftLoading: false }
+                : e
+            ));
+          }
+        })();
+      }
     }
   }, [isLoading, setPhase, showToast, sandboxMode, accountMode, preauthCache, addCredentialAlert, practice]);
 
@@ -7972,10 +7997,10 @@ export default function LevelAI() {
             Please contact our team to resume service.
           </p>
           <div style={{
-            background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+            background: "rgba(20,184,166,0.06)", border: "1px solid rgba(20,184,166,0.2)",
             borderRadius: 10, padding: "16px 20", marginBottom: 20,
           }}>
-            <div style={{ color: "#a5b4fc", fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Contact Support</div>
+            <div style={{ color: "#5EEAD4", fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Contact Support</div>
             <div style={{ color: T.textSoft, fontSize: 14 }}>billing@levelai.com</div>
           </div>
           <button
@@ -8024,15 +8049,9 @@ export default function LevelAI() {
         {/* Logo */}
         <div style={{ padding: sidebarOpen ? "20px 20px 16px" : "20px 0 16px",
           borderBottom:"1px solid " + T.border, display:"flex", alignItems:"center",
-          gap:10, justifyContent: sidebarOpen ? "flex-start" : "center",
+          justifyContent: sidebarOpen ? "flex-start" : "center",
           transition:"padding 0.25s" }}>
-          <div style={{ fontSize:24, flexShrink:0 }}>&#x1F9B7;</div>
-          {sidebarOpen && (
-            <div style={{ overflow:"hidden", whiteSpace:"nowrap" }}>
-              <div style={{ color:T.lime, fontSize:18, fontWeight:900 }}>level<span style={{ color:T.textMid }}>ai</span></div>
-              <div style={{ color:T.indigo, fontSize:8, fontWeight:800, letterSpacing:"0.1em" }}>insurance made easy</div>
-            </div>
-          )}
+          <BrandLogo size={sidebarOpen ? 22 : 24} showText={sidebarOpen} textSize={18} subtitle="insurance made easy" subtitleColor={T.accent || "#14B8A6"} />
         </div>
 
         {/* Nav items */}

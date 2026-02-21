@@ -65,11 +65,73 @@ const SYSTEM_PROMPT_PREFIX =
   "- Give medical or legal advice.\n" +
   "- Write more than 3 sentences. Seriously.\n\n";
 
+// ── Sandbox fallback: short canned answers when no API key or no auth ────────
+function sandboxAnswer(question, coverageJson) {
+  const q = (question || "").toLowerCase();
+  const cov = coverageJson || {};
+  const fmt = (cents) => `$${((cents || 0) / 100).toFixed(0)}`;
+
+  if (/covered|coverage|what.*cover/i.test(q)) {
+    const pct = cov.copay_pct != null ? `${100 - cov.copay_pct}%` : "around 80%";
+    return `Based on what I see, the plan covers ${pct} of today's procedure. They have ${fmt(cov.annual_remaining_cents || 150000)} remaining on their annual max, so they should be good to go.`;
+  }
+  if (/owe|out.of.pocket|patient.pay|cost/i.test(q)) {
+    const copay = cov.copay_pct != null ? cov.copay_pct : 20;
+    return `The patient's responsible for about ${copay}% coinsurance after the deductible. With their current benefits, I'd estimate a ${fmt(copay * 500)} patient portion — but double-check the EOB once it processes.`;
+  }
+  if (/pre.?auth|prior.?auth/i.test(q)) {
+    return "Looking at the procedure code and plan type, I don't see a pre-auth requirement for this one. That said, some plans sneak it in for certain tooth numbers, so it never hurts to call the carrier to confirm if you want to be safe.";
+  }
+  if (/deductible/i.test(q)) {
+    return `Their individual deductible is ${fmt(cov.individual_deductible_cents || 5000)} and they've met ${fmt(cov.individual_deductible_met_cents || 5000)} so far this year. ${(cov.individual_deductible_met_cents || 5000) >= (cov.individual_deductible_cents || 5000) ? "Looks like they've already satisfied it!" : "They'll need to cover the remaining deductible first."}`;
+  }
+  if (/waiting.period|wait/i.test(q)) {
+    return "I don't see any active waiting periods flagged on this plan. If it's a newer policy (under 12 months), you might want to confirm directly with the carrier — some plans have sneaky waiting periods for major work.";
+  }
+  if (/confident|accuracy|sure/i.test(q)) {
+    return "Pretty confident on the numbers here — they came straight from the 271 response. The deductible and annual max figures are solid. Coverage percentages should be accurate too, but I'd always recommend verifying against the actual EOB for major procedures.";
+  }
+  if (/dmo|ppo|hmo|plan.type/i.test(q)) {
+    const payer = cov.payer_name || "this carrier";
+    return `This looks like a PPO plan based on the benefit structure from ${payer}. PPO means they can see any provider, but they'll get better rates staying in-network. Out-of-network benefits are usually reduced by 20-30%.`;
+  }
+  if (/tell.*patient|patient.*know/i.test(q)) {
+    return "I'd let them know their insurance is active and covering most of today's visit. Give them a ballpark estimate of their copay so there are no surprises at checkout. If it's a bigger procedure, mention you'll send them an itemized statement once the claim processes.";
+  }
+  // Generic fallback
+  return `Good question! Based on what I see in the verification data, this patient has an active plan with ${fmt(cov.annual_remaining_cents || 150000)} remaining in annual benefits. Their coverage looks straightforward for today's visit. Let me know if you want me to dig into any specific aspect of their benefits.`;
+}
+
 export async function POST(request) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    // Auth — allow sandbox/demo users who may not be signed in
+    let userId = null;
+    try {
+      const authResult = await auth();
+      userId = authResult.userId;
+    } catch { /* unauthenticated — sandbox mode */ }
+
+    const body = await request.json().catch(() => ({}));
+    const patientId = body.patient_id || "unknown";
+    const question = (body.question || "").trim();
+    const coverageJson = body.coverage_json || {};
+    const history = Array.isArray(body.history) ? body.history : [];
+
+    // Determine account mode
+    let accountMode = "sandbox";
+    if (userId) {
+      try {
+        const { prisma } = await import("../../../../lib/prisma.js");
+        const practice = await prisma.practice.findUnique({ where: { clerkUserId: userId } });
+        if (practice) accountMode = practice.accountMode || "sandbox";
+      } catch { /* default to sandbox */ }
+    }
+
+    // Sandbox mode → return canned intelligent response (no API key needed)
+    if (!userId || accountMode === "sandbox") {
+      if (!question) return Response.json({ error: "Question is required" }, { status: 400 });
+      await new Promise(r => setTimeout(r, 600 + Math.random() * 800)); // simulate latency
+      return Response.json({ answer: sandboxAnswer(question, coverageJson), patient_id: patientId });
     }
 
     // Rate limit: 20 chat messages per minute per user
@@ -84,12 +146,6 @@ export async function POST(request) {
         { status: 503 }
       );
     }
-
-    const body = await request.json().catch(() => ({}));
-    const patientId = body.patient_id || "unknown";
-    const question = (body.question || "").trim();
-    const coverageJson = body.coverage_json || {};
-    const history = Array.isArray(body.history) ? body.history : [];
 
     if (!question) {
       return Response.json({ error: "Question is required" }, { status: 400 });

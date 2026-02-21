@@ -86,14 +86,18 @@ Email: ${pracEmail}`;
 
 export async function POST(request) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Auth — allow sandbox/demo users who may not be signed in
+    let userId = null;
+    try {
+      const authResult = await auth();
+      userId = authResult.userId;
+    } catch { /* unauthenticated — sandbox mode */ }
 
-    const rl = checkRateLimit(`emaildraft:${userId}`, { maxRequests: 20, windowMs: 60_000 });
-    const blocked = rateLimitResponse(rl);
-    if (blocked) return blocked;
+    if (userId) {
+      const rl = checkRateLimit(`emaildraft:${userId}`, { maxRequests: 20, windowMs: 60_000 });
+      const blocked = rateLimitResponse(rl);
+      if (blocked) return blocked;
+    }
 
     const body = await request.json().catch(() => ({}));
     const {
@@ -109,8 +113,8 @@ export async function POST(request) {
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
-    // Fallback if no API key
-    if (!apiKey) {
+    // Fallback if no API key (also covers sandbox mode)
+    if (!apiKey || !userId) {
       return Response.json({ draft: buildFallbackDraft(body) });
     }
 
