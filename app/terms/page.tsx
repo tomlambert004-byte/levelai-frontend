@@ -39,7 +39,7 @@ export default function TermsPage() {
       <main className="pt-28 pb-24">
         <div className="mx-auto max-w-3xl px-6">
           <div className="mb-12">
-            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#0D9488] mb-4">Legal</div>
+            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#2563EB] mb-4">Legal</div>
             <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">Terms of Service</h1>
             <p className="text-[#525252] text-lg">Last updated: February 2025</p>
           </div>
@@ -116,8 +116,8 @@ export default function TermsPage() {
 
             <Section title="6. Data and Privacy">
               <p>
-                Your use of the Service is also governed by our <Link href="/privacy" className="text-[#0D9488] hover:text-[#0F766E] transition-colors underline">Privacy Policy</Link> and
-                our <Link href="/hipaa" className="text-[#0D9488] hover:text-[#0F766E] transition-colors underline">HIPAA Compliance</Link> commitments.
+                Your use of the Service is also governed by our <Link href="/privacy" className="text-[#2563EB] hover:text-[#1D4ED8] transition-colors underline">Privacy Policy</Link> and
+                our <Link href="/hipaa" className="text-[#2563EB] hover:text-[#1D4ED8] transition-colors underline">HIPAA Compliance</Link> commitments.
               </p>
               <p>
                 We take the protection of patient health information (PHI) extremely seriously.
@@ -207,9 +207,9 @@ export default function TermsPage() {
                 If you have any questions about these Terms, please contact us:
               </p>
               <ul>
-                <li>Email: <a href="mailto:thomas@lvlai.app" className="text-[#0D9488] hover:text-[#0F766E] transition-colors">thomas@lvlai.app</a></li>
-                <li>Phone: <a href="tel:+15123955633" className="text-[#0D9488] hover:text-[#0F766E] transition-colors">(512) 395-5633</a></li>
-                <li>Support: <a href="mailto:support@levelai.app" className="text-[#0D9488] hover:text-[#0F766E] transition-colors">support@levelai.app</a></li>
+                <li>Email: <a href="mailto:thomas@lvlai.app" className="text-[#2563EB] hover:text-[#1D4ED8] transition-colors">thomas@lvlai.app</a></li>
+                <li>Phone: <a href="tel:+15123955633" className="text-[#2563EB] hover:text-[#1D4ED8] transition-colors">(512) 395-5633</a></li>
+                <li>Support: <a href="mailto:support@levelai.app" className="text-[#2563EB] hover:text-[#1D4ED8] transition-colors">support@levelai.app</a></li>
               </ul>
             </Section>
           </div>

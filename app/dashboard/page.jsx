@@ -3,13 +3,13 @@ export const dynamic = "force-dynamic";
 import { SignedIn, SignedOut, useAuth, useClerk, useSignIn, useSignUp, useUser } from "@clerk/nextjs";
 import { useState, useCallback, useEffect, useRef } from "react";
 // Theme — dual palettes: calm, premium, harmonious
-// Satoshi font · #0A0A0A base · #14B8A6 accent (used sparingly)
+// Satoshi font · #0A0A0A base · #3B82F6 accent (used sparingly)
 // Status colors: muted and sophisticated — no bright orange, hot pink, or jarring reds
 const themes = {
   dark: {
     bg:"#0A0A0A", bgCard:"#1A1A1A", border:"#1C1C1C", borderStrong:"#2A2A2A",
-    // Success / Verified — soft teal
-    lime:"#14B8A6", limeLight:"#0A1F1C", limeBorder:"#134E48", limeDark:"#5EEAD4",
+    // Success / Verified — soft blue
+    lime:"#3B82F6", limeLight:"#0C1929", limeBorder:"#1E3A5F", limeDark:"#93C5FD",
     text:"#F5F5F0", textMid:"#A3A3A3", textSoft:"#525252",
     // Warning / Action Required — muted amber (soft, not bright)
     amber:"#D97706", amberLight:"#1A170D", amberBorder:"#5C4417", amberDark:"#FBBF24",
@@ -17,21 +17,21 @@ const themes = {
     red:"#B91C1C", redLight:"#1C0F0F", redBorder:"#5C1A1A",
     // Neutral / Pending
     slate:"#6B7280", slateLight:"#141618",
-    // Verification process — brand teal (same family)
-    indigo:"#14B8A6", indigoLight:"#0A1F1C", indigoBorder:"#134E48",
-    indigoDark:"#5EEAD4",
-    // RPA / AI automation — muted teal variant (stays in family)
-    rpa:"#14B8A6", rpaLight:"#0A1F1C", rpaBorder:"#134E48", rpaDark:"#5EEAD4",
+    // Verification process — brand blue (same family)
+    indigo:"#3B82F6", indigoLight:"#0C1929", indigoBorder:"#1E3A5F",
+    indigoDark:"#93C5FD",
+    // RPA / AI automation — blue variant (stays in family)
+    rpa:"#3B82F6", rpaLight:"#0C1929", rpaBorder:"#1E3A5F", rpaDark:"#93C5FD",
     shadow:"rgba(0,0,0,0.4)", shadowStrong:"rgba(0,0,0,0.6)",
     // Brand
-    accent:"#14B8A6", accentLight:"#5EEAD4", accentBg:"#0A1F1C",
+    accent:"#3B82F6", accentLight:"#93C5FD", accentBg:"#0C1929",
     // Sidebar
     sidebar:"#111111",
   },
   light: {
     bg:"#F5F5F0", bgCard:"#FFFFFF", border:"#E5E5E5", borderStrong:"#D4D4D4",
-    // Success / Verified — soft teal
-    lime:"#0D9488", limeLight:"#F0FDFA", limeBorder:"#99F6E4", limeDark:"#0F766E",
+    // Success / Verified — soft blue
+    lime:"#2563EB", limeLight:"#EFF6FF", limeBorder:"#BFDBFE", limeDark:"#1D4ED8",
     text:"#1A1A18", textMid:"#525252", textSoft:"#A3A3A3",
     // Warning / Action Required — muted amber
     amber:"#B45309", amberLight:"#FFFBEB", amberBorder:"#FDE68A", amberDark:"#92400E",
@@ -39,14 +39,14 @@ const themes = {
     red:"#B91C1C", redLight:"#FEF2F2", redBorder:"#FECACA",
     // Neutral / Pending
     slate:"#6B7280", slateLight:"#F9FAFB",
-    // Verification process — brand teal
-    indigo:"#0D9488", indigoLight:"#F0FDFA", indigoBorder:"#99F6E4",
-    indigoDark:"#0F766E",
-    // RPA / AI automation — muted teal variant
-    rpa:"#0D9488", rpaLight:"#F0FDFA", rpaBorder:"#99F6E4", rpaDark:"#0F766E",
+    // Verification process — brand blue
+    indigo:"#2563EB", indigoLight:"#EFF6FF", indigoBorder:"#BFDBFE",
+    indigoDark:"#1D4ED8",
+    // RPA / AI automation — blue variant
+    rpa:"#2563EB", rpaLight:"#EFF6FF", rpaBorder:"#BFDBFE", rpaDark:"#1D4ED8",
     shadow:"rgba(0,0,0,0.04)", shadowStrong:"rgba(0,0,0,0.08)",
     // Brand
-    accent:"#0D9488", accentLight:"#0F766E", accentBg:"#F0FDFA",
+    accent:"#2563EB", accentLight:"#1D4ED8", accentBg:"#EFF6FF",
     // Sidebar
     sidebar:"#FFFFFF",
   },
@@ -116,7 +116,7 @@ function BrandLogo({ size = 20, showText = true, subtitle, subtitleColor, forceD
         draggable={false}
       />
       {subtitle && (
-        <div style={{ fontSize: h * 0.30, fontWeight:700, color: subtitleColor || "#14B8A6",
+        <div style={{ fontSize: h * 0.30, fontWeight:700, color: subtitleColor || "#3B82F6",
           letterSpacing:"0.1em", marginTop: h * 0.08, paddingLeft:2, textTransform:"lowercase" }}>{subtitle}</div>
       )}
     </div>
@@ -1069,9 +1069,9 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
       {/* ── Left brand panel ── */}
       <div style={{ width: 420, flexShrink: 0, background: "#0A0A0A", color: "white", padding: "56px 48px",
         display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "flex-start", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: -80, right: -80, width: 360, height: 360, background: "#14B8A6",
+        <div style={{ position: "absolute", top: -80, right: -80, width: 360, height: 360, background: "#3B82F6",
           opacity: 0.08, borderRadius: "50%", filter: "blur(80px)" }} />
-        <div style={{ position: "absolute", bottom: -60, left: -60, width: 280, height: 280, background: "#14B8A6",
+        <div style={{ position: "absolute", bottom: -60, left: -60, width: 280, height: 280, background: "#3B82F6",
           opacity: 0.05, borderRadius: "50%", filter: "blur(80px)" }} />
 
         <div style={{ position: "relative", zIndex: 10 }}>
@@ -1281,7 +1281,7 @@ function WizardProgressBar({ currentStep }) {
                 border: active ? "3px solid white" : "none",
                 boxShadow: active ? "0 0 0 4px rgba(255,255,255,0.25)" : "none",
                 fontSize: done ? 16 : 13, fontWeight: 900,
-                color: done ? "white" : active ? "#0D9488" : "rgba(255,255,255,0.45)",
+                color: done ? "white" : active ? "#2563EB" : "rgba(255,255,255,0.45)",
                 transition: "all 0.3s",
               }}>
                 {done ? "✓" : s.icon}
@@ -1480,13 +1480,13 @@ function OnboardingWizard({ onComplete, showToast }) {
       }}>
         {/* Ambient blobs */}
         <div style={{ position:"absolute", top:-100, right:-80, width:360, height:360, borderRadius:"50%",
-          background:"#14B8A6", opacity:0.06, filter:"blur(80px)", pointerEvents:"none" }} />
+          background:"#3B82F6", opacity:0.06, filter:"blur(80px)", pointerEvents:"none" }} />
         <div style={{ position:"absolute", bottom:-80, left:-60, width:300, height:300, borderRadius:"50%",
-          background:"#14B8A6", opacity:0.04, filter:"blur(80px)", pointerEvents:"none" }} />
+          background:"#3B82F6", opacity:0.04, filter:"blur(80px)", pointerEvents:"none" }} />
 
         {/* Logo */}
         <div style={{ position:"relative", zIndex:1, marginBottom:52 }}>
-          <BrandLogo size={44} subtitle="Practice Setup" subtitleColor="#14B8A6" forceDark />
+          <BrandLogo size={44} subtitle="Practice Setup" subtitleColor="#3B82F6" forceDark />
         </div>
 
         {/* Progress dots */}
@@ -1558,7 +1558,7 @@ function OnboardingWizard({ onComplete, showToast }) {
           <div style={{ fontSize:11, color:"rgba(255,255,255,0.5)", fontWeight:700, marginBottom:4 }}>
             AVERAGE SETUP TIME
           </div>
-          <div style={{ fontSize:24, fontWeight:900, color:"#5EEAD4" }}>4 min 12 sec</div>
+          <div style={{ fontSize:24, fontWeight:900, color:"#93C5FD" }}>4 min 12 sec</div>
           <div style={{ fontSize:11, color:"rgba(255,255,255,0.5)", marginTop:2 }}>
             Most practices go live before their next patient.
           </div>
@@ -1613,7 +1613,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                       background: activationError ? T.redLight : T.bgCard,
                       boxShadow: activationError ? "0 0 0 3px rgba(239,68,68,0.12)" : "none",
                     }}
-                    onFocus={e => { if (!activationError) e.target.style.borderColor = "#14B8A6"; }}
+                    onFocus={e => { if (!activationError) e.target.style.borderColor = "#3B82F6"; }}
                     onBlur={e => { if (!activationError) e.target.style.borderColor = "#c8c8c0"; }}
                   />
                 </div>
@@ -1804,7 +1804,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                             <div style={{
                               width:22, height:22, borderRadius:"50%", flexShrink:0,
                               display:"flex", alignItems:"center", justifyContent:"center",
-                              background: done ? "#22c55e" : active ? "#14B8A6" : "#e2e2dc",
+                              background: done ? "#22c55e" : active ? "#3B82F6" : "#e2e2dc",
                               fontSize:11, fontWeight:900, color:"white",
                               animation: active ? "wizPulse 1s ease-in-out infinite" : "none",
                             }}>
@@ -1812,7 +1812,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                             </div>
                             <div style={{
                               fontSize:14, fontWeight: active ? 800 : done ? 700 : 400,
-                              color: done ? "#1a1a18" : active ? "#0D9488" : "#a0a09a",
+                              color: done ? "#1a1a18" : active ? "#2563EB" : "#a0a09a",
                             }}>
                               {phase}
                             </div>
@@ -1824,7 +1824,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                     {/* Progress bar */}
                     <div style={{ marginTop:24, background:"#e2e2dc", borderRadius:4, height:6, overflow:"hidden" }}>
                       <div style={{
-                        height:"100%", borderRadius:4, background:"linear-gradient(90deg,#14B8A6,#0EA5E9)",
+                        height:"100%", borderRadius:4, background:"linear-gradient(90deg,#3B82F6,#0EA5E9)",
                         width: `${Math.min(100, (syncPhase / (PMS_SYNC_PHASES.length - 1)) * 100)}%`,
                         transition:"width 0.9s ease-out",
                       }} />
@@ -2003,10 +2003,10 @@ function OnboardingWizard({ onComplete, showToast }) {
               </div>
 
               <button onClick={() => setInvites([...invites, { email:"", role:"Front Desk" }])}
-                style={{ background:"none", border:"1px dashed #c8c8c0", borderRadius:10, color:"#14B8A6",
+                style={{ background:"none", border:"1px dashed #c8c8c0", borderRadius:10, color:"#3B82F6",
                   fontWeight:800, fontSize:13, cursor:"pointer", padding:"10px 16px",
                   width:"100%", marginBottom:28, transition:"0.2s" }}
-                onMouseEnter={e => e.currentTarget.style.borderColor="#14B8A6"}
+                onMouseEnter={e => e.currentTarget.style.borderColor="#3B82F6"}
                 onMouseLeave={e => e.currentTarget.style.borderColor="#c8c8c0"}>
                 + Add another team member
               </button>
@@ -2056,10 +2056,10 @@ function OnboardingWizard({ onComplete, showToast }) {
                     onComplete();
                   }}
                   style={{
-                    flex:1, padding:"17px", background:"linear-gradient(135deg,#14B8A6,#0D9488)",
+                    flex:1, padding:"17px", background:"linear-gradient(135deg,#3B82F6,#2563EB)",
                     color:"white", border:"none", borderRadius:12, fontSize:16, fontWeight:900,
                     cursor:"pointer", letterSpacing:"0.01em",
-                    boxShadow:"0 8px 24px rgba(20,184,166,0.35)",
+                    boxShadow:"0 8px 24px rgba(59,130,246,0.35)",
                     transition:"transform 0.2s, box-shadow 0.2s",
                   }}
                   onMouseEnter={e => { e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow="0 12px 32px rgba(79,70,229,0.5)"; }}
@@ -2200,7 +2200,7 @@ function PreauthWidget({ patient, result, triage, showToast, prefetched, practic
     .practice-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1a1a18; padding-bottom: 14px; margin-bottom: 28px; }
     .practice-name { font-family: Arial, sans-serif; font-size: 18pt; font-weight: 900; color: #1a1a18; }
     .practice-sub  { font-family: Arial, sans-serif; font-size: 9pt; color: #666; margin-top: 3px; }
-    .badge { font-family: Arial, sans-serif; font-size: 8pt; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; background: #0D9488; color: white; padding: 4px 10px; border-radius: 20px; }
+    .badge { font-family: Arial, sans-serif; font-size: 8pt; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; background: #2563EB; color: white; padding: 4px 10px; border-radius: 20px; }
     .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 32px; margin-bottom: 28px; padding: 16px 20px; background: #f8f8f6; border: 1px solid #e2e2dc; border-radius: 6px; font-family: Arial, sans-serif; font-size: 10pt; }
     .meta-grid .lbl { font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.05em; font-size: 9pt; }
     .letter-body { white-space: pre-wrap; font-size: 11.5pt; line-height: 1.85; }
@@ -2208,8 +2208,8 @@ function PreauthWidget({ patient, result, triage, showToast, prefetched, practic
     .attachments h3 { font-family: Arial, sans-serif; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 900; margin-bottom: 10px; color: #555; }
     .attachments li { font-size: 10pt; font-family: Arial, sans-serif; padding: 3px 0; }
     .footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #ccc; font-size: 8.5pt; color: #999; font-family: Arial, sans-serif; display: flex; justify-content: space-between; }
-    .print-btn { position: fixed; bottom: 24px; right: 24px; background: #0D9488; color: white; font-family: Arial, sans-serif; font-weight: 900; font-size: 14px; padding: 13px 26px; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 6px 20px rgba(13,148,136,0.35); }
-    .print-btn:hover { background: #0F766E; }
+    .print-btn { position: fixed; bottom: 24px; right: 24px; background: #2563EB; color: white; font-family: Arial, sans-serif; font-weight: 900; font-size: 14px; padding: 13px 26px; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 6px 20px rgba(37,99,235,0.35); }
+    .print-btn:hover { background: #1D4ED8; }
   </style>
 </head>
 <body>
@@ -5616,7 +5616,7 @@ function Analytics({ patients, results, agentLog }) {
                 </div>
                 <div style={{ width:"100%", maxWidth:52, display:"flex", flexDirection:"column", justifyContent:"flex-end", height:"100%",
                   borderRadius: isSelected||isHovered ? "6px 6px 0 0" : "4px 4px 0 0",
-                  overflow:"hidden", boxShadow: isSelected ? "0 -4px 12px rgba(20,184,166,0.3)" : "none", transition:"all 0.2s" }}>
+                  overflow:"hidden", boxShadow: isSelected ? "0 -4px 12px rgba(59,130,246,0.3)" : "none", transition:"all 0.2s" }}>
                   <div style={{ height:`${cashPct}%`, background:T.lime, borderBottom:"2px solid white" }} />
                   <div style={{ height:`${insPct}%`, background:T.indigo }} />
                 </div>
@@ -7182,7 +7182,7 @@ function AdminDashboard({ showToast, onSignOut }) {
 
         {/* Logo */}
         <div style={{ padding: "0 24px", marginBottom: 32 }}>
-          <BrandLogo size={38} subtitle="Admin Console" subtitleColor="#14B8A6" />
+          <BrandLogo size={38} subtitle="Admin Console" subtitleColor="#3B82F6" />
         </div>
 
         {/* Nav items */}
@@ -7192,8 +7192,8 @@ function AdminDashboard({ showToast, onSignOut }) {
               style={{
                 display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
                 borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700,
-                background: activeTab === t.id ? "rgba(20,184,166,0.12)" : "transparent",
-                color: activeTab === t.id ? "#5EEAD4" : "#A3A3A3",
+                background: activeTab === t.id ? "rgba(59,130,246,0.12)" : "transparent",
+                color: activeTab === t.id ? "#93C5FD" : "#A3A3A3",
                 transition: "all 0.15s", width: "100%", textAlign: "left",
               }}>
               <span style={{ fontSize: 16 }}>{t.icon}</span>
@@ -7234,7 +7234,7 @@ function AdminDashboard({ showToast, onSignOut }) {
                 <button onClick={() => setShowGenForm(!showGenForm)} disabled={generating}
                   style={{
                     padding: "12px 24px", borderRadius: 10, border: "none", cursor: generating ? "not-allowed" : "pointer",
-                    background: generating ? "#2A2A2A" : "linear-gradient(135deg, #14B8A6, #0D9488)",
+                    background: generating ? "#2A2A2A" : "linear-gradient(135deg, #3B82F6, #2563EB)",
                     color: "white", fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", gap: 8,
                     transition: "all 0.15s", opacity: generating ? 0.7 : 1,
                   }}>
@@ -7244,10 +7244,10 @@ function AdminDashboard({ showToast, onSignOut }) {
 
               {/* Generate form */}
               {showGenForm && (
-                <div style={{ background: "linear-gradient(135deg, rgba(20,184,166,0.06), rgba(13,148,136,0.03))",
-                  border: "1px solid rgba(20,184,166,0.2)", borderRadius: 14, padding: "24px 28px",
+                <div style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.06), rgba(37,99,235,0.03))",
+                  border: "1px solid rgba(59,130,246,0.2)", borderRadius: 14, padding: "24px 28px",
                   marginBottom: 28, animation: "adminFadeIn 0.2s ease-out" }}>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: "#5EEAD4", marginBottom: 16 }}>New Code Details (optional)</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: "#93C5FD", marginBottom: 16 }}>New Code Details (optional)</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                     <div>
                       <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Customer / Practice Name</label>
@@ -7265,7 +7265,7 @@ function AdminDashboard({ showToast, onSignOut }) {
                   <div style={{ display: "flex", gap: 10 }}>
                     <button onClick={handleGenerate} disabled={generating}
                       style={{ padding: "10px 24px", borderRadius: 8, border: "none", cursor: generating ? "not-allowed" : "pointer",
-                        background: "linear-gradient(135deg, #14B8A6, #0D9488)", color: "white", fontSize: 12, fontWeight: 800 }}>
+                        background: "linear-gradient(135deg, #3B82F6, #2563EB)", color: "white", fontSize: 12, fontWeight: 800 }}>
                       {generating ? "⏳ Generating…" : "Generate Code"}
                     </button>
                     <button onClick={() => { setShowGenForm(false); setGenLabel(""); setGenEmail(""); }}
@@ -7295,11 +7295,11 @@ function AdminDashboard({ showToast, onSignOut }) {
 
               {/* Newly generated code highlight */}
               {newCode && (
-                <div style={{ background: "linear-gradient(135deg, rgba(20,184,166,0.10), rgba(13,148,136,0.06))",
-                  border: "1px solid rgba(20,184,166,0.3)", borderRadius: 14, padding: "24px 28px",
+                <div style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.10), rgba(37,99,235,0.06))",
+                  border: "1px solid rgba(59,130,246,0.3)", borderRadius: 14, padding: "24px 28px",
                   marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: "#5EEAD4", textTransform: "uppercase",
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#93C5FD", textTransform: "uppercase",
                       letterSpacing: "0.08em", marginBottom: 8 }}>New Code Generated</div>
                     <div style={{ fontSize: 32, fontWeight: 900, color: "#F5F5F0",
                       fontFamily: "'Courier New', Courier, monospace", letterSpacing: "0.1em" }}>
@@ -7307,8 +7307,8 @@ function AdminDashboard({ showToast, onSignOut }) {
                     </div>
                   </div>
                   <button onClick={() => copyCode(newCode)}
-                    style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid rgba(20,184,166,0.4)",
-                      background: "rgba(20,184,166,0.12)", color: "#5EEAD4", fontSize: 12, fontWeight: 800,
+                    style={{ padding: "10px 20px", borderRadius: 8, border: "1px solid rgba(59,130,246,0.4)",
+                      background: "rgba(59,130,246,0.12)", color: "#93C5FD", fontSize: 12, fontWeight: 800,
                       cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                     📋 Copy
                   </button>
@@ -7398,7 +7398,7 @@ function AdminDashboard({ showToast, onSignOut }) {
                 </div>
                 <div style={{ background: "#111111", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Live Mode</div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: "#14B8A6" }}>{practices.filter(p => p.accountMode === "live").length}</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#3B82F6" }}>{practices.filter(p => p.accountMode === "live").length}</div>
                 </div>
               </div>
 
@@ -7423,7 +7423,7 @@ function AdminDashboard({ showToast, onSignOut }) {
                   {practices.map((p, i) => {
                     const tierColors = {
                       enterprise:    { bg: "rgba(139,92,246,0.12)", color: "#a78bfa", border: "rgba(139,92,246,0.2)", label: "Enterprise" },
-                      professional:  { bg: "rgba(20,184,166,0.10)", color: "#5EEAD4", border: "rgba(20,184,166,0.2)", label: "Professional" },
+                      professional:  { bg: "rgba(59,130,246,0.10)", color: "#93C5FD", border: "rgba(59,130,246,0.2)", label: "Professional" },
                       starter:       { bg: "rgba(100,116,139,0.12)", color: "#94a3b8", border: "rgba(100,116,139,0.2)", label: "Starter" },
                     };
                     const tier = tierColors[p.planTier] || tierColors.starter;
@@ -7454,9 +7454,9 @@ function AdminDashboard({ showToast, onSignOut }) {
                         <div>
                           <span style={{
                             display: "inline-block", padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 800,
-                            background: p.accountMode === "live" ? "rgba(20,184,166,0.10)" : "rgba(245,158,11,0.12)",
-                            color: p.accountMode === "live" ? "#5EEAD4" : "#fbbf24",
-                            border: "1px solid " + (p.accountMode === "live" ? "rgba(20,184,166,0.2)" : "rgba(245,158,11,0.2)"),
+                            background: p.accountMode === "live" ? "rgba(59,130,246,0.10)" : "rgba(245,158,11,0.12)",
+                            color: p.accountMode === "live" ? "#93C5FD" : "#fbbf24",
+                            border: "1px solid " + (p.accountMode === "live" ? "rgba(59,130,246,0.2)" : "rgba(245,158,11,0.2)"),
                           }}>
                             {p.accountMode === "live" ? "Live" : "Sandbox"}
                           </span>
@@ -7596,9 +7596,9 @@ function AdminDashboard({ showToast, onSignOut }) {
                         )}
                         {issue.adminNotes && (
                           <div>
-                            <div style={{ fontSize: 10, fontWeight: 800, color: "#14B8A6", textTransform: "uppercase",
+                            <div style={{ fontSize: 10, fontWeight: 800, color: "#3B82F6", textTransform: "uppercase",
                               letterSpacing: "0.06em", marginBottom: 4 }}>Admin Notes</div>
-                            <div style={{ fontSize: 12, color: "#5EEAD4", lineHeight: 1.5 }}>{issue.adminNotes}</div>
+                            <div style={{ fontSize: 12, color: "#93C5FD", lineHeight: 1.5 }}>{issue.adminNotes}</div>
                           </div>
                         )}
                       </div>
@@ -8661,10 +8661,10 @@ export default function LevelAI() {
             Please contact our team to resume service.
           </p>
           <div style={{
-            background: "rgba(20,184,166,0.06)", border: "1px solid rgba(20,184,166,0.2)",
+            background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)",
             borderRadius: 10, padding: "16px 20", marginBottom: 20,
           }}>
-            <div style={{ color: "#5EEAD4", fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Contact Support</div>
+            <div style={{ color: "#93C5FD", fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Contact Support</div>
             <div style={{ color: T.textSoft, fontSize: 14 }}>billing@levelai.com</div>
           </div>
           <button
@@ -8716,7 +8716,7 @@ export default function LevelAI() {
           borderBottom:"1px solid " + T.border, display:"flex", alignItems:"center",
           justifyContent: sidebarOpen ? "flex-start" : "center",
           transition:"padding 0.25s" }}>
-          <BrandLogo size={sidebarOpen ? 38 : 28} showText={sidebarOpen} subtitle={sidebarOpen ? "insurance made easy" : null} subtitleColor={T.accent || "#14B8A6"} />
+          <BrandLogo size={sidebarOpen ? 38 : 28} showText={sidebarOpen} subtitle={sidebarOpen ? "insurance made easy" : null} subtitleColor={T.accent || "#3B82F6"} />
         </div>
 
         {/* Nav items */}

@@ -9,7 +9,7 @@ const T = {
   bg: "#0A0A0A", bgCard: "#1A1A1A", border: "#1C1C1C", borderStrong: "#2A2A2A",
   text: "#F5F5F0", textMid: "#A3A3A3", textSoft: "#525252",
   red: "#B91C1C", redLight: "#1C0F0F", redBorder: "#5C1A1A",
-  indigo: "#14B8A6", indigoLight: "#0A1F1C", indigoBorder: "#134E48", indigoDark: "#5EEAD4",
+  indigo: "#3B82F6", indigoLight: "#0C1929", indigoBorder: "#1E3A5F", indigoDark: "#93C5FD",
 };
 
 // ── Validators ───────────────────────────────────────────────────────────────
@@ -210,9 +210,9 @@ export default function LoginPage() {
       {/* ── Left brand panel ── */}
       <div style={{ width: 420, flexShrink: 0, background: "#0A0A0A", color: "white", padding: "56px 48px",
         display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "flex-start", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", top: -80, right: -80, width: 360, height: 360, background: "#14B8A6",
+        <div style={{ position: "absolute", top: -80, right: -80, width: 360, height: 360, background: "#3B82F6",
           opacity: 0.08, borderRadius: "50%", filter: "blur(80px)" }} />
-        <div style={{ position: "absolute", bottom: -60, left: -60, width: 280, height: 280, background: "#14B8A6",
+        <div style={{ position: "absolute", bottom: -60, left: -60, width: 280, height: 280, background: "#3B82F6",
           opacity: 0.05, borderRadius: "50%", filter: "blur(80px)" }} />
 
         <div style={{ position: "relative", zIndex: 10 }}>

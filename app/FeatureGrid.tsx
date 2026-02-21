@@ -131,14 +131,14 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
             <button
               key={f.title}
               onClick={() => setActiveIdx(i)}
-              className="group rounded-2xl border border-black/[0.06] bg-white p-7 hover:border-[#14B8A6]/30 hover:shadow-lg hover:shadow-[#14B8A6]/[0.04] transition-all text-left cursor-pointer"
+              className="group rounded-2xl border border-black/[0.06] bg-white p-7 hover:border-[#3B82F6]/30 hover:shadow-lg hover:shadow-[#3B82F6]/[0.04] transition-all text-left cursor-pointer"
             >
-              <div className="w-11 h-11 rounded-xl bg-[#14B8A6]/10 flex items-center justify-center mb-5">
-                {Icon && <Icon className="w-5 h-5 text-[#14B8A6]" />}
+              <div className="w-11 h-11 rounded-xl bg-[#3B82F6]/10 flex items-center justify-center mb-5">
+                {Icon && <Icon className="w-5 h-5 text-[#3B82F6]" />}
               </div>
               <div className="text-base font-bold text-[#1A1A18] mb-2">{f.title}</div>
               <p className="text-sm text-[#525252] leading-relaxed mb-4">{f.description}</p>
-              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#14B8A6] opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#3B82F6] opacity-0 group-hover:opacity-100 transition-opacity">
                 Learn more
                 <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
@@ -158,14 +158,14 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
               <button
                 key={f.title}
                 onClick={() => setActiveIdx(i + 6)}
-                className="group rounded-2xl border border-black/[0.06] bg-white p-7 hover:border-[#14B8A6]/30 hover:shadow-lg hover:shadow-[#14B8A6]/[0.04] transition-all text-left cursor-pointer"
+                className="group rounded-2xl border border-black/[0.06] bg-white p-7 hover:border-[#3B82F6]/30 hover:shadow-lg hover:shadow-[#3B82F6]/[0.04] transition-all text-left cursor-pointer"
               >
-                <div className="w-11 h-11 rounded-xl bg-[#14B8A6]/10 flex items-center justify-center mb-5">
-                  {Icon && <Icon className="w-5 h-5 text-[#14B8A6]" />}
+                <div className="w-11 h-11 rounded-xl bg-[#3B82F6]/10 flex items-center justify-center mb-5">
+                  {Icon && <Icon className="w-5 h-5 text-[#3B82F6]" />}
                 </div>
                 <div className="text-base font-bold text-[#1A1A18] mb-2">{f.title}</div>
                 <p className="text-sm text-[#525252] leading-relaxed mb-4">{f.description}</p>
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#14B8A6] opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#3B82F6] opacity-0 group-hover:opacity-100 transition-opacity">
                   Learn more
                   <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
@@ -233,17 +233,17 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
               {/* Icon */}
               <div style={{
                 width: 56, height: 56, borderRadius: 16,
-                background: "rgba(20,184,166,0.1)",
+                background: "rgba(59,130,246,0.1)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 marginBottom: 24,
               }}>
-                <ActiveIcon className="w-7 h-7 text-[#14B8A6]" />
+                <ActiveIcon className="w-7 h-7 text-[#3B82F6]" />
               </div>
 
               {/* Label */}
               <div style={{
                 fontSize: 11, fontWeight: 800, letterSpacing: "0.15em",
-                textTransform: "uppercase", color: "#14B8A6", marginBottom: 12,
+                textTransform: "uppercase", color: "#3B82F6", marginBottom: 12,
               }}>
                 {active.title}
               </div>
@@ -272,11 +272,11 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
                   }}>
                     <div style={{
                       width: 22, height: 22, borderRadius: "50%",
-                      background: "rgba(20,184,166,0.1)",
+                      background: "rgba(59,130,246,0.1)",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       flexShrink: 0, marginTop: 1,
                     }}>
-                      <IconCheck className="w-3 h-3 text-[#14B8A6]" />
+                      <IconCheck className="w-3 h-3 text-[#3B82F6]" />
                     </div>
                     <span style={{ fontSize: 14, color: "#525252", lineHeight: 1.6, fontWeight: 500 }}>{b}</span>
                   </li>
@@ -288,13 +288,13 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
                 href="/dashboard?sandbox=1"
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 8,
-                  borderRadius: 12, background: "#14B8A6", color: "#fff",
+                  borderRadius: 12, background: "#3B82F6", color: "#fff",
                   padding: "12px 24px", fontSize: 14, fontWeight: 800,
                   textDecoration: "none", transition: "background 0.15s",
-                  boxShadow: "0 4px 14px rgba(20,184,166,0.25)",
+                  boxShadow: "0 4px 14px rgba(59,130,246,0.25)",
                 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#0D9488"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "#14B8A6"; }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#2563EB"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "#3B82F6"; }}
               >
                 Try it in the Sandbox
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

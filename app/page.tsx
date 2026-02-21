@@ -313,7 +313,7 @@ const STATS = [
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#F5F5F0] text-[#1A1A18] selection:bg-[#14B8A6]/30 overflow-x-hidden font-sans">
+    <div className="min-h-screen bg-[#F5F5F0] text-[#1A1A18] selection:bg-[#3B82F6]/30 overflow-x-hidden font-sans">
 
       {/* ═══════════════════════════ NAVIGATION ═══════════════════════════════ */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-black/[0.06] bg-[#F5F5F0]/80 backdrop-blur-xl">
@@ -331,7 +331,7 @@ export default function LandingPage() {
             <Link href="/login" className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-black/10 bg-black/[0.03] px-4 py-2 text-sm font-bold text-[#1A1A18] hover:bg-black/[0.06] transition-colors">
               Sign In
             </Link>
-            <Link href="/login" className="inline-flex items-center gap-2 rounded-lg bg-[#14B8A6] px-4 py-2 text-sm font-bold text-white hover:bg-[#0D9488] transition-colors shadow-lg shadow-[#14B8A6]/20">
+            <Link href="/login" className="inline-flex items-center gap-2 rounded-lg bg-[#3B82F6] px-4 py-2 text-sm font-bold text-white hover:bg-[#2563EB] transition-colors shadow-lg shadow-[#3B82F6]/20">
               Get Started Free
             </Link>
           </div>
@@ -341,20 +341,20 @@ export default function LandingPage() {
       {/* ═══════════════════════════ HERO ══════════════════════════════════════ */}
       <section className="relative pt-32 pb-24 md:pt-44 md:pb-36 overflow-hidden">
         {/* Glow orbs */}
-        <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-[#14B8A6]/[0.07] rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-[-100px] right-[-200px] w-[500px] h-[500px] bg-[#14B8A6]/[0.04] rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-[#3B82F6]/[0.07] rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-[-100px] right-[-200px] w-[500px] h-[500px] bg-[#3B82F6]/[0.04] rounded-full blur-[100px] pointer-events-none" />
 
         <div className="relative mx-auto max-w-5xl px-6 text-center">
           {/* Badge */}
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#14B8A6]/30 bg-[#14B8A6]/[0.08] px-4 py-1.5 text-xs font-bold text-[#0D9488] tracking-wide uppercase">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#14B8A6] animate-pulse" />
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#3B82F6]/30 bg-[#3B82F6]/[0.08] px-4 py-1.5 text-xs font-bold text-[#2563EB] tracking-wide uppercase">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#3B82F6] animate-pulse" />
             Zero Data Retention Architecture
           </div>
 
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-black leading-[0.95] tracking-tight mb-6">
             Stop paying your staff to sit on hold
             <br />
-            <span className="bg-gradient-to-r from-[#0D9488] to-[#14B8A6] bg-clip-text text-transparent">with insurance companies.</span>
+            <span className="bg-gradient-to-r from-[#2563EB] to-[#3B82F6] bg-clip-text text-transparent">with insurance companies.</span>
           </h1>
 
           <p className="mx-auto max-w-2xl text-lg md:text-xl text-[#525252] leading-relaxed mb-10">
@@ -363,12 +363,12 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/login" className="group inline-flex items-center gap-2 rounded-xl bg-[#14B8A6] px-7 py-3.5 text-base font-extrabold text-white shadow-xl shadow-[#14B8A6]/25 hover:shadow-[#14B8A6]/40 hover:bg-[#0D9488] transition-all">
+            <Link href="/login" className="group inline-flex items-center gap-2 rounded-xl bg-[#3B82F6] px-7 py-3.5 text-base font-extrabold text-white shadow-xl shadow-[#3B82F6]/25 hover:shadow-[#3B82F6]/40 hover:bg-[#2563EB] transition-all">
               Get Started Free
               <IconArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link href="/dashboard?sandbox=1" className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-black/[0.03] px-7 py-3.5 text-base font-bold text-[#1A1A18] hover:bg-black/[0.06] transition-colors">
-              <IconPlay className="w-4 h-4 text-[#14B8A6]" />
+              <IconPlay className="w-4 h-4 text-[#3B82F6]" />
               Try the Sandbox
             </Link>
           </div>
@@ -380,7 +380,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-6xl grid grid-cols-2 md:grid-cols-4 divide-x divide-black/[0.06]">
           {STATS.map((s) => (
             <div key={s.label} className="py-10 px-6 text-center">
-              <div className="text-3xl md:text-4xl font-black text-[#14B8A6] mb-1">{s.value}</div>
+              <div className="text-3xl md:text-4xl font-black text-[#3B82F6] mb-1">{s.value}</div>
               <div className="text-sm text-[#525252] font-semibold">{s.label}</div>
             </div>
           ))}
@@ -391,7 +391,7 @@ export default function LandingPage() {
       <section className="py-24 md:py-36">
         <div className="mx-auto max-w-6xl px-6">
           <div className="text-center mb-16">
-            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#14B8A6] mb-4">Zero Data Retention</div>
+            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#3B82F6] mb-4">Zero Data Retention</div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
               Zero patient data stored.
               <br className="hidden md:block" /> Ever.
@@ -424,9 +424,9 @@ export default function LandingPage() {
                 body: "We catch claim denials before the patient sits in the chair. AI-parsed breakdowns flag missing tooth clauses, annual max issues, and frequency limitations so you never eat a write-off.",
               },
             ].map((card) => (
-              <div key={card.title} className="group rounded-2xl border border-black/[0.06] bg-white p-8 hover:border-[#14B8A6]/30 transition-colors">
-                <card.icon className="w-8 h-8 text-[#14B8A6] mb-5" />
-                <div className="text-xs font-extrabold text-[#14B8A6] uppercase tracking-wider mb-2">{card.stat}</div>
+              <div key={card.title} className="group rounded-2xl border border-black/[0.06] bg-white p-8 hover:border-[#3B82F6]/30 transition-colors">
+                <card.icon className="w-8 h-8 text-[#3B82F6] mb-5" />
+                <div className="text-xs font-extrabold text-[#3B82F6] uppercase tracking-wider mb-2">{card.stat}</div>
                 <div className="text-base font-bold text-[#1A1A18] mb-3">{card.title}</div>
                 <p className="text-sm text-[#525252] leading-relaxed">{card.body}</p>
               </div>
@@ -436,10 +436,10 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════════════════ THE SOLUTION ═════════════════════════════ */}
-      <section className="py-24 md:py-36 bg-gradient-to-b from-transparent via-[#14B8A6]/[0.02] to-transparent">
+      <section className="py-24 md:py-36 bg-gradient-to-b from-transparent via-[#3B82F6]/[0.02] to-transparent">
         <div className="mx-auto max-w-6xl px-6">
           <div className="text-center mb-16">
-            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#14B8A6] mb-4">Legacy vs. Level</div>
+            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#3B82F6] mb-4">Legacy vs. Level</div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
               Your current vendor is a
               <br className="hidden md:block" /> slow, risky liability.
@@ -459,7 +459,7 @@ export default function LandingPage() {
                 "Per-verification fees that scale against you",
                 "No pre-auth automation, just eligibility checks",
               ]},
-              { label: "Level AI", color: "text-[#14B8A6]", border: "border-[#14B8A6]/20", items: [
+              { label: "Level AI", color: "text-[#3B82F6]", border: "border-[#3B82F6]/20", items: [
                 "Zero Data Retention \u2014 PHI never stored at rest",
                 "Fully autonomous portal scraping, no phone calls",
                 "Real-time results before the morning huddle",
@@ -487,7 +487,7 @@ export default function LandingPage() {
       <section id="features" className="py-24 md:py-36">
         <div className="mx-auto max-w-6xl px-6">
           <div className="text-center mb-16">
-            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#14B8A6] mb-4">Features</div>
+            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#3B82F6] mb-4">Features</div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
               Built for practices that
               <br className="hidden md:block" /> refuse to settle.
@@ -507,7 +507,7 @@ export default function LandingPage() {
       <section id="how-it-works" className="py-24 md:py-36 bg-white/40">
         <div className="mx-auto max-w-5xl px-6">
           <div className="text-center mb-16">
-            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#14B8A6] mb-4">How it works</div>
+            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#3B82F6] mb-4">How it works</div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
               Up and running in minutes.
             </h2>
@@ -521,9 +521,9 @@ export default function LandingPage() {
               <div key={step.num} className="relative text-center md:text-left">
                 {/* Connector line */}
                 {i < STEPS.length - 1 && (
-                  <div className="hidden md:block absolute top-8 left-[calc(100%+0.5rem)] w-[calc(100%-1rem)] h-px bg-gradient-to-r from-[#14B8A6]/40 to-transparent" />
+                  <div className="hidden md:block absolute top-8 left-[calc(100%+0.5rem)] w-[calc(100%-1rem)] h-px bg-gradient-to-r from-[#3B82F6]/40 to-transparent" />
                 )}
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#14B8A6]/10 border border-[#14B8A6]/20 text-xl font-black text-[#14B8A6] mb-5">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#3B82F6]/10 border border-[#3B82F6]/20 text-xl font-black text-[#3B82F6] mb-5">
                   {step.num}
                 </div>
                 <div className="text-lg font-bold text-[#1A1A18] mb-2">{step.title}</div>
@@ -538,7 +538,7 @@ export default function LandingPage() {
       <section id="pricing" className="py-24 md:py-36">
         <div className="mx-auto max-w-6xl px-6">
           <div className="text-center mb-16">
-            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#14B8A6] mb-4">Pricing</div>
+            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#3B82F6] mb-4">Pricing</div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
               Simple, transparent pricing.
             </h2>
@@ -553,12 +553,12 @@ export default function LandingPage() {
                 key={plan.name}
                 className={`relative rounded-2xl border p-8 flex flex-col ${
                   plan.highlighted
-                    ? "border-[#14B8A6]/40 bg-white shadow-xl shadow-[#14B8A6]/10 ring-1 ring-[#14B8A6]/20"
+                    ? "border-[#3B82F6]/40 bg-white shadow-xl shadow-[#3B82F6]/10 ring-1 ring-[#3B82F6]/20"
                     : "border-black/[0.06] bg-white"
                 }`}
               >
                 {plan.highlighted && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#14B8A6] px-4 py-1 text-xs font-extrabold text-white tracking-wide uppercase">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#3B82F6] px-4 py-1 text-xs font-extrabold text-white tracking-wide uppercase">
                     Most Popular
                   </div>
                 )}
@@ -568,13 +568,13 @@ export default function LandingPage() {
                   {plan.period && <span className="text-sm text-[#525252] font-semibold">{plan.period}</span>}
                 </div>
                 {plan.trial && (
-                  <div className="text-xs font-bold text-[#14B8A6] mb-3">{plan.trial} &middot; No credit card required</div>
+                  <div className="text-xs font-bold text-[#3B82F6] mb-3">{plan.trial} &middot; No credit card required</div>
                 )}
                 <p className="text-sm text-[#525252] mb-6 leading-relaxed">{plan.description}</p>
                 <ul className="space-y-3 mb-8 flex-1">
                   {plan.features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm text-[#525252]">
-                      <IconCheck className="w-4 h-4 mt-0.5 text-[#14B8A6] flex-shrink-0" />
+                      <IconCheck className="w-4 h-4 mt-0.5 text-[#3B82F6] flex-shrink-0" />
                       {f}
                     </li>
                   ))}
@@ -583,7 +583,7 @@ export default function LandingPage() {
                   href={plan.name === "Enterprise" ? "/contact" : "/login"}
                   className={`block w-full text-center rounded-xl py-3 text-sm font-extrabold transition-colors ${
                     plan.highlighted
-                      ? "bg-[#14B8A6] text-white hover:bg-[#0D9488] shadow-lg shadow-[#14B8A6]/20"
+                      ? "bg-[#3B82F6] text-white hover:bg-[#2563EB] shadow-lg shadow-[#3B82F6]/20"
                       : "border border-black/10 bg-black/[0.03] text-[#1A1A18] hover:bg-black/[0.06]"
                   }`}
                 >
@@ -596,11 +596,11 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════════════════ CONTACT / CTA ════════════════════════════ */}
-      <section id="contact" className="py-24 md:py-36 bg-gradient-to-b from-transparent via-[#14B8A6]/[0.03] to-transparent">
+      <section id="contact" className="py-24 md:py-36 bg-gradient-to-b from-transparent via-[#3B82F6]/[0.03] to-transparent">
         <div className="mx-auto max-w-4xl px-6 text-center">
           <div className="rounded-3xl border border-black/[0.06] bg-white p-12 md:p-16">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#14B8A6]/10 mb-6">
-              <IconMail className="w-6 h-6 text-[#14B8A6]" />
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#3B82F6]/10 mb-6">
+              <IconMail className="w-6 h-6 text-[#3B82F6]" />
             </div>
             <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-4">
               Ready to stop leaving money on the table?
@@ -610,12 +610,12 @@ export default function LandingPage() {
               and protects your revenue from day one. Zero risk. Zero data stored.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/login" className="group inline-flex items-center gap-2 rounded-xl bg-[#14B8A6] px-7 py-3.5 text-base font-extrabold text-white shadow-xl shadow-[#14B8A6]/25 hover:shadow-[#14B8A6]/40 hover:bg-[#0D9488] transition-all">
+              <Link href="/login" className="group inline-flex items-center gap-2 rounded-xl bg-[#3B82F6] px-7 py-3.5 text-base font-extrabold text-white shadow-xl shadow-[#3B82F6]/25 hover:shadow-[#3B82F6]/40 hover:bg-[#2563EB] transition-all">
                 Start Your Free Trial
                 <IconArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link href="/contact" className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-black/[0.03] px-7 py-3.5 text-base font-bold text-[#1A1A18] hover:bg-black/[0.06] transition-colors">
-                <IconMail className="w-4 h-4 text-[#14B8A6]" />
+                <IconMail className="w-4 h-4 text-[#3B82F6]" />
                 Contact Sales
               </Link>
             </div>

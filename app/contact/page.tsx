@@ -84,7 +84,7 @@ export default function ContactPage() {
       <main className="pt-28 pb-24">
         <div className="mx-auto max-w-5xl px-6">
           <div className="text-center mb-16">
-            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#0D9488] mb-4">Get in touch</div>
+            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#2563EB] mb-4">Get in touch</div>
             <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">Contact & Support</h1>
             <p className="text-[#525252] text-lg max-w-2xl mx-auto">
               Have a question, need help, or just want to say hello? We&apos;re here for you.
@@ -99,35 +99,35 @@ export default function ContactPage() {
 
               <div className="space-y-6">
                 <ContactCard
-                  icon={<IconMail className="w-5 h-5 text-[#0D9488]" />}
+                  icon={<IconMail className="w-5 h-5 text-[#2563EB]" />}
                   label="Email"
                   value="thomas@lvlai.app"
                   href="mailto:thomas@lvlai.app"
                   sub="For partnerships, sales, and general inquiries"
                 />
                 <ContactCard
-                  icon={<IconPhone className="w-5 h-5 text-[#0D9488]" />}
+                  icon={<IconPhone className="w-5 h-5 text-[#2563EB]" />}
                   label="Phone"
                   value="(512) 395-5633"
                   href="tel:+15123955633"
                   sub="Available for calls and text messages"
                 />
                 <ContactCard
-                  icon={<IconMail className="w-5 h-5 text-[#0D9488]" />}
+                  icon={<IconMail className="w-5 h-5 text-[#2563EB]" />}
                   label="Support"
                   value="support@levelai.app"
                   href="mailto:support@levelai.app"
                   sub="For technical support and account issues"
                 />
                 <ContactCard
-                  icon={<IconClock className="w-5 h-5 text-[#0D9488]" />}
+                  icon={<IconClock className="w-5 h-5 text-[#2563EB]" />}
                   label="Response Time"
                   value="Within 24 hours"
                   sub="We aim to respond to all inquiries within one business day. Urgent issues are prioritized."
                 />
               </div>
 
-              <div className="rounded-2xl border border-[#0D9488]/20 bg-[#0D9488]/[0.04] p-6">
+              <div className="rounded-2xl border border-[#2563EB]/20 bg-[#2563EB]/[0.04] p-6">
                 <h3 className="text-base font-bold text-[#1A1A18] mb-2">Our Commitment to You</h3>
                 <p className="text-sm text-[#525252] leading-relaxed">
                   At Level AI, we believe great software deserves great support. Whether you&apos;re a solo practice
@@ -148,8 +148,8 @@ export default function ContactPage() {
 
                 {status === "sent" ? (
                   <div className="text-center py-12">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#0D9488]/10 mb-6">
-                      <IconCheck className="w-8 h-8 text-[#0D9488]" />
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#2563EB]/10 mb-6">
+                      <IconCheck className="w-8 h-8 text-[#2563EB]" />
                     </div>
                     <h3 className="text-xl font-bold mb-2">Message Sent!</h3>
                     <p className="text-[#525252] text-sm mb-6">
@@ -157,7 +157,7 @@ export default function ContactPage() {
                     </p>
                     <button
                       onClick={() => setStatus("idle")}
-                      className="text-sm font-semibold text-[#0D9488] hover:text-[#0F766E] transition-colors"
+                      className="text-sm font-semibold text-[#2563EB] hover:text-[#1D4ED8] transition-colors"
                     >
                       Send another message
                     </button>
@@ -172,7 +172,7 @@ export default function ContactPage() {
                         value={form.name}
                         onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                         placeholder="Dr. Jane Smith"
-                        className="w-full rounded-xl border border-black/[0.08] bg-[#F5F5F0] px-4 py-3 text-sm text-[#1A1A18] placeholder:text-[#A3A3A3] focus:border-[#0D9488]/50 focus:outline-none focus:ring-1 focus:ring-[#0D9488]/30 transition-colors"
+                        className="w-full rounded-xl border border-black/[0.08] bg-[#F5F5F0] px-4 py-3 text-sm text-[#1A1A18] placeholder:text-[#A3A3A3] focus:border-[#2563EB]/50 focus:outline-none focus:ring-1 focus:ring-[#2563EB]/30 transition-colors"
                       />
                     </div>
                     <div>
@@ -183,7 +183,7 @@ export default function ContactPage() {
                         value={form.email}
                         onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                         placeholder="jane@practice.com"
-                        className="w-full rounded-xl border border-black/[0.08] bg-[#F5F5F0] px-4 py-3 text-sm text-[#1A1A18] placeholder:text-[#A3A3A3] focus:border-[#0D9488]/50 focus:outline-none focus:ring-1 focus:ring-[#0D9488]/30 transition-colors"
+                        className="w-full rounded-xl border border-black/[0.08] bg-[#F5F5F0] px-4 py-3 text-sm text-[#1A1A18] placeholder:text-[#A3A3A3] focus:border-[#2563EB]/50 focus:outline-none focus:ring-1 focus:ring-[#2563EB]/30 transition-colors"
                       />
                     </div>
                     <div>
@@ -193,7 +193,7 @@ export default function ContactPage() {
                         value={form.phone}
                         onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                         placeholder="(555) 123-4567"
-                        className="w-full rounded-xl border border-black/[0.08] bg-[#F5F5F0] px-4 py-3 text-sm text-[#1A1A18] placeholder:text-[#A3A3A3] focus:border-[#0D9488]/50 focus:outline-none focus:ring-1 focus:ring-[#0D9488]/30 transition-colors"
+                        className="w-full rounded-xl border border-black/[0.08] bg-[#F5F5F0] px-4 py-3 text-sm text-[#1A1A18] placeholder:text-[#A3A3A3] focus:border-[#2563EB]/50 focus:outline-none focus:ring-1 focus:ring-[#2563EB]/30 transition-colors"
                       />
                     </div>
                     <div>
@@ -204,7 +204,7 @@ export default function ContactPage() {
                         value={form.issue}
                         onChange={e => setForm(f => ({ ...f, issue: e.target.value }))}
                         placeholder="Tell us about your question, issue, or feedback..."
-                        className="w-full rounded-xl border border-black/[0.08] bg-[#F5F5F0] px-4 py-3 text-sm text-[#1A1A18] placeholder:text-[#A3A3A3] focus:border-[#0D9488]/50 focus:outline-none focus:ring-1 focus:ring-[#0D9488]/30 transition-colors resize-none"
+                        className="w-full rounded-xl border border-black/[0.08] bg-[#F5F5F0] px-4 py-3 text-sm text-[#1A1A18] placeholder:text-[#A3A3A3] focus:border-[#2563EB]/50 focus:outline-none focus:ring-1 focus:ring-[#2563EB]/30 transition-colors resize-none"
                       />
                     </div>
 
@@ -218,7 +218,7 @@ export default function ContactPage() {
                     <button
                       type="submit"
                       disabled={status === "sending"}
-                      className="w-full rounded-xl bg-[#0D9488] hover:bg-[#0F766E] text-white font-bold py-3.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold py-3.5 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {status === "sending" ? "Sending…" : "Send Message"}
                     </button>
@@ -248,13 +248,13 @@ export default function ContactPage() {
 function ContactCard({ icon, label, value, href, sub }: { icon: React.ReactNode; label: string; value: string; href?: string; sub: string }) {
   return (
     <div className="flex gap-4">
-      <div className="w-11 h-11 rounded-xl bg-[#0D9488]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+      <div className="w-11 h-11 rounded-xl bg-[#2563EB]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
         {icon}
       </div>
       <div>
         <div className="text-xs font-bold uppercase tracking-wider text-[#A3A3A3] mb-1">{label}</div>
         {href ? (
-          <a href={href} className="text-[#1A1A18] font-semibold hover:text-[#0D9488] transition-colors">{value}</a>
+          <a href={href} className="text-[#1A1A18] font-semibold hover:text-[#2563EB] transition-colors">{value}</a>
         ) : (
           <div className="text-[#1A1A18] font-semibold">{value}</div>
         )}

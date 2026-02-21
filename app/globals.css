@@ -14,7 +14,7 @@
  * Cards / Panels:   #1A1A1A
  * Primary text:     #F5F5F0
  * Secondary text:   #A3A3A3
- * Accent:           #14B8A6 (teal — used sparingly)
+ * Accent:           #3B82F6 (slate blue — used sparingly)
  * ───────────────────────────────────────────────────────────────────────────── */
 :root {
   /* ── Core surfaces ── */
@@ -36,19 +36,19 @@
   --text-muted: #A3A3A3;
   --text-disabled: #D4D4D4;
 
-  /* ── Brand accent (teal) ── */
-  --accent: #0D9488;
-  --accent-hover: #0F766E;
-  --accent-light: #0F766E;
-  --accent-muted: #F0FDFA;
-  --accent-border: #99F6E4;
-  --accent-glow: rgba(13, 148, 136, 0.08);
+  /* ── Brand accent (slate blue) ── */
+  --accent: #2563EB;
+  --accent-hover: #1D4ED8;
+  --accent-light: #1D4ED8;
+  --accent-muted: #EFF6FF;
+  --accent-border: #BFDBFE;
+  --accent-glow: rgba(37, 99, 235, 0.08);
 
-  /* ── Status: Verified (soft teal) ── */
-  --verified: #0D9488;
-  --verified-bg: #F0FDFA;
-  --verified-border: #99F6E4;
-  --verified-text: #0F766E;
+  /* ── Status: Verified (soft blue) ── */
+  --verified: #2563EB;
+  --verified-bg: #EFF6FF;
+  --verified-border: #BFDBFE;
+  --verified-text: #1D4ED8;
 
   /* ── Status: Action Required (muted amber) ── */
   --action: #B45309;
@@ -68,21 +68,21 @@
   --inactive-border: #E5E7EB;
   --inactive-text: #4B5563;
 
-  /* ── Status: Needs Review (soft teal, subtle) ── */
-  --review: #0D9488;
-  --review-bg: #F0FDFA;
-  --review-border: #A7F3D0;
-  --review-text: #065F46;
+  /* ── Status: Needs Review (soft blue, subtle) ── */
+  --review: #2563EB;
+  --review-bg: #EFF6FF;
+  --review-border: #93C5FD;
+  --review-text: #1E40AF;
 
   /* ── Interaction ── */
-  --focus-ring: rgba(13, 148, 136, 0.25);
+  --focus-ring: rgba(37, 99, 235, 0.25);
   --shadow-sm: rgba(0, 0, 0, 0.04);
   --shadow-md: rgba(0, 0, 0, 0.08);
   --shadow-lg: rgba(0, 0, 0, 0.12);
 
   /* ── Deprecated aliases ── */
   --muted: #A3A3A3;
-  --accent-light-compat: #0F766E;
+  --accent-light-compat: #1D4ED8;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -108,19 +108,19 @@
   --text-muted: #525252;
   --text-disabled: #3A3A3A;
 
-  /* ── Brand accent (teal) ── */
-  --accent: #14B8A6;
-  --accent-hover: #0D9488;
-  --accent-light: #5EEAD4;
-  --accent-muted: #0A1F1C;
-  --accent-border: #134E48;
-  --accent-glow: rgba(20, 184, 166, 0.15);
+  /* ── Brand accent (slate blue) ── */
+  --accent: #3B82F6;
+  --accent-hover: #2563EB;
+  --accent-light: #93C5FD;
+  --accent-muted: #0C1929;
+  --accent-border: #1E3A5F;
+  --accent-glow: rgba(59, 130, 246, 0.15);
 
-  /* ── Status: Verified (soft teal) ── */
-  --verified: #14B8A6;
-  --verified-bg: #0A1F1C;
-  --verified-border: #134E48;
-  --verified-text: #5EEAD4;
+  /* ── Status: Verified (soft blue) ── */
+  --verified: #3B82F6;
+  --verified-bg: #0C1929;
+  --verified-border: #1E3A5F;
+  --verified-text: #93C5FD;
 
   /* ── Status: Action Required (muted amber) ── */
   --action: #D97706;
@@ -140,21 +140,21 @@
   --inactive-border: #2A2D32;
   --inactive-text: #9CA3AF;
 
-  /* ── Status: Needs Review (soft teal, subtle) ── */
-  --review: #14B8A6;
-  --review-bg: #0A1A18;
-  --review-border: #103D38;
-  --review-text: #99F6E4;
+  /* ── Status: Needs Review (soft blue, subtle) ── */
+  --review: #3B82F6;
+  --review-bg: #0C1929;
+  --review-border: #172554;
+  --review-text: #BFDBFE;
 
   /* ── Interaction ── */
-  --focus-ring: rgba(20, 184, 166, 0.4);
+  --focus-ring: rgba(59, 130, 246, 0.4);
   --shadow-sm: rgba(0, 0, 0, 0.3);
   --shadow-md: rgba(0, 0, 0, 0.5);
   --shadow-lg: rgba(0, 0, 0, 0.7);
 
   /* ── Deprecated aliases (backward compat) ── */
   --muted: #525252;
-  --accent-light-compat: #5EEAD4;
+  --accent-light-compat: #93C5FD;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

@@ -46,7 +46,7 @@ export default function HipaaPage() {
       <main className="pt-28 pb-24">
         <div className="mx-auto max-w-3xl px-6">
           <div className="mb-12">
-            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#0D9488] mb-4">Compliance</div>
+            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#2563EB] mb-4">Compliance</div>
             <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">HIPAA Compliance</h1>
             <p className="text-[#525252] text-lg">Our commitment to protecting patient health information</p>
           </div>
@@ -59,8 +59,8 @@ export default function HipaaPage() {
               { label: "Zero PHI at Rest", sub: "Stateless architecture" },
               { label: "Encrypted", sub: "In transit & at rest" },
             ].map((badge) => (
-              <div key={badge.label} className="rounded-xl border border-[#0D9488]/20 bg-[#0D9488]/[0.04] p-4 text-center">
-                <IconShieldCheck className="w-6 h-6 text-[#0D9488] mx-auto mb-2" />
+              <div key={badge.label} className="rounded-xl border border-[#2563EB]/20 bg-[#2563EB]/[0.04] p-4 text-center">
+                <IconShieldCheck className="w-6 h-6 text-[#2563EB] mx-auto mb-2" />
                 <div className="text-sm font-bold text-[#1A1A18]">{badge.label}</div>
                 <div className="text-xs text-[#525252] mt-1">{badge.sub}</div>
               </div>
@@ -131,7 +131,7 @@ export default function HipaaPage() {
               </ul>
               <p>
                 To request a BAA, please contact us at{" "}
-                <a href="mailto:thomas@lvlai.app" className="text-[#0D9488] hover:text-[#0F766E] transition-colors">thomas@lvlai.app</a>.
+                <a href="mailto:thomas@lvlai.app" className="text-[#2563EB] hover:text-[#1D4ED8] transition-colors">thomas@lvlai.app</a>.
               </p>
             </Section>
 
@@ -179,9 +179,9 @@ export default function HipaaPage() {
                 please don&apos;t hesitate to reach out:
               </p>
               <ul>
-                <li>Email: <a href="mailto:thomas@lvlai.app" className="text-[#0D9488] hover:text-[#0F766E] transition-colors">thomas@lvlai.app</a></li>
-                <li>Phone: <a href="tel:+15123955633" className="text-[#0D9488] hover:text-[#0F766E] transition-colors">(512) 395-5633</a></li>
-                <li>Support: <a href="mailto:support@levelai.app" className="text-[#0D9488] hover:text-[#0F766E] transition-colors">support@levelai.app</a></li>
+                <li>Email: <a href="mailto:thomas@lvlai.app" className="text-[#2563EB] hover:text-[#1D4ED8] transition-colors">thomas@lvlai.app</a></li>
+                <li>Phone: <a href="tel:+15123955633" className="text-[#2563EB] hover:text-[#1D4ED8] transition-colors">(512) 395-5633</a></li>
+                <li>Support: <a href="mailto:support@levelai.app" className="text-[#2563EB] hover:text-[#1D4ED8] transition-colors">support@levelai.app</a></li>
               </ul>
             </Section>
           </div>
