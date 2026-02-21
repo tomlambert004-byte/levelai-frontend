@@ -662,7 +662,7 @@ export default function LandingPage() {
           </div>
           <div className="border-t border-black/[0.06] pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="text-sm text-[#A3A3A3]">&copy; {new Date().getFullYear()} Level AI. All rights reserved.</div>
-            <div className="text-sm text-[#A3A3A3]">HIPAA compliant &middot; SOC 2 Type II &middot; BAA available</div>
+            <div className="text-sm text-[#A3A3A3]">HIPAA compliant &middot; Zero Data Retention &middot; BAA available</div>
           </div>
         </div>
       </footer>
