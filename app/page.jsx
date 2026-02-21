@@ -2497,6 +2497,160 @@ function MedicaidCoveragePanel({ patient, result }) {
   );
 }
 
+// ── Payer Pal Chat Widget ──────────────────────────────────────────────────────
+const PAYER_PAL_CHIPS = [
+  "What's covered for today's visit?",
+  "How much will the patient owe?",
+  "Is a pre-auth needed?",
+  "Deductible status?",
+  "Any waiting periods?",
+];
+
+function PayerPalChat({ patient, result }) {
+  const [expanded, setExpanded] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput]       = useState("");
+  const [loading, setLoading]   = useState(false);
+  const endRef = useRef(null);
+
+  // Reset when patient changes
+  useEffect(() => {
+    setMessages([]);
+    setInput("");
+    setLoading(false);
+    setExpanded(false);
+  }, [patient?.id]);
+
+  // Auto-scroll to newest message
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  const sendQuestion = async (questionText) => {
+    const q = (questionText || input).trim();
+    if (!q || loading) return;
+    setInput("");
+    setMessages(prev => [...prev, { role: "user", text: q }]);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/v1/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patient_id: patient.id, question: q, coverage_json: result }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || data.error || "Chat failed");
+      setMessages(prev => [...prev, { role: "assistant", text: data.answer }]);
+    } catch (err) {
+      setMessages(prev => [...prev, { role: "assistant", text: "Sorry, I couldn't process that. " + (err.message || "") }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop:16, borderTop:"1px solid " + T.border, paddingTop:12 }}>
+      {/* Toggle header */}
+      <button onClick={() => setExpanded(!expanded)}
+        style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
+          padding:"10px 14px", borderRadius:10, border:"1px solid " + T.indigoBorder,
+          background:T.indigoLight, cursor:"pointer", transition:"all 0.15s" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:16 }}>🤖</span>
+          <span style={{ fontSize:12, fontWeight:800, color:T.indigoDark }}>Payer Pal</span>
+          <span style={{ fontSize:11, color:T.textMid, fontWeight:600 }}>Ask about this patient&apos;s coverage</span>
+        </div>
+        <span style={{ color:T.indigoDark, fontSize:14, fontWeight:800, transform: expanded ? "rotate(180deg)" : "none", transition:"transform 0.2s" }}>⌄</span>
+      </button>
+
+      {/* Expanded chat area */}
+      {expanded && (
+        <div style={{ marginTop:8, border:"1px solid " + T.border, borderRadius:10, overflow:"hidden",
+          background:T.bg, animation:"fadeIn 0.2s ease-out" }}>
+
+          {/* Messages area */}
+          <div style={{ maxHeight:280, overflowY:"auto", padding:12, display:"flex", flexDirection:"column", gap:8 }}>
+            {/* Quick chips — shown when empty */}
+            {messages.length === 0 && !loading && (
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color:T.textSoft, marginBottom:8 }}>Common questions:</div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                  {PAYER_PAL_CHIPS.map(chip => (
+                    <button key={chip} onClick={() => sendQuestion(chip)}
+                      style={{ padding:"6px 10px", borderRadius:8, border:"1px solid " + T.indigoBorder,
+                        background:T.bgCard, color:T.indigoDark, fontSize:11, fontWeight:700,
+                        cursor:"pointer", transition:"all 0.15s", whiteSpace:"nowrap" }}
+                      onMouseEnter={e => { e.currentTarget.style.background = T.indigoLight; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = T.bgCard; }}>
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Message bubbles */}
+            {messages.map((msg, i) => (
+              <div key={i} style={{ display:"flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                <div style={{
+                  maxWidth:"85%", padding:"8px 12px", borderRadius:10, fontSize:12, lineHeight:"1.55",
+                  fontWeight: msg.role === "user" ? 700 : 400,
+                  background: msg.role === "user" ? T.indigoLight : T.bgCard,
+                  color: msg.role === "user" ? T.indigoDark : T.text,
+                  border: "1px solid " + (msg.role === "user" ? T.indigoBorder : T.border),
+                }}>
+                  {msg.role === "assistant" && (
+                    <div style={{ fontSize:9, fontWeight:800, color:T.indigo, textTransform:"uppercase",
+                      letterSpacing:"0.06em", marginBottom:3 }}>Payer Pal</div>
+                  )}
+                  {msg.text}
+                </div>
+              </div>
+            ))}
+
+            {/* Typing indicator */}
+            {loading && (
+              <div style={{ display:"flex", alignItems:"center", gap:6, padding:"4px 0" }}>
+                <div style={{ display:"flex", gap:3 }}>
+                  {[0,1,2].map(j => (
+                    <span key={j} style={{ width:5, height:5, borderRadius:"50%", background:T.indigo,
+                      animation:`wizPulse 1.2s ease-in-out ${j * 0.2}s infinite` }} />
+                  ))}
+                </div>
+                <span style={{ color:T.textMid, fontSize:11, fontWeight:700 }}>Payer Pal is thinking…</span>
+              </div>
+            )}
+            <div ref={endRef} />
+          </div>
+
+          {/* Input row */}
+          <div style={{ display:"flex", gap:8, padding:"8px 12px", borderTop:"1px solid " + T.border, background:T.bgCard }}>
+            <input
+              type="text"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendQuestion(); } }}
+              placeholder="Ask about coverage…"
+              style={{ flex:1, padding:"8px 12px", borderRadius:8, border:"1px solid " + T.border,
+                fontSize:12, outline:"none", fontFamily:"inherit", background:T.bg, color:T.text }}
+            />
+            <button
+              onClick={() => sendQuestion()}
+              disabled={loading || !input.trim()}
+              style={{ padding:"8px 14px", borderRadius:8, border:"none",
+                background: loading || !input.trim() ? T.borderStrong : T.indigoDark,
+                color:"white", fontWeight:800, fontSize:11,
+                cursor: loading || !input.trim() ? "not-allowed" : "pointer",
+                transition:"all 0.15s", whiteSpace:"nowrap" }}>
+              Send
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Benefits Panel ────────────────────────────────────────────────────────────
 function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast, onBack, backLabel, practice, preauthCache }) {
   if (!patient) return (
@@ -2784,6 +2938,9 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
             )}
 
             {/* Action flags are now shown in the Action Required panel above with full explanations */}
+
+            {/* Payer Pal AI Chat */}
+            <PayerPalChat patient={patient} result={result} />
 
             {/* Download Benefit PDF */}
             <div style={{ marginTop:20, paddingTop:16, borderTop:"1px solid " + T.border }}>
