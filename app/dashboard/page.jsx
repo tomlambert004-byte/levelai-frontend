@@ -213,10 +213,10 @@ function triagePatient(patient, result) {
 }
 
 // ── Medicaid Detection (inline — no import needed for client component) ──────
-const MEDICAID_KW = /medicaid|medi-cal|denti-cal|chip|soonercare|masshealth|badgercare|husky|tmhp|ahcccs|superior\s*health|peach\s*state|sunshine\s*health|wellcare|molina|centene|amerihealth|caresource|illinicare|buckeye|nj\s*familycare|apple\s*health|healthy\s*michigan|virginia\s*medicaid|texas\s*health\s*steps/i;
-const MEDICAID_PAYER_IDS = new Set(["18916","77037","610279","77027","77034","77036","77033","77032","77012","77031","77030","77028","77039","77040","77003","77029"]);
-const PAYER_STATE_MAP = {"18916":"TX","77037":"TX","610279":"CA","77027":"NY","77034":"FL","77036":"PA","77033":"IL","77032":"OH","77012":"GA","77031":"NC","77030":"MI","77028":"NJ","77039":"VA","77040":"WA","77003":"AZ","77029":"MA"};
-const INSURANCE_STATE_MAP = {"medi-cal":"CA","denti-cal":"CA","soonercare":"OK","masshealth":"MA","badgercare":"WI","husky":"CT","peach state":"GA","healthy michigan":"MI","nj familycare":"NJ","apple health":"WA","ahcccs":"AZ","illinicare":"IL","buckeye":"OH","superior health":"TX","tmhp":"TX","sunshine health":"FL","virginia medicaid":"VA"};
+const MEDICAID_KW = /medicaid|medi-cal|denti-cal|chip|soonercare|masshealth|badgercare|husky|tmhp|ahcccs|superior\s*health|peach\s*state|sunshine\s*health|wellcare|molina|centene|amerihealth|caresource|illinicare|buckeye|nj\s*familycare|apple\s*health|healthy\s*michigan|virginia\s*medicaid|texas\s*health\s*steps|denali|arkids|mainecare|kancare|med-quest|heritage\s*health|centennial\s*care|equalitycare|rite\s*smiles|green\s*mountain|oregon\s*health/i;
+const MEDICAID_PAYER_IDS = new Set(["18916","77037","610279","77027","77034","77036","77033","77032","77012","77031","77030","77028","77039","77040","77003","77029","77001","77002","77004","77006","77007","77010","77013","77014","77015","77016","77017","77018","77019","77020","77021","77022","77023","77024","77025","77026","77038","77041","77035","77042","77043","77044","77045","77046","77047","77048","77049","77050","77051","77052","77053"]);
+const PAYER_STATE_MAP = {"18916":"TX","77001":"AL","77002":"AK","77003":"AZ","77004":"AR","610279":"CA","77010":"CO","77006":"CT","77007":"DE","77034":"FL","77012":"GA","77013":"HI","77014":"ID","77033":"IL","77015":"IN","77016":"IA","77017":"KS","77018":"KY","77019":"LA","77020":"ME","77021":"MD","77029":"MA","77030":"MI","77022":"MN","77023":"MS","77024":"MO","77025":"MT","77026":"NE","77042":"NV","77043":"NH","77028":"NJ","77044":"NM","77027":"NY","77031":"NC","77045":"ND","77032":"OH","77046":"OK","77047":"OR","77036":"PA","77048":"RI","77035":"SC","77049":"SD","77038":"TN","77037":"TX","77050":"UT","77051":"VT","77039":"VA","77040":"WA","77052":"WV","77041":"WI","77053":"WY"};
+const INSURANCE_STATE_MAP = {"medi-cal":"CA","denti-cal":"CA","soonercare":"OK","masshealth":"MA","badgercare":"WI","husky":"CT","peach state":"GA","healthy michigan":"MI","nj familycare":"NJ","apple health":"WA","ahcccs":"AZ","illinicare":"IL","buckeye":"OH","superior health":"TX","tmhp":"TX","sunshine health":"FL","virginia medicaid":"VA","denali":"AK","arkids":"AR","mainecare":"ME","kancare":"KS","med-quest":"HI","medquest":"HI","heritage health":"NE","centennial care":"NM","equalitycare":"WY","rite smiles":"RI","green mountain":"VT","oregon health plan":"OR","ohp":"OR","tenncare":"TN","hoosier":"IN","missouri healthnet":"MO","healthy connections":"SC","health first colorado":"CO","badgercare plus":"WI","alabama medicaid":"AL","kentucky medicaid":"KY","healthy smiles":"LA","minnesota care":"MN","montana medicaid":"MT","nevada medicaid":"NV","south dakota medicaid":"SD","utah medicaid":"UT","west virginia medicaid":"WV","wyoming medicaid":"WY"};
 
 function isMedicaidPatient(patient) {
   if (!patient) return false;
@@ -240,6 +240,7 @@ function detectMedicaidStateClient(patient) {
 // Pre-auth letters route to the payer's PA department, not the patient.
 // Medicaid PA goes to the state Medicaid dental office.
 const MEDICAID_PA_CONTACTS = {
+  // ── Top 20 (highest Medicaid enrollment) ───────────────────────────────────
   TX: { name: "TMHP Dental Services",         email: "dental@tmhp.com",              fax: "1-512-514-4214", label: "Texas Medicaid (TMHP)" },
   CA: { name: "Denti-Cal / Medi-Cal Dental",  email: "dental@denti-cal.ca.gov",      fax: "1-916-440-5690", label: "Denti-Cal (California)" },
   NY: { name: "NY Medicaid Dental",           email: "dental@health.ny.gov",         fax: "1-518-486-7922", label: "NY Medicaid" },
@@ -260,6 +261,37 @@ const MEDICAID_PA_CONTACTS = {
   MO: { name: "Missouri HealthNet Dental",   email: "dental@dss.mo.gov",            fax: "1-573-526-5592", label: "MO HealthNet" },
   WI: { name: "BadgerCare Plus Dental",      email: "dental@dhs.wisconsin.gov",     fax: "1-608-266-1935", label: "WI BadgerCare Plus" },
   SC: { name: "SC Healthy Connections Dental",email: "dental@scdhhs.gov",            fax: "1-803-255-8291", label: "SC Healthy Connections" },
+  // ── Remaining 30 states ────────────────────────────────────────────────────
+  AL: { name: "Alabama Medicaid Dental",      email: "dental@medicaid.alabama.gov",  fax: "1-334-242-5097", label: "AL Medicaid" },
+  AK: { name: "Alaska Medicaid Dental",       email: "dental@health.alaska.gov",     fax: "1-907-334-2382", label: "AK Medicaid (Denali)" },
+  AR: { name: "ARKids / AR Medicaid Dental",  email: "dental@dhs.arkansas.gov",      fax: "1-501-682-8090", label: "AR Medicaid" },
+  CT: { name: "HUSKY Health Dental",          email: "dental@ct.gov",                fax: "1-860-424-5116", label: "CT HUSKY Health" },
+  DE: { name: "DE Medicaid Dental (DMMA)",    email: "dental@dhss.delaware.gov",     fax: "1-302-255-9136", label: "DE Medicaid" },
+  HI: { name: "Med-QUEST Dental",            email: "dental@medquest.hawaii.gov",   fax: "1-808-692-8087", label: "HI Med-QUEST" },
+  IA: { name: "Iowa Medicaid Dental",         email: "dental@dhs.iowa.gov",          fax: "1-515-725-1360", label: "IA Medicaid" },
+  ID: { name: "Idaho Medicaid Dental",        email: "dental@dhw.idaho.gov",         fax: "1-208-364-1892", label: "ID Medicaid" },
+  KS: { name: "KanCare Dental",              email: "dental@kdhe.ks.gov",           fax: "1-785-296-4813", label: "KS KanCare" },
+  KY: { name: "KY Medicaid Dental",          email: "dental@chfs.ky.gov",           fax: "1-502-564-0509", label: "KY Medicaid" },
+  LA: { name: "LA Healthy Smiles Dental",    email: "dental@ldh.la.gov",            fax: "1-225-342-3893", label: "LA Healthy Smiles" },
+  MD: { name: "MD Healthy Smiles Dental",    email: "dental@health.maryland.gov",   fax: "1-410-767-5215", label: "MD Healthy Smiles" },
+  ME: { name: "MaineCare Dental",            email: "dental@maine.gov",             fax: "1-207-287-1747", label: "ME MaineCare" },
+  MN: { name: "MN Health Care Programs Dental",email: "dental@dhs.state.mn.us",     fax: "1-651-431-7566", label: "MN Medicaid" },
+  MS: { name: "MS Medicaid Dental (DOM)",     email: "dental@medicaid.ms.gov",       fax: "1-601-359-6294", label: "MS Medicaid" },
+  MT: { name: "MT Medicaid Dental (Smiles)",  email: "dental@dphhs.mt.gov",          fax: "1-406-444-1970", label: "MT Medicaid" },
+  NC: { name: "NC Medicaid Dental",           email: "dental@dhhs.nc.gov",           fax: "1-919-855-4300", label: "NC Medicaid" },
+  ND: { name: "ND Medicaid Dental",           email: "dental@nd.gov",                fax: "1-701-328-1544", label: "ND Medicaid" },
+  NE: { name: "NE Medicaid Dental (Heritage)",email: "dental@dhhs.ne.gov",           fax: "1-402-471-9092", label: "NE Heritage Health" },
+  NH: { name: "NH Medicaid Dental",           email: "dental@dhhs.nh.gov",           fax: "1-603-271-4240", label: "NH Medicaid" },
+  NM: { name: "NM Centennial Care Dental",   email: "dental@hsd.state.nm.us",       fax: "1-505-827-6286", label: "NM Centennial Care" },
+  NV: { name: "NV Medicaid Dental",           email: "dental@dhcfp.nv.gov",          fax: "1-775-684-3644", label: "NV Medicaid" },
+  OK: { name: "SoonerCare Dental",           email: "dental@okhca.org",             fax: "1-405-522-7246", label: "OK SoonerCare" },
+  OR: { name: "Oregon Health Plan Dental",    email: "dental@dhsoha.state.or.us",    fax: "1-503-945-6873", label: "OR OHP Dental" },
+  RI: { name: "RI Medicaid Dental (RIte Smiles)",email: "dental@eohhs.ri.gov",       fax: "1-401-462-6353", label: "RI RIte Smiles" },
+  SD: { name: "SD Medicaid Dental",           email: "dental@state.sd.us",           fax: "1-605-773-5246", label: "SD Medicaid" },
+  UT: { name: "UT Medicaid Dental",           email: "dental@health.utah.gov",       fax: "1-801-538-6036", label: "UT Medicaid" },
+  VT: { name: "VT Medicaid Dental (DVHA)",    email: "dental@vermont.gov",           fax: "1-802-879-5963", label: "VT Green Mountain Care" },
+  WV: { name: "WV Medicaid Dental (MCO)",     email: "dental@dhhr.wv.gov",           fax: "1-304-558-1130", label: "WV Medicaid" },
+  WY: { name: "WY EqualityCare Dental",       email: "dental@health.wyo.gov",        fax: "1-307-777-6964", label: "WY EqualityCare" },
 };
 
 const COMMERCIAL_PA_CONTACTS = {
@@ -8175,14 +8207,40 @@ export default function LevelAI() {
       // Determine what fields are missing from the verification result
       const missingFields = [];
       const flags = finalResult.actionFlags || {};
-      if (flags.missing_tooth_clause) missingFields.push("Missing tooth clause details");
-      if (flags.pre_auth_required) missingFields.push("Pre-authorization requirements");
-      if (flags.waiting_period_active) missingFields.push("Waiting period end date");
-      if (flags.frequency_limit_reached) missingFields.push("Frequency limitation reset dates");
-      if (flags.annual_max_low) missingFields.push("Annual maximum remaining and reset date");
-      if (flags.cob_active) missingFields.push("Coordination of Benefits — secondary payer info");
-      if (finalResult._failCategory === "payer_unsupported") missingFields.push("Complete benefit breakdown — electronic verification unavailable");
-      if (finalResult._failCategory === "payer_system_error") missingFields.push("Complete benefit breakdown — payer system error");
+      const isMedicaidFax = isMedicaidPatient(patient) || finalResult._is_medicaid;
+
+      if (isMedicaidFax) {
+        // ── Medicaid-specific missing fields ────────────────────────────────
+        const medState = finalResult._medicaid_state || detectMedicaidStateClient(patient) || "unknown";
+        const medInfo = finalResult.medicaid_info || {};
+        if (!medInfo.covered_categories || medInfo.covered_categories.length === 0)
+          missingFields.push(`${medState} Medicaid covered dental service categories`);
+        if (!medInfo.frequency_limits || Object.keys(medInfo.frequency_limits).length === 0)
+          missingFields.push(`Frequency limitations for preventive and restorative procedures (${medState})`);
+        if (medInfo.prior_auth_required !== false && (!medInfo.prior_auth_codes || medInfo.prior_auth_codes.length === 0))
+          missingFields.push(`Prior authorization requirements by CDT code (${medState} Medicaid)`);
+        if (medInfo.copay_schedule == null)
+          missingFields.push(`Copay schedule by procedure type (${medState} Medicaid)`);
+        if (flags.missing_tooth_clause)
+          missingFields.push("Missing/replacement tooth clause details under state Medicaid plan");
+        if (flags.waiting_period_active)
+          missingFields.push("Waiting period end date for Medicaid dental coverage");
+        if (finalResult._failCategory === "payer_unsupported" || finalResult._failCategory === "payer_system_error")
+          missingFields.push(`Complete Medicaid dental benefit breakdown — electronic verification unavailable for ${medState}`);
+        // Fallback: if Medicaid verification returned action_required with no specific flags
+        if (missingFields.length === 0)
+          missingFields.push(`Medicaid dental eligibility confirmation and benefit details (${medState})`);
+      } else {
+        // ── Commercial insurance missing fields ─────────────────────────────
+        if (flags.missing_tooth_clause) missingFields.push("Missing tooth clause details");
+        if (flags.pre_auth_required) missingFields.push("Pre-authorization requirements");
+        if (flags.waiting_period_active) missingFields.push("Waiting period end date");
+        if (flags.frequency_limit_reached) missingFields.push("Frequency limitation reset dates");
+        if (flags.annual_max_low) missingFields.push("Annual maximum remaining and reset date");
+        if (flags.cob_active) missingFields.push("Coordination of Benefits — secondary payer info");
+        if (finalResult._failCategory === "payer_unsupported") missingFields.push("Complete benefit breakdown — electronic verification unavailable");
+        if (finalResult._failCategory === "payer_system_error") missingFields.push("Complete benefit breakdown — payer system error");
+      }
 
       // Only auto-fax if there are specific missing fields to request
       if (missingFields.length > 0) {
@@ -8223,6 +8281,8 @@ export default function LevelAI() {
                   patientDob: patient.dob,
                   appointmentDate: patient.appointmentDate,
                   missingFields,
+                  isMedicaid: isMedicaidFax,
+                  medicaidState: isMedicaidFax ? (finalResult._medicaid_state || detectMedicaidStateClient(patient)) : null,
                 }),
               });
               const data = await res.json();

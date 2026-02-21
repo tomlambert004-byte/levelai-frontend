@@ -58,6 +58,8 @@ export async function POST(request) {
       patientDob: body.patientDob,
       missingFields: missingFields || [],
       appointmentDate: body.appointmentDate,
+      isMedicaid: body.isMedicaid || false,
+      medicaidState: body.medicaidState || null,
     });
 
     // Generate a fax ID for tracking
