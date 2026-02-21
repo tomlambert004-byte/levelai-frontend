@@ -23,6 +23,13 @@ export default function RootLayout({
   return (
     <ClerkProvider publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
       <html lang="en">
+        <head>
+          {/* Satoshi — modern geometric sans-serif (Fontshare CDN) */}
+          <link
+            href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap"
+            rel="stylesheet"
+          />
+        </head>
         <body>{children}</body>
       </html>
     </ClerkProvider>

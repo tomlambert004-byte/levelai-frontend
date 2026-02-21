@@ -2,47 +2,53 @@
 export const dynamic = "force-dynamic";
 import { SignedIn, SignedOut, useAuth, useClerk, useSignIn, useSignUp, useUser } from "@clerk/nextjs";
 import { useState, useCallback, useEffect, useRef } from "react";
-// Theme — dual palettes: dark-first premium aesthetic with teal accent
+// Theme — dual palettes: calm, premium, harmonious
+// Satoshi font · #0A0A0A base · #14B8A6 accent (used sparingly)
+// Status colors: muted and sophisticated — no bright orange, hot pink, or jarring reds
 const themes = {
   dark: {
-    bg:"#0A0A0A", bgCard:"#111111", border:"#1C1C1C", borderStrong:"#2A2A2A",
-    // Success / Verified — brand teal
+    bg:"#0A0A0A", bgCard:"#1A1A1A", border:"#1C1C1C", borderStrong:"#2A2A2A",
+    // Success / Verified — soft teal
     lime:"#14B8A6", limeLight:"#0A1F1C", limeBorder:"#134E48", limeDark:"#5EEAD4",
     text:"#F5F5F0", textMid:"#A3A3A3", textSoft:"#525252",
-    // Warning / Action Required — warm gold (cooler than orange, complements teal)
-    amber:"#D4A031", amberLight:"#1A170D", amberBorder:"#5C4417", amberDark:"#E8C560",
-    // Error / Failed — muted rose (cooler than fire-red, more refined on dark)
-    red:"#E05C6B", redLight:"#1C0F11", redBorder:"#6B2832",
+    // Warning / Action Required — muted amber (soft, not bright)
+    amber:"#D97706", amberLight:"#1A170D", amberBorder:"#5C4417", amberDark:"#FBBF24",
+    // Error / Failed — muted red (not hot pink or jarring)
+    red:"#B91C1C", redLight:"#1C0F0F", redBorder:"#5C1A1A",
     // Neutral / Pending
-    slate:"#8896A7", slateLight:"#141618",
+    slate:"#6B7280", slateLight:"#141618",
     // Verification process — brand teal (same family)
     indigo:"#14B8A6", indigoLight:"#0A1F1C", indigoBorder:"#134E48",
     indigoDark:"#5EEAD4",
-    // RPA / AI automation — sky blue (natural teal companion)
-    rpa:"#38BDF8", rpaLight:"#0B1521", rpaBorder:"#1A3A5C", rpaDark:"#7DD3FC",
+    // RPA / AI automation — muted teal variant (stays in family)
+    rpa:"#14B8A6", rpaLight:"#0A1F1C", rpaBorder:"#134E48", rpaDark:"#5EEAD4",
     shadow:"rgba(0,0,0,0.4)", shadowStrong:"rgba(0,0,0,0.6)",
     // Brand
     accent:"#14B8A6", accentLight:"#5EEAD4", accentBg:"#0A1F1C",
+    // Sidebar
+    sidebar:"#111111",
   },
   light: {
     bg:"#F5F5F0", bgCard:"#FFFFFF", border:"#E5E5E5", borderStrong:"#D4D4D4",
-    // Success / Verified — brand teal
+    // Success / Verified — soft teal
     lime:"#0D9488", limeLight:"#F0FDFA", limeBorder:"#99F6E4", limeDark:"#0F766E",
     text:"#1A1A18", textMid:"#525252", textSoft:"#A3A3A3",
-    // Warning / Action Required — warm gold
-    amber:"#B8860B", amberLight:"#FDF8EC", amberBorder:"#E8D5A0", amberDark:"#8B6914",
-    // Error / Failed — muted rose
-    red:"#C0394F", redLight:"#FDF0F2", redBorder:"#F0C4CB",
+    // Warning / Action Required — muted amber
+    amber:"#B45309", amberLight:"#FFFBEB", amberBorder:"#FDE68A", amberDark:"#92400E",
+    // Error / Failed — muted red
+    red:"#B91C1C", redLight:"#FEF2F2", redBorder:"#FECACA",
     // Neutral / Pending
-    slate:"#64748B", slateLight:"#F6F7F8",
+    slate:"#6B7280", slateLight:"#F9FAFB",
     // Verification process — brand teal
     indigo:"#0D9488", indigoLight:"#F0FDFA", indigoBorder:"#99F6E4",
     indigoDark:"#0F766E",
-    // RPA / AI automation — sky blue
-    rpa:"#0C87C9", rpaLight:"#EFF8FF", rpaBorder:"#A8D8F0", rpaDark:"#085D8C",
+    // RPA / AI automation — muted teal variant
+    rpa:"#0D9488", rpaLight:"#F0FDFA", rpaBorder:"#99F6E4", rpaDark:"#0F766E",
     shadow:"rgba(0,0,0,0.04)", shadowStrong:"rgba(0,0,0,0.08)",
     // Brand
     accent:"#0D9488", accentLight:"#0F766E", accentBg:"#F0FDFA",
+    // Sidebar
+    sidebar:"#FFFFFF",
   },
 };
 let T = themes.dark;
@@ -1009,7 +1015,7 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
 
   // ── layout shell ───────────────────────────────────────────────────────────
   return (
-    <div style={{ height: "100vh", display: "flex", background: T.bg, fontFamily: "'Nunito', sans-serif" }}>
+    <div style={{ height: "100vh", display: "flex", background: T.bg, fontFamily: "'Satoshi', system-ui, sans-serif" }}>
 
       {/* ── Left brand panel ── */}
       <div style={{ width: 420, flexShrink: 0, background: "#0A0A0A", color: "white", padding: "56px 48px",
@@ -1403,10 +1409,10 @@ function OnboardingWizard({ onComplete, showToast }) {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 10000,
-      display: "flex", fontFamily: "'Nunito', sans-serif",
+      display: "flex", fontFamily: "'Satoshi', system-ui, sans-serif",
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+        @import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap');
         @keyframes wizFadeIn { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
         @keyframes wizPulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
         @keyframes wizSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
@@ -7038,9 +7044,9 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
   const usedCodes = codes.filter(c => c.used).length;
 
   return (
-    <div style={{ height: "100vh", background: "#0A0A0A", fontFamily: "'Nunito', sans-serif", display: "flex", overflow: "hidden" }}>
+    <div style={{ height: "100vh", background: "#0A0A0A", fontFamily: "'Satoshi', system-ui, sans-serif", display: "flex", overflow: "hidden" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+        @import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
         ::-webkit-scrollbar{width:5px;}
         ::-webkit-scrollbar-thumb{background:#2A2A2A;border-radius:4px;}
@@ -8385,7 +8391,7 @@ export default function LevelAI() {
   return (
     <div style={{ height:"100vh", background:T.bg, fontFamily:"'Nunito',sans-serif", display:"flex", flexDirection:"row", overflow:"hidden", position:"relative" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+        @import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
         ::-webkit-scrollbar{width:5px;}
         ::-webkit-scrollbar-thumb{background:${T.borderStrong};border-radius:4px;}

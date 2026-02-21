@@ -197,7 +197,7 @@ const STATS = [
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F0] selection:bg-[#14B8A6]/30 overflow-x-hidden">
+    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F0] selection:bg-[#14B8A6]/30 overflow-x-hidden font-sans">
 
       {/* ═══════════════════════════ NAVIGATION ═══════════════════════════════ */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.06] bg-[#0A0A0A]/80 backdrop-blur-xl">
@@ -260,7 +260,7 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════════════════ STATS BAR ════════════════════════════════ */}
-      <section className="border-y border-white/[0.06] bg-[#111111]/50">
+      <section className="border-y border-white/[0.06] bg-[#1A1A1A]/50">
         <div className="mx-auto max-w-6xl grid grid-cols-2 md:grid-cols-4 divide-x divide-white/[0.06]">
           {STATS.map((s) => (
             <div key={s.label} className="py-10 px-6 text-center">
@@ -275,7 +275,7 @@ export default function LandingPage() {
       <section className="py-24 md:py-36">
         <div className="mx-auto max-w-6xl px-6">
           <div className="text-center mb-16">
-            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#D4A031] mb-4">The problem</div>
+            <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#D97706] mb-4">The problem</div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4">
               Insurance chaos is costing you
               <br className="hidden md:block" /> time, money, and sanity.
@@ -307,7 +307,7 @@ export default function LandingPage() {
                 body: "Insurance verification is the number one source of front-desk frustration and the leading cause of staff turnover in dental practices.",
               },
             ].map((card) => (
-              <div key={card.title} className="group rounded-2xl border border-white/[0.06] bg-[#111111] p-8 hover:border-[#14B8A6]/30 transition-colors">
+              <div key={card.title} className="group rounded-2xl border border-white/[0.06] bg-[#1A1A1A] p-8 hover:border-[#14B8A6]/30 transition-colors">
                 <card.icon className="w-8 h-8 text-[#14B8A6] mb-5" />
                 <div className="text-2xl font-black text-[#14B8A6] mb-1">{card.stat}</div>
                 <div className="text-base font-bold text-[#F5F5F0] mb-3">{card.title}</div>
@@ -335,7 +335,7 @@ export default function LandingPage() {
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {[
-              { label: "Before Level AI", color: "text-[#E05C6B]", border: "border-[#E05C6B]/20", items: [
+              { label: "Before Level AI", color: "text-[#F87171]", border: "border-[#F87171]/20", items: [
                 "Hours on the phone with insurance companies",
                 "Manually entering data into spreadsheets",
                 "Claim denials catching you off guard",
@@ -350,7 +350,7 @@ export default function LandingPage() {
                 "Full visibility 24 hours before every appointment",
               ]},
             ].map((col) => (
-              <div key={col.label} className={`rounded-2xl border ${col.border} bg-[#111111] p-8`}>
+              <div key={col.label} className={`rounded-2xl border ${col.border} bg-[#1A1A1A] p-8`}>
                 <div className={`text-sm font-extrabold tracking-wide uppercase ${col.color} mb-6`}>{col.label}</div>
                 <ul className="space-y-4">
                   {col.items.map((item) => (
@@ -379,7 +379,7 @@ export default function LandingPage() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {FEATURES.map((f) => (
-              <div key={f.title} className="group rounded-2xl border border-white/[0.06] bg-[#111111] p-7 hover:border-[#14B8A6]/30 hover:shadow-lg hover:shadow-[#14B8A6]/[0.04] transition-all">
+              <div key={f.title} className="group rounded-2xl border border-white/[0.06] bg-[#1A1A1A] p-7 hover:border-[#14B8A6]/30 hover:shadow-lg hover:shadow-[#14B8A6]/[0.04] transition-all">
                 <div className="w-11 h-11 rounded-xl bg-[#14B8A6]/10 flex items-center justify-center mb-5">
                   <f.icon className="w-5 h-5 text-[#14B8A6]" />
                 </div>
@@ -392,7 +392,7 @@ export default function LandingPage() {
       </section>
 
       {/* ═══════════════════════════ HOW IT WORKS ═════════════════════════════ */}
-      <section id="how-it-works" className="py-24 md:py-36 bg-[#111111]/40">
+      <section id="how-it-works" className="py-24 md:py-36 bg-[#1A1A1A]/40">
         <div className="mx-auto max-w-5xl px-6">
           <div className="text-center mb-16">
             <div className="text-xs font-extrabold tracking-[0.2em] uppercase text-[#14B8A6] mb-4">How it works</div>
@@ -441,8 +441,8 @@ export default function LandingPage() {
                 key={plan.name}
                 className={`relative rounded-2xl border p-8 flex flex-col ${
                   plan.highlighted
-                    ? "border-[#14B8A6]/40 bg-gradient-to-b from-[#14B8A6]/[0.06] to-[#111111] shadow-xl shadow-[#14B8A6]/10"
-                    : "border-white/[0.06] bg-[#111111]"
+                    ? "border-[#14B8A6]/40 bg-gradient-to-b from-[#14B8A6]/[0.06] to-[#1A1A1A] shadow-xl shadow-[#14B8A6]/10"
+                    : "border-white/[0.06] bg-[#1A1A1A]"
                 }`}
               >
                 {plan.highlighted && (
@@ -483,7 +483,7 @@ export default function LandingPage() {
       {/* ═══════════════════════════ CONTACT / CTA ════════════════════════════ */}
       <section id="contact" className="py-24 md:py-36 bg-gradient-to-b from-transparent via-[#14B8A6]/[0.03] to-transparent">
         <div className="mx-auto max-w-4xl px-6 text-center">
-          <div className="rounded-3xl border border-white/[0.06] bg-[#111111] p-12 md:p-16">
+          <div className="rounded-3xl border border-white/[0.06] bg-[#1A1A1A] p-12 md:p-16">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#14B8A6]/10 mb-6">
               <IconMail className="w-6 h-6 text-[#14B8A6]" />
             </div>
