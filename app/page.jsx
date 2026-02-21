@@ -53,27 +53,60 @@ const wholeDollars = (c) => c != null ? "$" + Math.round(Number(c)).toLocaleStri
 const pct = (n) => n != null ? n + "%" : "--";
 
 // ── Brand Logo Component ─────────────────────────────────────────────────────
-// White tooth icon integrated into the wordmark, matching the logo spec
-function BrandLogo({ size = 20, showText = true, textSize, subtitle, subtitleColor }) {
-  const fs = textSize || size;
-  return (
-    <div style={{ display:"flex", alignItems:"center", gap: size * 0.5 }}>
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink:0 }}>
-        <path d="M12 2C9.5 2 7.5 3.5 6.5 5.5C5.5 7.5 5 10 5.5 13C6 16 7 19 8 21C8.5 22 9.5 22 10 21C10.5 19.5 11 17 12 17C13 17 13.5 19.5 14 21C14.5 22 15.5 22 16 21C17 19 18 16 18.5 13C19 10 18.5 7.5 17.5 5.5C16.5 3.5 14.5 2 12 2Z" fill="white"/>
-      </svg>
-      {showText && (
-        <div style={{ overflow:"hidden", whiteSpace:"nowrap" }}>
-          <div style={{ fontSize:fs, fontWeight:900, letterSpacing:"-0.03em", lineHeight:1.1 }}>
-            <span style={{ color:"#FFFFFF" }}>le</span>
-            <span style={{ color:"#14B8A6" }}>v</span>
-            <span style={{ color:"#FFFFFF" }}>el</span>
-            <span style={{ color:"rgba(255,255,255,0.4)", marginLeft:3 }}>ai</span>
-          </div>
-          {subtitle && (
-            <div style={{ fontSize: fs * 0.42, fontWeight:800, color: subtitleColor || "#14B8A6",
-              letterSpacing:"0.12em", textTransform:"uppercase", marginTop:2 }}>{subtitle}</div>
-          )}
+// Uses the actual logo image (levelai-logo.jpg) for pixel-perfect rendering.
+// The logo features: "le" white, "v" teal checkmark integrated into a white tooth outline, "el" white, "ai" white with teal dot on "i".
+// Props:
+//   size      — controls height of the logo image (default 20)
+//   showText  — when false, shows only the tooth/v icon portion (for collapsed sidebar)
+//   subtitle  — optional subtitle text below the logo
+//   subtitleColor — color for the subtitle
+function BrandLogo({ size = 20, showText = true, subtitle, subtitleColor }) {
+  const h = size;
+
+  // Collapsed mode — show just the tooth+checkmark icon (center portion of logo)
+  if (!showText) {
+    return (
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <div style={{ width: h, height: h, overflow:"hidden", position:"relative" }}>
+          <img
+            src="/levelai-logo.jpg"
+            alt="Level AI"
+            style={{
+              height: h * 2.2,
+              width: h * 2.2 * 3.6,
+              objectFit:"contain",
+              position:"absolute",
+              // Center on the tooth/v portion (roughly 30-55% of the width)
+              left: -(h * 2.2 * 3.6 * 0.28),
+              top: -(h * 0.45),
+              mixBlendMode:"lighten",
+            }}
+            draggable={false}
+          />
         </div>
+      </div>
+    );
+  }
+
+  const w = h * 3.6; // aspect ratio of the wordmark
+  return (
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-start" }}>
+      <img
+        src="/levelai-logo.jpg"
+        alt="Level AI"
+        style={{
+          height: h,
+          width: w,
+          objectFit:"contain",
+          objectPosition:"center",
+          display:"block",
+          mixBlendMode:"lighten",
+        }}
+        draggable={false}
+      />
+      {subtitle && (
+        <div style={{ fontSize: h * 0.38, fontWeight:800, color: subtitleColor || "#14B8A6",
+          letterSpacing:"0.12em", textTransform:"uppercase", marginTop:2, paddingLeft:2 }}>{subtitle}</div>
       )}
     </div>
   );
@@ -983,7 +1016,7 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
 
         <div style={{ position: "relative", zIndex: 10 }}>
           <div style={{ marginBottom: 52 }}>
-            <BrandLogo size={30} textSize={26} />
+            <BrandLogo size={30} />
           </div>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase",
             color: "#14B8A6", marginBottom: 16 }}>White-Glove SaaS</div>
@@ -1415,7 +1448,7 @@ function OnboardingWizard({ onComplete, showToast }) {
 
         {/* Logo */}
         <div style={{ position:"relative", zIndex:1, marginBottom:52 }}>
-          <BrandLogo size={28} textSize={24} subtitle="Practice Setup" subtitleColor="#14B8A6" />
+          <BrandLogo size={28} subtitle="Practice Setup" subtitleColor="#14B8A6" />
         </div>
 
         {/* Progress dots */}
@@ -2920,15 +2953,32 @@ function PayerPalChat({ patient, result }) {
     }
   };
 
-  const handleEscalate = (questionText) => {
-    // Store the escalation — in a real implementation this could POST to an API
-    // For now we'll show a confirmation and log it
+  const handleEscalate = async (questionText) => {
+    // Find the AI response that preceded this escalation
+    const lastAssistant = messages.slice().reverse().find(m => m.role === "assistant");
+
     setMessages(prev => [...prev, {
       role: "assistant",
-      text: "Got it! I've flagged this question for the development team to review. They'll look into improving my ability to answer questions like this. Thanks for the feedback! 🙏",
+      text: "Got it! I've flagged this question for the team to review. They'll look into it and improve my ability to answer questions like this. Thanks for the feedback! 🙏",
       isEscalation: true,
     }]);
-    console.log("[PayerPal] Escalated question:", questionText);
+
+    // Persist the flag via API (non-blocking)
+    try {
+      await fetch("/api/v1/chat/flag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patient_id: patient?.id || "unknown",
+          question: questionText,
+          ai_response: lastAssistant?.text || null,
+          error_type: lastAssistant?.errorType || null,
+        }),
+      });
+    } catch {
+      // Non-blocking — UI already shows confirmation
+      console.warn("[PayerPal] Could not persist flag — will retry on next escalation");
+    }
   };
 
   return (
@@ -6835,9 +6885,54 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
     return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
   };
 
+  // Flagged Issues state
+  const [flaggedIssues, setFlaggedIssues] = useState([]);
+  const [flaggedLoading, setFlaggedLoading] = useState(false);
+  const [flaggedCounts, setFlaggedCounts] = useState({ open: 0, reviewed: 0, resolved: 0 });
+
+  const loadFlaggedIssues = useCallback(async () => {
+    setFlaggedLoading(true);
+    try {
+      const res = await fetch("/api/v1/admin/flagged-issues");
+      const data = await res.json();
+      setFlaggedIssues(data.issues || []);
+      setFlaggedCounts(data.counts || { open: 0, reviewed: 0, resolved: 0 });
+    } catch { /* silent */ }
+    finally { setFlaggedLoading(false); }
+  }, []);
+
+  // Load flagged issues when tab is first opened
+  useEffect(() => {
+    if (activeTab === "flagged") loadFlaggedIssues();
+  }, [activeTab, loadFlaggedIssues]);
+
+  const handleUpdateIssue = async (issueId, status, adminNotes) => {
+    try {
+      const res = await fetch("/api/v1/admin/flagged-issues", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issueId, status, adminNotes }),
+      });
+      if (res.ok) {
+        setFlaggedIssues(prev => prev.map(i => i.id === issueId ? { ...i, status, ...(adminNotes !== undefined ? { adminNotes } : {}), ...(status === "resolved" ? { resolvedAt: new Date().toISOString() } : {}) } : i));
+        setFlaggedCounts(prev => {
+          const counts = { ...prev };
+          // Recalculate from updated list
+          const updated = flaggedIssues.map(i => i.id === issueId ? { ...i, status } : i);
+          counts.open = updated.filter(i => i.status === "open").length;
+          counts.reviewed = updated.filter(i => i.status === "reviewed").length;
+          counts.resolved = updated.filter(i => i.status === "resolved").length;
+          return counts;
+        });
+        showToast(`Issue ${status === "resolved" ? "resolved" : "updated"} ✓`);
+      }
+    } catch { showToast("Failed to update issue"); }
+  };
+
   const TABS = [
     { id: "codes", label: "Activation Codes", icon: "🔑" },
     { id: "practices", label: "Practices", icon: "🏥" },
+    { id: "flagged", label: "Flagged Issues", icon: "🚩", badge: flaggedCounts.open || 0 },
   ];
 
   const availableCodes = codes.filter(c => !c.used).length;
@@ -6860,7 +6955,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
 
         {/* Logo */}
         <div style={{ padding: "0 24px", marginBottom: 32 }}>
-          <BrandLogo size={22} textSize={18} subtitle="Admin Console" subtitleColor="#14B8A6" />
+          <BrandLogo size={22} subtitle="Admin Console" subtitleColor="#14B8A6" />
         </div>
 
         {/* Nav items */}
@@ -6872,10 +6967,16 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                 borderRadius: 8, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700,
                 background: activeTab === t.id ? "rgba(20,184,166,0.12)" : "transparent",
                 color: activeTab === t.id ? "#5EEAD4" : "#A3A3A3",
-                transition: "all 0.15s",
+                transition: "all 0.15s", width: "100%", textAlign: "left",
               }}>
               <span style={{ fontSize: 16 }}>{t.icon}</span>
-              {t.label}
+              <span style={{ flex: 1 }}>{t.label}</span>
+              {t.badge > 0 && (
+                <span style={{ fontSize: 10, fontWeight: 900, color: "#fff", background: "#EF4444",
+                  borderRadius: 10, padding: "1px 7px", minWidth: 18, textAlign: "center" }}>
+                  {t.badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -7123,6 +7224,136 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                         {p.activatedAt ? fmtDate(p.activatedAt) : "Not activated"}
                       </div>
                       <div style={{ fontSize: 11, color: "#525252" }}>{fmtDate(p.createdAt)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ═══ Flagged Issues Tab ═══ */}
+          {activeTab === "flagged" && (
+            <div>
+              <div style={{ marginBottom: 32 }}>
+                <h1 style={{ fontSize: 24, fontWeight: 900, color: "#F5F5F5", marginBottom: 4 }}>Flagged Issues</h1>
+                <p style={{ fontSize: 13, color: "#525252" }}>Payer Pal questions escalated by front-desk staff across all practices</p>
+              </div>
+
+              {/* Stats row */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 28 }}>
+                {[
+                  { label: "Open", count: flaggedCounts.open, color: "#EF4444" },
+                  { label: "Reviewed", count: flaggedCounts.reviewed, color: "#FBBF24" },
+                  { label: "Resolved", count: flaggedCounts.resolved, color: "#22c55e" },
+                ].map(s => (
+                  <div key={s.label} style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{s.label}</div>
+                    <div style={{ fontSize: 28, fontWeight: 900, color: s.color }}>{s.count}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Refresh button */}
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+                <button onClick={loadFlaggedIssues} disabled={flaggedLoading}
+                  style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #1F1F1F",
+                    background: "#141414", color: "#A3A3A3", fontSize: 12, fontWeight: 700,
+                    cursor: flaggedLoading ? "wait" : "pointer" }}>
+                  {flaggedLoading ? "Loading…" : "↻ Refresh"}
+                </button>
+              </div>
+
+              {flaggedLoading ? (
+                <div style={{ textAlign: "center", color: "#525252", padding: 40 }}>Loading flagged issues…</div>
+              ) : flaggedIssues.length === 0 ? (
+                <div style={{ textAlign: "center", color: "#525252", padding: 40, background: "#141414",
+                  borderRadius: 12, border: "1px solid #1F1F1F" }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🎉</div>
+                  No flagged issues yet. When front-desk staff escalate Payer Pal questions, they&apos;ll appear here.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {flaggedIssues.map(issue => (
+                    <div key={issue.id} style={{
+                      background: "#141414", borderRadius: 12, border: "1px solid #1F1F1F",
+                      overflow: "hidden", animation: "adminFadeIn 0.3s ease-out"
+                    }}>
+                      {/* Issue header */}
+                      <div style={{ padding: "14px 20px", display: "flex", justifyContent: "space-between",
+                        alignItems: "flex-start", borderBottom: "1px solid #1F1F1F" }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                            <span style={{
+                              display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 800,
+                              background: issue.status === "open" ? "rgba(239,68,68,0.12)" : issue.status === "reviewed" ? "rgba(251,191,36,0.12)" : "rgba(34,197,94,0.12)",
+                              color: issue.status === "open" ? "#EF4444" : issue.status === "reviewed" ? "#FBBF24" : "#22c55e",
+                              border: `1px solid ${issue.status === "open" ? "rgba(239,68,68,0.2)" : issue.status === "reviewed" ? "rgba(251,191,36,0.2)" : "rgba(34,197,94,0.2)"}`,
+                              textTransform: "uppercase",
+                            }}>{issue.status}</span>
+                            {issue.practice?.name && (
+                              <span style={{ fontSize: 11, color: "#A3A3A3", fontWeight: 700 }}>
+                                {issue.practice.name}
+                              </span>
+                            )}
+                            {issue.errorType && (
+                              <span style={{ fontSize: 10, color: "#525252", fontWeight: 600, background: "#1F1F1F",
+                                padding: "1px 6px", borderRadius: 4 }}>
+                                {issue.errorType}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#525252" }}>
+                            {fmtDate(issue.createdAt)}
+                            {issue.patientId && <span> · Patient: {issue.patientId}</span>}
+                          </div>
+                        </div>
+                        {/* Status actions */}
+                        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                          {issue.status === "open" && (
+                            <button onClick={() => handleUpdateIssue(issue.id, "reviewed")}
+                              style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid rgba(251,191,36,0.3)",
+                                background: "rgba(251,191,36,0.08)", color: "#FBBF24", fontSize: 10, fontWeight: 800,
+                                cursor: "pointer" }}>
+                              Mark Reviewed
+                            </button>
+                          )}
+                          {issue.status !== "resolved" && (
+                            <button onClick={() => handleUpdateIssue(issue.id, "resolved")}
+                              style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid rgba(34,197,94,0.3)",
+                                background: "rgba(34,197,94,0.08)", color: "#22c55e", fontSize: 10, fontWeight: 800,
+                                cursor: "pointer" }}>
+                              Resolve
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {/* Question + AI Response */}
+                      <div style={{ padding: "14px 20px" }}>
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase",
+                            letterSpacing: "0.06em", marginBottom: 4 }}>Staff Question</div>
+                          <div style={{ fontSize: 13, color: "#F5F5F5", lineHeight: 1.5, fontWeight: 600 }}>
+                            &ldquo;{issue.question}&rdquo;
+                          </div>
+                        </div>
+                        {issue.aiResponse && (
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase",
+                              letterSpacing: "0.06em", marginBottom: 4 }}>AI Response</div>
+                            <div style={{ fontSize: 12, color: "#A3A3A3", lineHeight: 1.5, padding: "8px 12px",
+                              background: "#0A0A0A", borderRadius: 8, border: "1px solid #1F1F1F" }}>
+                              {issue.aiResponse}
+                            </div>
+                          </div>
+                        )}
+                        {issue.adminNotes && (
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: "#14B8A6", textTransform: "uppercase",
+                              letterSpacing: "0.06em", marginBottom: 4 }}>Admin Notes</div>
+                            <div style={{ fontSize: 12, color: "#5EEAD4", lineHeight: 1.5 }}>{issue.adminNotes}</div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -8051,7 +8282,7 @@ export default function LevelAI() {
           borderBottom:"1px solid " + T.border, display:"flex", alignItems:"center",
           justifyContent: sidebarOpen ? "flex-start" : "center",
           transition:"padding 0.25s" }}>
-          <BrandLogo size={sidebarOpen ? 22 : 24} showText={sidebarOpen} textSize={18} subtitle="insurance made easy" subtitleColor={T.accent || "#14B8A6"} />
+          <BrandLogo size={sidebarOpen ? 22 : 24} showText={sidebarOpen} subtitle={sidebarOpen ? "insurance made easy" : null} subtitleColor={T.accent || "#14B8A6"} />
         </div>
 
         {/* Nav items */}

@@ -1,5 +1,16 @@
 import { ClerkProvider } from '@clerk/nextjs';
+import type { Metadata } from 'next';
 import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'Level AI — Insurance Made Easy',
+  description: 'AI-powered dental insurance verification and benefits management',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+  },
+};
 
 export default function RootLayout({
   children,

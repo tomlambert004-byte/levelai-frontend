@@ -27,6 +27,7 @@ model Practice {
   updatedAt   DateTime @updatedAt
 
   auditLogs           AuditLog[]
+  flaggedIssues       FlaggedIssue[]
 }
 
 // ── Audit log for PHI access and sensitive operations ─────────────────────────
@@ -46,6 +47,27 @@ model AuditLog {
 
   @@index([practiceId])
   @@index([action])
+  @@index([createdAt])
+}
+
+// ── Flagged Payer Pal issues (escalated by front-desk staff) ─────────────────
+// Stores questions/answers that Payer Pal couldn't handle well, for admin review.
+model FlaggedIssue {
+  id            String    @id @default(cuid())
+  practiceId    String?
+  practice      Practice? @relation(fields: [practiceId], references: [id])
+  userId        String?               // Clerk userId who flagged it
+  patientId     String?               // Patient ID (not PHI — just the schedule ID like "p4")
+  question      String                // The user question that was flagged
+  aiResponse    String?               // The AI response (or error) that triggered the flag
+  errorType     String?               // "service_error", "config_error", "timeout", "unknown", etc.
+  status        String    @default("open") // "open" | "reviewed" | "resolved"
+  adminNotes    String?               // Admin can annotate
+  createdAt     DateTime  @default(now())
+  resolvedAt    DateTime?
+
+  @@index([practiceId])
+  @@index([status])
   @@index([createdAt])
 }
 
