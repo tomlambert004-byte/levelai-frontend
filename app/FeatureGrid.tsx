@@ -52,13 +52,6 @@ function IconCheck({ className }: { className?: string }) {
     </svg>
   );
 }
-function IconX({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
 
 // Map icon names to components
 const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
@@ -106,6 +99,12 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
 
   return (
     <>
+      {/* Inject keyframes once */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes featureBackdropIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes featureModalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+      `}} />
+
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {features.map((f, i) => {
           const Icon = ICON_MAP[f.iconName];
@@ -134,51 +133,104 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
       {/* ── Feature Detail Modal ── */}
       {active && ActiveIcon && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16,
+          }}
           onClick={() => setActiveIdx(null)}
         >
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-[fadeIn_0.15s_ease-out]" />
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+            animation: "featureBackdropIn 0.2s ease-out forwards",
+          }} />
 
-          {/* Modal */}
+          {/* Modal card */}
           <div
-            className="relative bg-white rounded-3xl border border-black/[0.06] shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto animate-[modalIn_0.2s_ease-out]"
+            style={{
+              position: "relative",
+              background: "#fff",
+              borderRadius: 24,
+              border: "1px solid rgba(0,0,0,0.06)",
+              boxShadow: "0 25px 60px rgba(0,0,0,0.15)",
+              maxWidth: 520, width: "100%",
+              maxHeight: "85vh", overflowY: "auto",
+              animation: "featureModalIn 0.25s ease-out forwards",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close button */}
             <button
               onClick={() => setActiveIdx(null)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/[0.04] hover:bg-black/[0.08] flex items-center justify-center transition-colors z-10"
+              style={{
+                position: "absolute", top: 16, right: 16,
+                width: 36, height: 36, borderRadius: "50%",
+                background: "rgba(0,0,0,0.05)", border: "none",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", zIndex: 10, transition: "background 0.15s",
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.1)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,0.05)"; }}
             >
-              <IconX className="w-4 h-4 text-[#525252]" />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#525252" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             </button>
 
-            <div className="p-8 md:p-10">
-              {/* Icon + title */}
-              <div className="w-14 h-14 rounded-2xl bg-[#14B8A6]/10 flex items-center justify-center mb-6">
+            <div style={{ padding: "36px 40px" }}>
+              {/* Icon */}
+              <div style={{
+                width: 56, height: 56, borderRadius: 16,
+                background: "rgba(20,184,166,0.1)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                marginBottom: 24,
+              }}>
                 <ActiveIcon className="w-7 h-7 text-[#14B8A6]" />
               </div>
 
-              <div className="text-xs font-extrabold tracking-[0.15em] uppercase text-[#14B8A6] mb-3">
+              {/* Label */}
+              <div style={{
+                fontSize: 11, fontWeight: 800, letterSpacing: "0.15em",
+                textTransform: "uppercase", color: "#14B8A6", marginBottom: 12,
+              }}>
                 {active.title}
               </div>
 
-              <h3 className="text-2xl md:text-3xl font-black text-[#1A1A18] leading-tight mb-4">
+              {/* Headline */}
+              <h3 style={{
+                fontSize: 28, fontWeight: 900, color: "#1A1A18",
+                lineHeight: 1.2, marginBottom: 16,
+              }}>
                 {active.detail.headline}
               </h3>
 
-              <p className="text-[#525252] text-base leading-relaxed mb-8">
+              {/* Body */}
+              <p style={{
+                color: "#525252", fontSize: 15, lineHeight: 1.7, marginBottom: 28,
+              }}>
                 {active.detail.body}
               </p>
 
               {/* Bullets */}
-              <ul className="space-y-3 mb-8">
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, marginBottom: 28 }}>
                 {active.detail.bullets.map((b) => (
-                  <li key={b} className="flex items-start gap-3">
-                    <div className="w-5 h-5 rounded-full bg-[#14B8A6]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <li key={b} style={{
+                    display: "flex", alignItems: "flex-start", gap: 12,
+                    marginBottom: 12,
+                  }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: "50%",
+                      background: "rgba(20,184,166,0.1)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0, marginTop: 1,
+                    }}>
                       <IconCheck className="w-3 h-3 text-[#14B8A6]" />
                     </div>
-                    <span className="text-sm text-[#525252] leading-relaxed font-medium">{b}</span>
+                    <span style={{ fontSize: 14, color: "#525252", lineHeight: 1.6, fontWeight: 500 }}>{b}</span>
                   </li>
                 ))}
               </ul>
@@ -186,10 +238,18 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
               {/* CTA */}
               <a
                 href="/login"
-                className="inline-flex items-center gap-2 rounded-xl bg-[#14B8A6] px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-[#14B8A6]/20 hover:bg-[#0D9488] transition-colors"
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  borderRadius: 12, background: "#14B8A6", color: "#fff",
+                  padding: "12px 24px", fontSize: 14, fontWeight: 800,
+                  textDecoration: "none", transition: "background 0.15s",
+                  boxShadow: "0 4px 14px rgba(20,184,166,0.25)",
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#0D9488"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "#14B8A6"; }}
               >
                 Try it in the Sandbox
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
                 </svg>
               </a>
@@ -197,12 +257,6 @@ export function FeatureGrid({ features }: { features: Feature[] }) {
           </div>
         </div>
       )}
-
-      {/* Modal keyframes */}
-      <style>{`
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-      `}</style>
     </>
   );
 }
