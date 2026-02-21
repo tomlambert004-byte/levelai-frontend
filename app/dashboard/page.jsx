@@ -1050,7 +1050,7 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
             Insurance verification on autopilot.
           </h1>
           <p style={{ fontSize: 15, lineHeight: 1.75, opacity: 0.75, maxWidth: 340 }}>
-            Level AI verifies every patient&apos;s insurance before they walk in the door, so your front desk never has to chase down benefits again. We handle the insurance connections, payer portal automation, and patient outreach behind the scenes. Just connect your practice management system and let us do the heavy lifting.
+            Every patient&apos;s insurance — verified before they walk in. Connect your practice management system and we&apos;ll handle the rest.
           </p>
         </div>
       </div>
