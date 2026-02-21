@@ -55,8 +55,8 @@ let T = themes.dark;
 
 function useTheme() {
   const [mode, setMode] = useState(() => {
-    if (typeof window === "undefined") return "dark";
-    return localStorage.getItem("levelai_theme") || "dark";
+    if (typeof window === "undefined") return "light";
+    return localStorage.getItem("levelai_theme") || "light";
   });
   useEffect(() => {
     localStorage.setItem("levelai_theme", mode);
