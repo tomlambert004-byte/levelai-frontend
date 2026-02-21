@@ -1063,9 +1063,9 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
           {/* ───────── LOGIN ───────── */}
           {step === "login" && (
             <div style={{ animation: "fadeIn 0.4s ease-out" }}>
-              <div style={{ fontSize: 30, fontWeight: 900, color: T.text, marginBottom: 6 }}>Welcome back</div>
+              <div style={{ fontSize: 30, fontWeight: 900, color: T.text, marginBottom: 6 }}>Welcome to Level AI</div>
               <div style={{ fontSize: 14, color: T.textSoft, marginBottom: 32, lineHeight: 1.5 }}>
-                Sign in to your Level AI practice dashboard.
+                Sign in or create an account to get started.
               </div>
               <form onSubmit={handleSignIn} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <OInput label="Email" type="email" placeholder="you@practice.com" value={email} onChange={e => { setEmail(e.target.value); setAuthErr(""); }} required validate="email" />
