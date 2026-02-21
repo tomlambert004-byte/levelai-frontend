@@ -13,7 +13,7 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "../../../../../lib/prisma.js";
 import { logAudit, getClientIp } from "../../../../../lib/audit.js";
 import { checkRateLimit, rateLimitResponse } from "../../../../../lib/rateLimit.js";
-import { checkPracticeActive } from "../../../../../lib/practiceGate.js";
+import { checkPracticeActive, checkFeature } from "../../../../../lib/practiceGate.js";
 
 export async function POST(request) {
   try {
@@ -32,6 +32,10 @@ export async function POST(request) {
     // Practice suspension gate
     const gate = checkPracticeActive(practice);
     if (gate) return gate;
+
+    // Feature gate: SMS requires Professional plan
+    const smsGate = checkFeature(practice, "sms");
+    if (smsGate) return smsGate;
 
     const body = await request.json();
     const { recipientPhone, message, smsQueueId } = body;

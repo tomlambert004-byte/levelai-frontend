@@ -1,3 +1,23 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// HIPAA COMPLIANCE — ZERO PHI AT REST
+//
+// This database stores ONLY business configuration (Practice, billing, audit).
+// NO patient data (names, DOBs, member IDs, insurance) is persisted here.
+//
+// Patient data lifecycle:
+//   PMS (Open Dental) → Encrypted Redis Cache (AES-256-GCM) → Browser State
+//   TTL: 24 hours max, expires at 11 PM daily. See lib/patientCache.js
+//
+// Verification results: returned directly to frontend, stored in React state
+//   only. Never written to Postgres. See app/api/v1/verify/route.js
+//
+// Audit logs: contain action metadata (counts, status codes) — never PHI.
+//   See lib/audit.js
+//
+// Migration 20260221_drop_phi_tables removed the legacy Patient and
+// VerificationResult tables that were created in the initial schema.
+// ═══════════════════════════════════════════════════════════════════════════════
+
 generator client {
   provider = "prisma-client-js"
 }

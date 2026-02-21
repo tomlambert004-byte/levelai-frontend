@@ -6038,7 +6038,7 @@ const SInput = ({ label, type = "text", placeholder, value, onChange, validate, 
   );
 };
 
-function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab }) {
+function Settings({ showToast, sandboxMode, practice, setPractice, onSyncComplete, initialTab }) {
   const [activeTab, setActiveTab]   = useState(initialTab || "general");
 
   // General — load from practice object if available, otherwise empty
@@ -6519,11 +6519,16 @@ function Settings({ showToast, sandboxMode, practice, onSyncComplete, initialTab
                     {verificationDays !== (practice?.verificationDaysAhead || 7) && (
                       <button onClick={async () => {
                         try {
-                          await fetch("/api/v1/practice", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ verificationDaysAhead: verificationDays }),
-                          });
+                          if (sandboxMode) {
+                            // Sandbox: update local practice state instead of API
+                            if (setPractice) setPractice(prev => ({ ...prev, verificationDaysAhead: verificationDays }));
+                          } else {
+                            await fetch("/api/v1/practice", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ verificationDaysAhead: verificationDays }),
+                            });
+                          }
                           showToast(`Verification window set to ${verificationDays} day${verificationDays !== 1 ? "s" : ""}.`);
                         } catch { showToast("Failed to save — please try again."); }
                       }}
@@ -7753,7 +7758,21 @@ export default function LevelAI() {
   const [accountMode, setAccountMode]     = useState("live");
   useEffect(() => {
     const isSandbox = new URLSearchParams(window.location.search).get("sandbox") === "1";
-    if (isSandbox) { setSandboxMode(true); setAccountMode("sandbox"); }
+    if (isSandbox) {
+      setSandboxMode(true);
+      setAccountMode("sandbox");
+      // Provide a mock practice object so settings like verificationDaysAhead work in sandbox
+      setPractice(prev => prev || {
+        name: "Bright Smile Dental",
+        npi: "1234567890",
+        taxId: "12-3456789",
+        email: "demo@brightsmile.com",
+        faxNumber: "(512) 555-0199",
+        verificationDaysAhead: 7,
+        pmsSystem: "Open Dental",
+        activatedAt: new Date().toISOString(),
+      });
+    }
     setSandboxChecked(true);
   }, []);
   const handleLogout = useCallback(() => {
@@ -9056,7 +9075,7 @@ export default function LevelAI() {
 
         {tab === "settings" && (
           <div key="settings" style={{ animation:"fadeIn 0.3s ease-out", height:"100%", display:"flex", flexDirection:"column" }}>
-          <Settings showToast={showToast} sandboxMode={sandboxMode} practice={practice}
+          <Settings showToast={showToast} sandboxMode={sandboxMode} practice={practice} setPractice={setPractice}
             onSyncComplete={() => loadWeekSchedule(new Date().toISOString().split("T")[0])}
             initialTab={settingsInitialTab}
             key={settingsInitialTab || "default"} />
@@ -9209,7 +9228,7 @@ export default function LevelAI() {
                   ? <Skeleton w={200} h={11} />
                   : <span style={{ color:T.textSoft, fontSize:11 }}>{patients.length} patients · {isMounted ? new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}) : ""}</span>
                 }
-                <span style={{ color:T.indigo, fontSize:11, fontWeight:700 }}>&#x1F916; Auto-verifies {practice?.verificationDaysAhead || 7}d + 24h before appt</span>
+{/* removed auto-verify tagline */}
               </div>
             </div>
 

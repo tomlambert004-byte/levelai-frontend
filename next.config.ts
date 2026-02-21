@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const isProd = process.env.NODE_ENV === "production";
 const PROD_ORIGIN = "https://lvlai.app";
@@ -25,7 +26,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https:",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.clerk.accounts.dev https://clerk.lvlai.app https://api.stedi.com https://api.twilio.com https://challenges.cloudflare.com",
+              "connect-src 'self' https://*.clerk.accounts.dev https://clerk.lvlai.app https://api.stedi.com https://api.twilio.com https://challenges.cloudflare.com https://*.sentry.io https://*.ingest.sentry.io",
               "frame-src 'self' https://*.clerk.accounts.dev https://clerk.lvlai.app https://challenges.cloudflare.com",
             ].join("; "),
           },
@@ -45,4 +46,14 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  // Sentry build-time options
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: !process.env.CI, // suppress logs in local dev
+
+  // Upload source maps for better stack traces in production
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+});

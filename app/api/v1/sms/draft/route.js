@@ -21,6 +21,7 @@
  */
 import { auth } from "@clerk/nextjs/server";
 import { checkRateLimit, rateLimitResponse } from "../../../../../lib/rateLimit.js";
+import { checkFeature } from "../../../../../lib/practiceGate.js";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-20250514";
@@ -72,6 +73,14 @@ export async function POST(request) {
       const rl = await checkRateLimit(`smsdraft:${userId}`, { maxRequests: 30, windowMs: 60_000 });
       const blocked = rateLimitResponse(rl);
       if (blocked) return blocked;
+
+      // Feature gate: SMS requires Professional plan (skip for sandbox/unauthenticated)
+      try {
+        const { prisma } = await import("../../../../../lib/prisma.js");
+        const practice = await prisma.practice.findUnique({ where: { clerkUserId: userId } });
+        const smsGate = checkFeature(practice, "sms");
+        if (smsGate) return smsGate;
+      } catch { /* if lookup fails, allow (graceful degradation) */ }
     }
 
     const body = await request.json().catch(() => ({}));
