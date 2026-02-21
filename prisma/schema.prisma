@@ -59,6 +59,8 @@ model Patient {
 
   verificationResults VerificationResult[]
   smsQueue            SmsQueue[]
+
+  @@unique([practiceId, externalId])        // prevent duplicate patients per practice
 }
 
 // ── A single eligibility verification result ─────────────────────────────────

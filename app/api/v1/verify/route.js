@@ -509,7 +509,24 @@ export async function POST(request) {
       }
     }
 
-    // ── Fixture fallback ───────────────────────────────────────────────────────
+    // ── Live mode without Stedi → warn, don't silently return fake data ─────
+    if (!isSandbox && !canUseStedi) {
+      const reasons = [];
+      if (!stediKey) reasons.push("STEDI_API_KEY not configured");
+      if (!member_id && !body.memberId) reasons.push("no member ID");
+      if (!resolvedPayerId) reasons.push("unknown payer");
+      console.warn(`[verify] Live mode but can't use Stedi: ${reasons.join(", ")}. Returning fixture with warning.`);
+      // Still return fixture data but flag it clearly so the UI can warn
+      const fixture = FIXTURES[patient_id] || FIXTURES["p1"];
+      const result = normalize271(fixture);
+      return Response.json({
+        ...result,
+        _source: "fixture_warning",
+        _warning: `Live mode: returned demo data because ${reasons.join(", ")}. Configure Stedi credentials in Settings for real verification.`,
+      });
+    }
+
+    // ── Fixture fallback (sandbox mode only) ────────────────────────────────
     const fixture = FIXTURES[patient_id];
     if (!fixture) {
       // For directory patients with no fixture, return a generic active plan
@@ -539,11 +556,12 @@ export async function POST(request) {
       metadata: { source: "fixture", status: result.verification_status },
     });
 
-    return Response.json({ ...result, _source: canUseStedi ? "stedi_fallback_fixture" : "fixture" });
+    return Response.json({ ...result, _source: "fixture" });
 
   } catch (err) {
+    console.error("[verify] Error:", err);
     return Response.json(
-      { error: "Verification failed.", detail: err.message },
+      { error: "Verification failed. Please try again." },
       { status: 500 }
     );
   }

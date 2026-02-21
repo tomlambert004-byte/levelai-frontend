@@ -20,10 +20,14 @@ export async function POST(request) {
     const blocked = rateLimitResponse(rl);
     if (blocked) return blocked;
 
-    // Validate webhook signature
+    // Validate webhook signature — REQUIRED in production
     const signature = request.headers.get("x-webhook-signature");
     const webhookSecret = process.env.PMS_WEBHOOK_SECRET;
-    if (webhookSecret && signature !== webhookSecret) {
+    if (!webhookSecret) {
+      console.error("[pms/webhook] PMS_WEBHOOK_SECRET not configured — rejecting request");
+      return Response.json({ error: "Webhook endpoint not configured" }, { status: 503 });
+    }
+    if (signature !== webhookSecret) {
       return Response.json({ error: "Invalid webhook signature" }, { status: 401 });
     }
 
@@ -61,65 +65,43 @@ export async function POST(request) {
         return Response.json({ error: "Practice not found" }, { status: 404 });
       }
 
-      // Upsert patient by externalId or create new
+      // Upsert patient by (practiceId + externalId) — prevent cross-practice pollution
+      const patientData = {
+        firstName: first_name || "Unknown",
+        lastName: last_name || "Patient",
+        dateOfBirth: date_of_birth || "",
+        phone: phone || null,
+        email: email || null,
+        memberId: member_id || null,
+        groupNumber: group_number || null,
+        insuranceName: insurance_name || null,
+        payerId: payer_id || null,
+        procedure: procedure || null,
+        provider: provider || null,
+        appointmentDate: appointment_date || null,
+        appointmentTime: appointment_time || null,
+        isOON: is_oon || false,
+      };
+
       let patient;
       if (external_id) {
-        patient = await prisma.patient.upsert({
-          where: { id: external_id },
-          update: {
-            firstName: first_name || undefined,
-            lastName: last_name || undefined,
-            dateOfBirth: date_of_birth || undefined,
-            phone: phone || undefined,
-            email: email || undefined,
-            memberId: member_id || undefined,
-            groupNumber: group_number || undefined,
-            insuranceName: insurance_name || undefined,
-            payerId: payer_id || undefined,
-            procedure: procedure || undefined,
-            provider: provider || undefined,
-            appointmentDate: appointment_date || undefined,
-            appointmentTime: appointment_time || undefined,
-            isOON: is_oon || false,
-          },
-          create: {
-            id: external_id,
-            practiceId: practice_id,
-            firstName: first_name || "Unknown",
-            lastName: last_name || "Patient",
-            dateOfBirth: date_of_birth || "",
-            phone: phone || null,
-            email: email || null,
-            memberId: member_id || null,
-            groupNumber: group_number || null,
-            insuranceName: insurance_name || null,
-            payerId: payer_id || null,
-            procedure: procedure || null,
-            provider: provider || null,
-            appointmentDate: appointment_date || null,
-            appointmentTime: appointment_time || null,
-            isOON: is_oon || false,
-          },
+        // Find by practiceId + externalId (the safe composite key)
+        const existing = await prisma.patient.findFirst({
+          where: { practiceId: practice_id, externalId: external_id },
         });
+        if (existing) {
+          patient = await prisma.patient.update({
+            where: { id: existing.id },
+            data: patientData,
+          });
+        } else {
+          patient = await prisma.patient.create({
+            data: { practiceId: practice_id, externalId: external_id, ...patientData },
+          });
+        }
       } else {
         patient = await prisma.patient.create({
-          data: {
-            practiceId: practice_id,
-            firstName: first_name || "Unknown",
-            lastName: last_name || "Patient",
-            dateOfBirth: date_of_birth || "",
-            phone: phone || null,
-            email: email || null,
-            memberId: member_id || null,
-            groupNumber: group_number || null,
-            insuranceName: insurance_name || null,
-            payerId: payer_id || null,
-            procedure: procedure || null,
-            provider: provider || null,
-            appointmentDate: appointment_date || null,
-            appointmentTime: appointment_time || null,
-            isOON: is_oon || false,
-          },
+          data: { practiceId: practice_id, ...patientData },
         });
       }
 
@@ -139,6 +121,6 @@ export async function POST(request) {
     return Response.json({ received: true, event_type, note: "Unhandled event type" });
   } catch (err) {
     console.error("[pms/webhook] Error:", err);
-    return Response.json({ error: err.message }, { status: 500 });
+    return Response.json({ error: "Webhook processing failed" }, { status: 500 });
   }
 }
