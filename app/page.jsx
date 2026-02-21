@@ -5,12 +5,12 @@ import { useState, useCallback, useEffect, useRef } from "react";
 // Theme — dual palettes: dark-first premium aesthetic with teal accent
 const themes = {
   dark: {
-    bg:"#0A0A0A", bgCard:"#141414", border:"#1F1F1F", borderStrong:"#2A2A2A",
+    bg:"#0A0A0A", bgCard:"#111111", border:"#1C1C1C", borderStrong:"#2A2A2A",
     lime:"#14B8A6", limeLight:"#0A1F1C", limeBorder:"#134E48", limeDark:"#5EEAD4",
-    text:"#F5F5F5", textMid:"#A3A3A3", textSoft:"#525252",
+    text:"#F5F5F0", textMid:"#A3A3A3", textSoft:"#525252",
     amber:"#FBBF24", amberLight:"#1A1708", amberBorder:"#78350F", amberDark:"#FCD34D",
     red:"#EF4444", redLight:"#1C0A0A", redBorder:"#7F1D1D",
-    slate:"#94A3B8", slateLight:"#171717",
+    slate:"#94A3B8", slateLight:"#151515",
     indigo:"#14B8A6", indigoLight:"#0A1F1C", indigoBorder:"#134E48",
     indigoDark:"#5EEAD4",
     rpa:"#38BDF8", rpaLight:"#0A1628", rpaBorder:"#0C4A6E", rpaDark:"#7DD3FC",
@@ -19,9 +19,9 @@ const themes = {
     accent:"#14B8A6", accentLight:"#5EEAD4", accentBg:"#0A1F1C",
   },
   light: {
-    bg:"#FAFAFA", bgCard:"#FFFFFF", border:"#E5E5E5", borderStrong:"#D4D4D4",
+    bg:"#F5F5F0", bgCard:"#FFFFFF", border:"#E5E5E5", borderStrong:"#D4D4D4",
     lime:"#0D9488", limeLight:"#F0FDFA", limeBorder:"#99F6E4", limeDark:"#0F766E",
-    text:"#0A0A0A", textMid:"#525252", textSoft:"#A3A3A3",
+    text:"#1A1A18", textMid:"#525252", textSoft:"#A3A3A3",
     amber:"#D97706", amberLight:"#FFFBEB", amberBorder:"#FCD34D", amberDark:"#B45309",
     red:"#DC2626", redLight:"#FEF2F2", redBorder:"#FECACA",
     slate:"#64748B", slateLight:"#F8FAFC",
@@ -105,8 +105,8 @@ function BrandLogo({ size = 20, showText = true, subtitle, subtitleColor }) {
         draggable={false}
       />
       {subtitle && (
-        <div style={{ fontSize: h * 0.38, fontWeight:800, color: subtitleColor || "#14B8A6",
-          letterSpacing:"0.12em", textTransform:"uppercase", marginTop:2, paddingLeft:2 }}>{subtitle}</div>
+        <div style={{ fontSize: h * 0.38, fontWeight:700, color: subtitleColor || "#14B8A6",
+          letterSpacing:"0.08em", marginTop:2, paddingLeft:2 }}>{subtitle}</div>
       )}
     </div>
   );
@@ -1016,7 +1016,7 @@ function AuthFlow({ onComplete, showToast, onSandbox }) {
 
         <div style={{ position: "relative", zIndex: 10 }}>
           <div style={{ marginBottom: 52 }}>
-            <BrandLogo size={30} />
+            <BrandLogo size={52} />
           </div>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase",
             color: "#14B8A6", marginBottom: 16 }}>White-Glove SaaS</div>
@@ -1448,7 +1448,7 @@ function OnboardingWizard({ onComplete, showToast }) {
 
         {/* Logo */}
         <div style={{ position:"relative", zIndex:1, marginBottom:52 }}>
-          <BrandLogo size={28} subtitle="Practice Setup" subtitleColor="#14B8A6" />
+          <BrandLogo size={44} subtitle="Practice Setup" subtitleColor="#14B8A6" />
         </div>
 
         {/* Progress dots */}
@@ -7068,12 +7068,12 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
       `}</style>
 
       {/* ── Sidebar ── */}
-      <div style={{ width: 260, background: "#141414", borderRight: "1px solid #1F1F1F",
+      <div style={{ width: 260, background: "#111111", borderRight: "1px solid #1F1F1F",
         display: "flex", flexDirection: "column", padding: "24px 0" }}>
 
         {/* Logo */}
         <div style={{ padding: "0 24px", marginBottom: 32 }}>
-          <BrandLogo size={22} subtitle="Admin Console" subtitleColor="#14B8A6" />
+          <BrandLogo size={38} subtitle="Admin Console" subtitleColor="#14B8A6" />
         </div>
 
         {/* Nav items */}
@@ -7125,7 +7125,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
                 <div>
-                  <h1 style={{ fontSize: 24, fontWeight: 900, color: "#F5F5F5", marginBottom: 4 }}>Activation Codes</h1>
+                  <h1 style={{ fontSize: 24, fontWeight: 900, color: "#F5F5F0", marginBottom: 4 }}>Activation Codes</h1>
                   <p style={{ fontSize: 13, color: "#525252" }}>Generate and manage single-use license codes for new practices</p>
                 </div>
                 <button onClick={() => setShowGenForm(!showGenForm)} disabled={generating}
@@ -7150,13 +7150,13 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                       <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Customer / Practice Name</label>
                       <input value={genLabel} onChange={e => setGenLabel(e.target.value)} placeholder="e.g. Dr. Smith — Smile Dental"
                         style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #1F1F1F",
-                          background: "#0A0A0A", color: "#F5F5F5", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                          background: "#0A0A0A", color: "#F5F5F0", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
                     </div>
                     <div>
                       <label style={{ display: "block", fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Customer Email</label>
                       <input value={genEmail} onChange={e => setGenEmail(e.target.value)} placeholder="e.g. drsmith@smiledental.com" type="email"
                         style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #1F1F1F",
-                          background: "#0A0A0A", color: "#F5F5F5", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
+                          background: "#0A0A0A", color: "#F5F5F0", fontSize: 13, fontFamily: "inherit", outline: "none" }} />
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 10 }}>
@@ -7176,15 +7176,15 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
 
               {/* Stats row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 28 }}>
-                <div style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                <div style={{ background: "#111111", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Total Codes</div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: "#F5F5F5" }}>{codes.length}</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#F5F5F0" }}>{codes.length}</div>
                 </div>
-                <div style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                <div style={{ background: "#111111", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Available</div>
                   <div style={{ fontSize: 28, fontWeight: 900, color: "#22c55e" }}>{availableCodes}</div>
                 </div>
-                <div style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                <div style={{ background: "#111111", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Redeemed</div>
                   <div style={{ fontSize: 28, fontWeight: 900, color: "#f97316" }}>{usedCodes}</div>
                 </div>
@@ -7198,7 +7198,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 800, color: "#5EEAD4", textTransform: "uppercase",
                       letterSpacing: "0.08em", marginBottom: 8 }}>New Code Generated</div>
-                    <div style={{ fontSize: 32, fontWeight: 900, color: "#F5F5F5",
+                    <div style={{ fontSize: 32, fontWeight: 900, color: "#F5F5F0",
                       fontFamily: "'Courier New', Courier, monospace", letterSpacing: "0.1em" }}>
                       {newCode}
                     </div>
@@ -7216,12 +7216,12 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
               {loading ? (
                 <div style={{ textAlign: "center", color: "#525252", padding: 40 }}>Loading codes…</div>
               ) : codes.length === 0 ? (
-                <div style={{ textAlign: "center", color: "#525252", padding: 40, background: "#141414",
+                <div style={{ textAlign: "center", color: "#525252", padding: 40, background: "#111111",
                   borderRadius: 12, border: "1px solid #1F1F1F" }}>
                   No activation codes yet. Click &quot;Generate New Code&quot; to create one.
                 </div>
               ) : (
-                <div style={{ background: "#141414", borderRadius: 12, border: "1px solid #1F1F1F", overflow: "hidden" }}>
+                <div style={{ background: "#111111", borderRadius: 12, border: "1px solid #1F1F1F", overflow: "hidden" }}>
                   {/* Table header */}
                   <div style={{ display: "grid", gridTemplateColumns: "180px 1fr 90px 1fr 140px 44px",
                     padding: "12px 20px", borderBottom: "1px solid #1F1F1F", gap: 12 }}>
@@ -7236,7 +7236,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                       padding: "14px 20px", borderBottom: i < codes.length - 1 ? "1px solid #1e293b" : "none",
                       background: i % 2 === 0 ? "transparent" : "rgba(10,10,10,0.4)", gap: 12, alignItems: "center" }}>
                       <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: 13,
-                        fontWeight: 800, color: "#F5F5F5", letterSpacing: "0.05em" }}>{c.code}</div>
+                        fontWeight: 800, color: "#F5F5F0", letterSpacing: "0.05em" }}>{c.code}</div>
                       <div style={{ overflow: "hidden" }}>
                         {c.label ? (
                           <div style={{ fontSize: 12, fontWeight: 700, color: "#D4D4D4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.label}</div>
@@ -7279,21 +7279,21 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
           {activeTab === "practices" && (
             <div>
               <div style={{ marginBottom: 32 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 900, color: "#F5F5F5", marginBottom: 4 }}>Practices</h1>
+                <h1 style={{ fontSize: 24, fontWeight: 900, color: "#F5F5F0", marginBottom: 4 }}>Practices</h1>
                 <p style={{ fontSize: 13, color: "#525252" }}>All onboarded dental practices using Level AI</p>
               </div>
 
               {/* Stats row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 28 }}>
-                <div style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                <div style={{ background: "#111111", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Total Practices</div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: "#F5F5F5" }}>{practices.length}</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#F5F5F0" }}>{practices.length}</div>
                 </div>
-                <div style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                <div style={{ background: "#111111", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Activated</div>
                   <div style={{ fontSize: 28, fontWeight: 900, color: "#22c55e" }}>{practices.filter(p => p.activatedAt).length}</div>
                 </div>
-                <div style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                <div style={{ background: "#111111", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Live Mode</div>
                   <div style={{ fontSize: 28, fontWeight: 900, color: "#14B8A6" }}>{practices.filter(p => p.accountMode === "live").length}</div>
                 </div>
@@ -7302,12 +7302,12 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
               {loading ? (
                 <div style={{ textAlign: "center", color: "#525252", padding: 40 }}>Loading practices…</div>
               ) : practices.length === 0 ? (
-                <div style={{ textAlign: "center", color: "#525252", padding: 40, background: "#141414",
+                <div style={{ textAlign: "center", color: "#525252", padding: 40, background: "#111111",
                   borderRadius: 12, border: "1px solid #1F1F1F" }}>
                   No practices onboarded yet.
                 </div>
               ) : (
-                <div style={{ background: "#141414", borderRadius: 12, border: "1px solid #1F1F1F", overflow: "hidden" }}>
+                <div style={{ background: "#111111", borderRadius: 12, border: "1px solid #1F1F1F", overflow: "hidden" }}>
                   {/* Table header */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 160px 160px",
                     padding: "12px 20px", borderBottom: "1px solid #1F1F1F", gap: 12 }}>
@@ -7322,7 +7322,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                       padding: "14px 20px", borderBottom: i < practices.length - 1 ? "1px solid #1e293b" : "none",
                       background: i % 2 === 0 ? "transparent" : "rgba(10,10,10,0.4)", gap: 12, alignItems: "center" }}>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: "#F5F5F5" }}>{p.name || "Unnamed"}</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "#F5F5F0" }}>{p.name || "Unnamed"}</div>
                         {p.npi && <div style={{ fontSize: 10, color: "#525252", marginTop: 2 }}>NPI: {p.npi}</div>}
                       </div>
                       <div>
@@ -7353,7 +7353,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
           {activeTab === "flagged" && (
             <div>
               <div style={{ marginBottom: 32 }}>
-                <h1 style={{ fontSize: 24, fontWeight: 900, color: "#F5F5F5", marginBottom: 4 }}>Flagged Issues</h1>
+                <h1 style={{ fontSize: 24, fontWeight: 900, color: "#F5F5F0", marginBottom: 4 }}>Flagged Issues</h1>
                 <p style={{ fontSize: 13, color: "#525252" }}>Payer Pal questions escalated by front-desk staff across all practices</p>
               </div>
 
@@ -7364,7 +7364,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                   { label: "Reviewed", count: flaggedCounts.reviewed, color: "#FBBF24" },
                   { label: "Resolved", count: flaggedCounts.resolved, color: "#22c55e" },
                 ].map(s => (
-                  <div key={s.label} style={{ background: "#141414", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
+                  <div key={s.label} style={{ background: "#111111", border: "1px solid #1F1F1F", borderRadius: 12, padding: "18px 20px" }}>
                     <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{s.label}</div>
                     <div style={{ fontSize: 28, fontWeight: 900, color: s.color }}>{s.count}</div>
                   </div>
@@ -7375,7 +7375,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
                 <button onClick={loadFlaggedIssues} disabled={flaggedLoading}
                   style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #1F1F1F",
-                    background: "#141414", color: "#A3A3A3", fontSize: 12, fontWeight: 700,
+                    background: "#111111", color: "#A3A3A3", fontSize: 12, fontWeight: 700,
                     cursor: flaggedLoading ? "wait" : "pointer" }}>
                   {flaggedLoading ? "Loading…" : "↻ Refresh"}
                 </button>
@@ -7384,7 +7384,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
               {flaggedLoading ? (
                 <div style={{ textAlign: "center", color: "#525252", padding: 40 }}>Loading flagged issues…</div>
               ) : flaggedIssues.length === 0 ? (
-                <div style={{ textAlign: "center", color: "#525252", padding: 40, background: "#141414",
+                <div style={{ textAlign: "center", color: "#525252", padding: 40, background: "#111111",
                   borderRadius: 12, border: "1px solid #1F1F1F" }}>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>🎉</div>
                   No flagged issues yet. When front-desk staff escalate Payer Pal questions, they&apos;ll appear here.
@@ -7393,7 +7393,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {flaggedIssues.map(issue => (
                     <div key={issue.id} style={{
-                      background: "#141414", borderRadius: 12, border: "1px solid #1F1F1F",
+                      background: "#111111", borderRadius: 12, border: "1px solid #1F1F1F",
                       overflow: "hidden", animation: "adminFadeIn 0.3s ease-out"
                     }}>
                       {/* Issue header */}
@@ -7414,7 +7414,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                               </span>
                             )}
                             {issue.errorType && (
-                              <span style={{ fontSize: 10, color: "#525252", fontWeight: 600, background: "#1F1F1F",
+                              <span style={{ fontSize: 10, color: "#525252", fontWeight: 600, background: "#1C1C1C",
                                 padding: "1px 6px", borderRadius: 4 }}>
                                 {issue.errorType}
                               </span>
@@ -7450,7 +7450,7 @@ function AdminDashboard({ showToast, onSwitchToPractice, onSignOut }) {
                         <div style={{ marginBottom: 12 }}>
                           <div style={{ fontSize: 10, fontWeight: 800, color: "#525252", textTransform: "uppercase",
                             letterSpacing: "0.06em", marginBottom: 4 }}>Staff Question</div>
-                          <div style={{ fontSize: 13, color: "#F5F5F5", lineHeight: 1.5, fontWeight: 600 }}>
+                          <div style={{ fontSize: 13, color: "#F5F5F0", lineHeight: 1.5, fontWeight: 600 }}>
                             &ldquo;{issue.question}&rdquo;
                           </div>
                         </div>
@@ -8400,7 +8400,7 @@ export default function LevelAI() {
           borderBottom:"1px solid " + T.border, display:"flex", alignItems:"center",
           justifyContent: sidebarOpen ? "flex-start" : "center",
           transition:"padding 0.25s" }}>
-          <BrandLogo size={sidebarOpen ? 22 : 24} showText={sidebarOpen} subtitle={sidebarOpen ? "insurance made easy" : null} subtitleColor={T.accent || "#14B8A6"} />
+          <BrandLogo size={sidebarOpen ? 38 : 28} showText={sidebarOpen} subtitle={sidebarOpen ? "insurance made easy" : null} subtitleColor={T.accent || "#14B8A6"} />
         </div>
 
         {/* Nav items */}

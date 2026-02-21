@@ -2,17 +2,17 @@
 
 :root {
   --background: #0A0A0A;
-  --foreground: #F5F5F5;
+  --foreground: #F5F5F0;
   --accent: #14B8A6;
   --accent-light: #5EEAD4;
-  --card: #141414;
-  --border: #1F1F1F;
+  --card: #111111;
+  --border: #1C1C1C;
   --muted: #525252;
 }
 
 [data-theme="light"] {
-  --background: #FAFAFA;
-  --foreground: #0A0A0A;
+  --background: #F5F5F0;
+  --foreground: #1A1A18;
   --accent: #0D9488;
   --accent-light: #0F766E;
   --card: #FFFFFF;
