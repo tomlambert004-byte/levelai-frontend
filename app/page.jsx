@@ -7469,9 +7469,9 @@ export default function LevelAI() {
   }, [isLoading, setPhase, showToast, sandboxMode, accountMode, preauthCache, addCredentialAlert, practice]);
 
   // ── Auto-verify: fires on schedule load for today, 24h, and 7d windows ───────
-  // Skipped for admin users only. Sandbox mode now resolves from client-side fixtures.
+  // Admins skip auto-verify in live mode (preserves API calls) but run it in sandbox.
   useEffect(() => {
-    if (isAdmin) return;
+    if (isAdmin && !sandboxMode && accountMode !== "sandbox") return;
     const todayISO = new Date().toISOString().split("T")[0];
     patients.forEach((patient, idx) => {
       const h = patient.hoursUntil;
