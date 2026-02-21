@@ -394,6 +394,7 @@ try {
   checkRateLimit = rlMod.checkRateLimit;
   rateLimitResponse = rlMod.rateLimitResponse;
 } catch (_) { /* graceful degradation */ }
+import { checkPracticeActive } from "../../../../lib/practiceGate.js";
 
 // ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(request) {
@@ -404,10 +405,9 @@ export async function POST(request) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Rate limit: 20 req/min per IP
+    // Rate limit: 20 req/min per user (userId, not IP — prevents cross-tenant collisions)
     if (checkRateLimit && rateLimitResponse) {
-      const ip = getClientIp(request);
-      const rl = checkRateLimit(`verify:${ip}`, { maxRequests: 20, windowMs: 60_000 });
+      const rl = checkRateLimit(`verify:${userId}`, { maxRequests: 20, windowMs: 60_000 });
       const blocked = rateLimitResponse(rl);
       if (blocked) return blocked;
     }
@@ -429,13 +429,18 @@ export async function POST(request) {
       return Response.json({ error: "patient_id is required." }, { status: 400 });
     }
 
-    // ── Check sandbox mode — skip Stedi entirely ────────────────────────────────
+    // ── Resolve practice ONCE at the top — used for all DB writes + audit ────
+    let practice = null;
     let isSandbox = false;
     try {
       const { prisma: _p } = await import("../../../../lib/prisma.js");
-      const _prac = await _p.practice.findUnique({ where: { clerkUserId: userId } });
-      if (_prac?.accountMode === "sandbox") isSandbox = true;
+      practice = await _p.practice.findUnique({ where: { clerkUserId: userId } });
+      if (practice?.accountMode === "sandbox") isSandbox = true;
     } catch { /* if lookup fails, default to trying Stedi */ }
+
+    // Practice suspension gate
+    const gate = checkPracticeActive(practice);
+    if (gate) return gate;
 
     // ── Try real Stedi call first ──────────────────────────────────────────────
     const stediKey = process.env.STEDI_API_KEY;
@@ -458,47 +463,16 @@ export async function POST(request) {
           insuranceName: insurance_name || body.insurance || "",
         });
 
-        // Store to Postgres — look up real practiceId from Clerk auth
-        try {
-          const { prisma } = await import("../../../../lib/prisma.js");
-          const { auth }   = await import("@clerk/nextjs/server");
-          const { userId } = await auth();
-          // Upsert practice so it always exists; falls back to "demo" if unauthed
-          let practiceId = "demo";
-          if (userId) {
-            const practice = await prisma.practice.upsert({
-              where:  { clerkUserId: userId },
-              update: {},
-              create: { clerkUserId: userId, name: "My Practice" },
-            });
-            practiceId = practice.id;
-          }
-          await prisma.verificationResult.create({
-            data: {
-              practiceId,
-              memberIdUsed:       member_id || body.memberId || null,
-              payerIdUsed:        resolvedPayerId,
-              trigger:            trigger || "manual",
-              verificationStatus: normalized.verification_status,
-              planStatus:         normalized.plan_status,
-              payerName:          normalized.payer_name,
-              source:             "stedi",
-              rawResponse:        raw,
-              normalizedResult:   normalized,
-              durationMs,
-            },
-          });
-        } catch (_dbErr) {
-          // DB write is non-blocking — don't fail the request
-        }
+        // ZERO PHI AT REST: Verification results are returned directly to the
+        // frontend and stored in React state only. No Postgres persistence.
 
         if (logAudit) logAudit({
-          practiceId: practiceId !== "demo" ? practiceId : null,
-          userId: userId || null,
+          practiceId: practice?.id || null,
+          userId,
           action: "verify.eligibility",
           resourceType: "Patient",
           resourceId: patient_id,
-          ipAddress: getClientIp(request),
+          ipAddress: getClientIp?.(request) || null,
           metadata: { source: "stedi", status: normalized.verification_status },
         });
 
@@ -547,12 +521,12 @@ export async function POST(request) {
     const result = normalize271(fixture);
 
     if (logAudit) logAudit({
-      practiceId: null,
-      userId: null,
+      practiceId: practice?.id || null,
+      userId,
       action: "verify.eligibility",
       resourceType: "Patient",
       resourceId: patient_id,
-      ipAddress: getClientIp(request),
+      ipAddress: getClientIp?.(request) || null,
       metadata: { source: "fixture", status: result.verification_status },
     });
 

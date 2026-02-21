@@ -22,9 +22,9 @@ export async function POST(request) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Rate limit: 30 req/min per IP
+    // Rate limit: 30 req/min per user (userId, not IP — prevents cross-tenant collisions)
     const ip = getClientIp(request);
-    const rl = checkRateLimit(`medicaid:${ip}`, { maxRequests: 30, windowMs: 60_000 });
+    const rl = checkRateLimit(`medicaid:${userId}`, { maxRequests: 30, windowMs: 60_000 });
     const blocked = rateLimitResponse(rl);
     if (blocked) return blocked;
 
@@ -48,8 +48,16 @@ export async function POST(request) {
 
     const result = runMedicaidCheck(state, cdt_codes, patient_age ?? null);
 
+    // Resolve practiceId for audit — don't leave it null
+    let practiceId = null;
+    try {
+      const { prisma } = await import("../../../../../lib/prisma.js");
+      const practice = await prisma.practice.findUnique({ where: { clerkUserId: userId } });
+      if (practice) practiceId = practice.id;
+    } catch { /* non-critical */ }
+
     logAudit({
-      practiceId: null,
+      practiceId,
       userId,
       action: "medicaid.check",
       resourceType: "Medicaid",

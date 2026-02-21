@@ -1,8 +1,9 @@
 /**
  * POST /api/v1/patients/import
  *
- * Accepts a JSON array of parsed CSV rows and bulk-upserts them into the
- * Patient table under the authenticated practice.
+ * Accepts a JSON array of parsed CSV rows and bulk-loads them into the
+ * in-memory patient cache under the authenticated practice.
+ * NO data is written to Postgres.
  *
  * Each row shape (all strings, all optional except firstName + lastName):
  * {
@@ -14,10 +15,13 @@
  * }
  *
  * Returns: { imported: N, skipped: N, errors: [...] }
+ *
+ * ZERO PHI AT REST: Patient data goes to lib/patientCache.js only.
  */
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "../../../../../lib/prisma.js";
 import { logAudit, getClientIp } from "../../../../../lib/audit.js";
+import { getCachedSchedule, setCachedSchedule } from "../../../../../lib/patientCache.js";
 
 export async function POST(request) {
   try {
@@ -26,12 +30,11 @@ export async function POST(request) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get or create the practice record for this user
-    const practice = await prisma.practice.upsert({
-      where:  { clerkUserId: userId },
-      update: {},
-      create: { clerkUserId: userId, name: "My Practice" },
-    });
+    // Look up practice (business config stays in Postgres)
+    const practice = await prisma.practice.findUnique({ where: { clerkUserId: userId } });
+    if (!practice) {
+      return Response.json({ error: "Practice not found" }, { status: 404 });
+    }
 
     const body = await request.json();
     if (!Array.isArray(body.patients) || body.patients.length === 0) {
@@ -43,6 +46,9 @@ export async function POST(request) {
     let imported  = 0;
     let skipped   = 0;
 
+    // Group patients by appointment date for cache storage
+    const byDate = {};
+
     for (const row of patients) {
       const firstName = (row.firstName || "").trim();
       const lastName  = (row.lastName  || "").trim();
@@ -53,37 +59,53 @@ export async function POST(request) {
         continue;
       }
 
-      try {
-        await prisma.patient.create({
-          data: {
-            practiceId:      practice.id,
-            firstName,
-            lastName,
-            dateOfBirth:     (row.dateOfBirth     || "").trim(),
-            phone:           (row.phone           || "").trim() || null,
-            email:           (row.email           || "").trim() || null,
-            memberId:        (row.memberId        || "").trim() || null,
-            groupNumber:     (row.groupNumber     || "").trim() || null,
-            insuranceName:   (row.insuranceName   || "").trim() || null,
-            payerId:         (row.payerId         || "").trim() || null,
-            procedure:       (row.procedure       || "").trim() || null,
-            provider:        (row.provider        || "").trim() || null,
-            appointmentDate: (row.appointmentDate || "").trim() || null,
-            appointmentTime: (row.appointmentTime || "").trim() || null,
-          },
-        });
-        imported++;
-      } catch (err) {
-        skipped++;
-        errors.push(`Row ${patients.indexOf(row) + 1}: import failed`);
-      }
+      const dateKey = (row.appointmentDate || "").trim() || new Date().toISOString().split("T")[0];
+
+      if (!byDate[dateKey]) byDate[dateKey] = [];
+      byDate[dateKey].push({
+        id:              `csv_${imported}`,
+        externalId:      null,
+        name:            `${firstName} ${lastName}`,
+        dob:             (row.dateOfBirth     || "").trim(),
+        memberId:        (row.memberId        || "").trim() || "",
+        insurance:       (row.insuranceName   || "").trim() || "",
+        procedure:       (row.procedure       || "").trim() || "",
+        provider:        (row.provider        || "").trim() || "",
+        phone:           (row.phone           || "").trim() || "",
+        email:           (row.email           || "").trim() || "",
+        fee:             null,
+        isOON:           false,
+        payerId:         (row.payerId         || "").trim() || null,
+        groupNumber:     (row.groupNumber     || "").trim() || "",
+        appointmentDate: dateKey,
+        appointmentTime: (row.appointmentTime || "").trim() || "",
+        _source:         "csv_import",
+      });
+      imported++;
     }
 
+    // Merge into cache per date
+    for (const [dateStr, newPatients] of Object.entries(byDate)) {
+      const existing = getCachedSchedule(practice.id, dateStr) || [];
+      // Deduplicate by lowercase name
+      const seen = new Set(existing.map(p => p.name.toLowerCase()));
+      const merged = [...existing];
+      for (const p of newPatients) {
+        const key = p.name.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push(p);
+        }
+      }
+      setCachedSchedule(practice.id, dateStr, merged);
+    }
+
+    // Audit log — no PHI, just counts
     logAudit({
       practiceId: practice.id,
       userId,
       action: "patient.import",
-      resourceType: "Patient",
+      resourceType: "Schedule",
       ipAddress: getClientIp(request),
       metadata: { imported, skipped, total: patients.length },
     });

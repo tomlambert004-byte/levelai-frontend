@@ -30,19 +30,22 @@ export async function GET(request) {
       where: { clerkUserId: userId },
     });
 
+    // CRITICAL: Never return audit logs without a practice scope.
+    // Without this check, a user with no practice record would see ALL logs.
+    if (!practice) {
+      return Response.json({ logs: [] });
+    }
+
     const { searchParams } = new URL(request.url);
     const range = searchParams.get("range") || "7d";
     const days = RANGE_MAP[range] || 7;
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    // Query audit logs — scoped to this practice (or all if no practice yet)
-    const where = { createdAt: { gte: since } };
-    if (practice) {
-      where.practiceId = practice.id;
-    }
-
     const logs = await prisma.auditLog.findMany({
-      where,
+      where: {
+        practiceId: practice.id,
+        createdAt: { gte: since },
+      },
       orderBy: { createdAt: "desc" },
       take: 500, // cap at 500 rows for performance
     });

@@ -2,21 +2,26 @@
  * GET /api/v1/patients/daily?date=YYYY-MM-DD
  *
  * Priority:
- *   1. Postgres — query Patient rows for this practice + date (from OD sync or CSV import)
- *   2. Demo mode — merge fixture roster + Open Dental API results for a rich schedule
- *      (fixtures always included; OD patients layered on top, deduplicated by name)
+ *   1. In-memory cache — instant return for already-loaded schedules
+ *   2. PMS API pull — lazy warm-up on cache miss, populates cache for subsequent requests
+ *   3. Demo mode — fixture roster (sandbox only, available 24/7)
  *
  * Auth: Clerk userId → Practice.id lookup. Unauthenticated or practice-less → demo mode.
+ *
+ * ZERO PHI AT REST: No patient data is written to Postgres. All patient data
+ * lives in the in-memory cache (lib/patientCache.js) with a daily expiry window.
  */
 
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "../../../../../lib/prisma.js";
 import { syncDailySchedule } from "../../../../../lib/opendental.js";
+import { getCachedSchedule, setCachedSchedule } from "../../../../../lib/patientCache.js";
+import { checkPracticeActive } from "../../../../../lib/practiceGate.js";
 
 // Ensure Next.js never caches this route — schedule data must be fresh every request
 export const dynamic = "force-dynamic";
 
-// ── Fixture data (last-resort fallback) ──────────────────────────────────────
+// ── Fixture data (sandbox/demo fallback — available 24/7) ────────────────────
 const ALL_PATIENTS = [
   { id:"p1", name:"Sarah Mitchell",  gender:"F", dob:"1985-03-14", memberId:"UHC-884-221-09",  insurance:"UnitedHealthcare",       procedure:"Composite Restoration (D2391)",       provider:"Dr. Patel", fee:42000,  phone:"555-210-4832", email:"sarah.mitchell@email.com" },
   { id:"p2", name:"James Thornton",  gender:"M", dob:"1972-07-28", memberId:"DL-99032-TH",     insurance:"Delta Dental",           procedure:"Posterior Composite (D2392)",         provider:"Dr. Patel", fee:38000,  phone:"555-384-9201", email:"jthornton@email.com" },
@@ -29,7 +34,6 @@ const ALL_PATIENTS = [
 ];
 
 const WEEKLY_SCHEDULE = {
-  // Every day showcases: clear✅, OON⚠️, Medicaid💜, pre-auth/MTC🔴, warning⚠️, and more
   1: [["p1","8:00 AM"],["p8","9:00 AM"],["p7","10:00 AM"],["p4","11:00 AM"],["p5","1:00 PM"],["p6","2:30 PM"]],
   2: [["p2","8:00 AM"],["p4","9:00 AM"],["p8","10:00 AM"],["p1","11:00 AM"],["p7","1:00 PM"],["p3","2:00 PM"],["p5","3:30 PM"]],
   3: [["p6","8:00 AM"],["p8","9:00 AM"],["p2","10:00 AM"],["p7","11:00 AM"],["p4","1:00 PM"],["p1","2:30 PM"]],
@@ -47,9 +51,8 @@ function parseTime(timeStr) {
 
 function fixtureForDate(date) {
   let dow = new Date(date + "T12:00:00").getDay();
-  // Demo mode: remap weekends to nearest weekday so the schedule is never empty
-  if (dow === 0) dow = 1; // Sunday → Monday
-  if (dow === 6) dow = 5; // Saturday → Friday
+  if (dow === 0) dow = 1;
+  if (dow === 6) dow = 5;
   const slots = WEEKLY_SCHEDULE[dow] || [];
   const patientMap = Object.fromEntries(ALL_PATIENTS.map(p => [p.id, p]));
   const nowMs = Date.now();
@@ -64,15 +67,11 @@ function fixtureForDate(date) {
 }
 
 /**
- * Pull from Open Dental API directly and normalize to our patient shape.
- * This uses the same syncDailySchedule function but skips the DB entirely.
+ * Normalize PMS patients to our standard UI shape.
  */
-async function odDirectForDate(date) {
-  const odPatients = await syncDailySchedule(date);
-  if (!odPatients || odPatients.length === 0) return [];
-
+function normalizePmsPatients(pmsPatients, date) {
   const nowMs = Date.now();
-  return odPatients.map((p, idx) => {
+  return pmsPatients.map((p, idx) => {
     let hoursUntil = 0;
     try {
       const { hours, minutes } = parseTime(p.appointmentTime || "12:00 PM");
@@ -82,6 +81,7 @@ async function odDirectForDate(date) {
 
     return {
       id:              p.externalId || `od_${idx}`,
+      externalId:      p.externalId || null,
       name:            `${p.firstName} ${p.lastName}`.trim(),
       dob:             p.dateOfBirth   || "",
       memberId:        p.memberId      || "",
@@ -96,8 +96,30 @@ async function odDirectForDate(date) {
       appointmentDate: p.appointmentDate || date,
       appointmentTime: p.appointmentTime || "",
       hoursUntil,
-      _source:         "opendental",
+      _source:         "pms",
     };
+  });
+}
+
+/** Recompute volatile hoursUntil for cached patients */
+function recomputeHoursUntil(patients, date) {
+  const nowMs = Date.now();
+  return patients.map(p => {
+    let hoursUntil = 0;
+    try {
+      const { hours, minutes } = parseTime(p.appointmentTime || "12:00 PM");
+      const apptDate = new Date(`${date}T${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:00`);
+      hoursUntil = Math.round(((apptDate.getTime() - nowMs) / 3600000) * 10) / 10;
+    } catch { /* leave 0 */ }
+    return { ...p, hoursUntil };
+  });
+}
+
+function sortByTime(patients) {
+  return patients.sort((a, b) => {
+    const ta = parseTime(a.appointmentTime || "12:00 PM");
+    const tb = parseTime(b.appointmentTime || "12:00 PM");
+    return (ta.hours * 60 + ta.minutes) - (tb.hours * 60 + tb.minutes);
   });
 }
 
@@ -105,72 +127,66 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
-  // ── Collect patients from all available sources, then merge + dedupe ──────
+  // ── Resolve practice + account mode ─────────────────────────────────────────
+  let practice = null;
+  let accountMode = "sandbox";
+  let practiceKey = null;
 
-  // 1a. DB patients (if authenticated with a practice)
-  let dbMapped = [];
-  if (process.env.DATABASE_URL) {
-    try {
-      const { userId } = await auth();
-      if (userId) {
-        const practice = await prisma.practice.findUnique({ where: { clerkUserId: userId } });
-        if (practice) {
-          const dbPatients = await prisma.patient.findMany({
-            where:   { practiceId: practice.id, appointmentDate: date },
-            orderBy: { appointmentTime: "asc" },
-          });
-          const nowMs = Date.now();
-          dbMapped = dbPatients.map(p => {
-            let hoursUntil = 0;
-            try {
-              const { hours, minutes } = parseTime(p.appointmentTime || "12:00 PM");
-              const apptDate = new Date(`${date}T${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:00`);
-              hoursUntil = Math.round(((apptDate.getTime() - nowMs) / 3600000) * 10) / 10;
-            } catch { /* leave 0 */ }
-            return {
-              id: p.id, name: `${p.firstName} ${p.lastName}`,
-              dob: p.dateOfBirth || "", memberId: p.memberId || "",
-              insurance: p.insuranceName || "", procedure: p.procedure || "",
-              provider: p.provider || "", phone: p.phone || "", email: p.email || "",
-              fee: null, isOON: p.isOON || false, payerId: p.payerId || null,
-              appointmentDate: p.appointmentDate || date,
-              appointmentTime: p.appointmentTime || "",
-              hoursUntil, _source: "postgres",
-            };
-          });
-        }
-      }
-    } catch (_err) {
-      console.warn("[daily] DB lookup failed:", _err.message);
-    }
-  }
-
-  // 1b. Open Dental API patients
-  let odResults = [];
   try {
-    odResults = await odDirectForDate(date);
-  } catch (odErr) {
-    console.warn("[daily] OD API call failed:", odErr.message);
+    const { userId } = await auth();
+    if (userId) {
+      practice = await prisma.practice.findUnique({ where: { clerkUserId: userId } });
+      if (practice) {
+        accountMode = practice.accountMode || "sandbox";
+        practiceKey = practice.pmsSyncKey || null;
+      }
+    }
+  } catch { /* unauthenticated → sandbox */ }
+
+  // ── Practice suspension gate ──────────────────────────────────────────────
+  const gate = checkPracticeActive(practice);
+  if (gate) return gate;
+
+  // ── Sandbox mode: fixtures (available 24/7) ─────────────────────────────────
+  if (accountMode === "sandbox" || !practice) {
+    const fixtures = fixtureForDate(date);
+
+    // In sandbox mode, also layer in OD API results for a rich demo
+    let odResults = [];
+    try {
+      odResults = normalizePmsPatients(await syncDailySchedule(date, practiceKey), date);
+    } catch { /* OD not available — fixtures only */ }
+
+    // Merge: OD first (higher priority), fixtures fill gaps, deduplicate by name
+    const seen = new Set();
+    const merged = [];
+    for (const p of [...odResults, ...fixtures]) {
+      const key = p.name.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); merged.push(p); }
+    }
+    return Response.json(sortByTime(merged));
   }
 
-  // 1c. Fixture patients (always available)
-  const fixtures = fixtureForDate(date);
+  // ── Live mode: cache-first, PMS fallback ────────────────────────────────────
 
-  // ── 2. Merge all sources — deduplicate by lowercase name ──────────────────
-  // Priority: DB > OD > Fixtures (first occurrence wins)
-  const seen = new Set();
-  const merged = [];
-  for (const p of [...dbMapped, ...odResults, ...fixtures]) {
-    const key = p.name.toLowerCase();
-    if (!seen.has(key)) { seen.add(key); merged.push(p); }
+  // 1. Check cache
+  const cached = getCachedSchedule(practice.id, date);
+  if (cached && cached.length > 0) {
+    return Response.json(sortByTime(recomputeHoursUntil(cached, date)));
   }
 
-  // Sort by appointment time
-  merged.sort((a, b) => {
-    const ta = parseTime(a.appointmentTime || "12:00 PM");
-    const tb = parseTime(b.appointmentTime || "12:00 PM");
-    return (ta.hours * 60 + ta.minutes) - (tb.hours * 60 + tb.minutes);
-  });
+  // 2. Cache miss → pull from PMS directly, populate cache, return
+  try {
+    const pmsPatients = await syncDailySchedule(date, practiceKey);
+    if (pmsPatients && pmsPatients.length > 0) {
+      const normalized = normalizePmsPatients(pmsPatients, date);
+      setCachedSchedule(practice.id, date, normalized);
+      return Response.json(sortByTime(normalized));
+    }
+  } catch (pmsErr) {
+    console.warn("[daily] PMS pull failed on cache miss:", pmsErr.message);
+  }
 
-  return Response.json(merged);
+  // 3. No cache, no PMS data → empty schedule
+  return Response.json([]);
 }

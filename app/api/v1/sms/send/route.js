@@ -1,14 +1,19 @@
 /**
- * POST /api/v1/sms/send — Twilio SMS send (or placeholder)
+ * POST /api/v1/sms/send — Stateless Twilio SMS send
  *
- * Called after a draft is approved. If TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN
- * + TWILIO_FROM_NUMBER are set, sends via Twilio REST API. Otherwise, marks
- * the draft as "approved" without sending (placeholder for demo).
+ * Accepts { recipientPhone, message } directly from the frontend.
+ * No database reads or writes — fully stateless.
+ *
+ * If TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN + TWILIO_FROM_NUMBER are set,
+ * sends via Twilio REST API. Otherwise, returns a placeholder success.
+ *
+ * ZERO PHI AT REST: No SMS content is stored in Postgres.
  */
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "../../../../../lib/prisma.js";
 import { logAudit, getClientIp } from "../../../../../lib/audit.js";
 import { checkRateLimit, rateLimitResponse } from "../../../../../lib/rateLimit.js";
+import { checkPracticeActive } from "../../../../../lib/practiceGate.js";
 
 export async function POST(request) {
   try {
@@ -20,21 +25,24 @@ export async function POST(request) {
     const blocked = rateLimitResponse(rl);
     if (blocked) return blocked;
 
+    // Verify practice exists (for audit trail)
     const practice = await prisma.practice.findUnique({ where: { clerkUserId: userId } });
     if (!practice) return Response.json({ error: "Practice not found" }, { status: 404 });
 
+    // Practice suspension gate
+    const gate = checkPracticeActive(practice);
+    if (gate) return gate;
+
     const body = await request.json();
-    const { smsQueueId } = body;
+    const { recipientPhone, message, smsQueueId } = body;
 
-    if (!smsQueueId) {
-      return Response.json({ error: "smsQueueId is required" }, { status: 400 });
+    // Support both new stateless format and legacy smsQueueId format
+    const phone = recipientPhone;
+    const smsBody = message;
+
+    if (!phone || !smsBody) {
+      return Response.json({ error: "recipientPhone and message are required" }, { status: 400 });
     }
-
-    // Verify ownership
-    const draft = await prisma.smsQueue.findFirst({
-      where: { id: smsQueueId, practiceId: practice.id },
-    });
-    if (!draft) return Response.json({ error: "Draft not found" }, { status: 404 });
 
     const twilioSid    = process.env.TWILIO_ACCOUNT_SID;
     const twilioToken  = process.env.TWILIO_AUTH_TOKEN;
@@ -51,66 +59,34 @@ export async function POST(request) {
             "Content-Type": "application/x-www-form-urlencoded",
           },
           body: new URLSearchParams({
-            To:   draft.recipientPhone,
+            To:   phone,
             From: twilioFrom,
-            Body: draft.draftMessage,
+            Body: smsBody,
           }),
         });
 
         const twilioData = await twilioRes.json();
 
         if (twilioRes.ok) {
-          await prisma.smsQueue.update({
-            where: { id: smsQueueId },
-            data: {
-              status:     "sent",
-              sentAt:     new Date(),
-              twilioSid:  twilioData.sid || null,
-              approvedBy: userId,
-              approvedAt: new Date(),
-            },
-          });
+          // Audit log — no PHI (no phone number or message content)
           logAudit({
             practiceId: practice.id,
             userId,
             action: "sms.send",
-            resourceType: "SmsQueue",
-            resourceId: smsQueueId,
             ipAddress: getClientIp(request),
             metadata: { status: "sent", twilioSid: twilioData.sid },
           });
           return Response.json({ sent: true, twilioSid: twilioData.sid });
         } else {
-          await prisma.smsQueue.update({
-            where: { id: smsQueueId },
-            data: {
-              status:       "failed",
-              errorMessage: twilioData.message || "Twilio send failed",
-              approvedBy:   userId,
-              approvedAt:   new Date(),
-            },
-          });
           console.error("[sms/send] Twilio error:", twilioData.code);
           return Response.json({ sent: false, error: "SMS delivery failed. Please try again." }, { status: 502 });
         }
       } catch (twilioErr) {
         console.error("[sms/send] Twilio exception:", twilioErr.name);
-        await prisma.smsQueue.update({
-          where: { id: smsQueueId },
-          data: { status: "failed", errorMessage: "Send failed" },
-        });
         return Response.json({ sent: false, error: "SMS delivery failed. Please try again." }, { status: 502 });
       }
     } else {
       // ── Placeholder mode (no Twilio configured) ───────────────────────
-      await prisma.smsQueue.update({
-        where: { id: smsQueueId },
-        data: {
-          status:     "approved",
-          approvedBy: userId,
-          approvedAt: new Date(),
-        },
-      });
       return Response.json({
         sent:    false,
         queued:  true,

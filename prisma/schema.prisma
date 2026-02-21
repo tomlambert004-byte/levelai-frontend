@@ -15,111 +15,29 @@ model Practice {
   npi         String?
   taxId       String?
   accountMode String   @default("sandbox")  // "sandbox" | "live"
+  status      String   @default("active")   // "active" | "suspended" | "cancelled"
   address     String?
   phone       String?
-  pmsSystem   String?                        // "Open Dental" | "Dentrix" | "Eaglesoft"
-  pmsSyncKey  String?                        // encrypted PMS sync key / eKey
-  activatedAt DateTime?                      // set when activation code is redeemed
+  pmsSystem     String?                        // "Open Dental" | "Dentrix" | "Eaglesoft"
+  pmsSyncKey    String?                        // encrypted PMS sync key / eKey
+  webhookSecret String?                        // per-practice HMAC secret for PMS webhooks
+  activatedAt   DateTime?                      // set when activation code is redeemed
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  patients            Patient[]
-  verificationResults VerificationResult[]
-  smsQueue            SmsQueue[]
   auditLogs           AuditLog[]
 }
 
-// ── A patient record belonging to a practice ─────────────────────────────────
-model Patient {
-  id          String   @id @default(cuid())
-  practiceId  String
-  practice    Practice @relation(fields: [practiceId], references: [id])
-
-  externalId  String?
-  firstName   String
-  lastName    String
-  dateOfBirth String
-  phone       String?
-  email       String?
-  gender      String?                        // "M" | "F"
-
-  memberId      String?
-  groupNumber   String?
-  insuranceName String?
-  payerId       String?
-
-  procedure       String?
-  provider        String?
-  appointmentDate String?
-  appointmentTime String?
-  isOON           Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  verificationResults VerificationResult[]
-  smsQueue            SmsQueue[]
-
-  // Unique constraint on (practiceId, externalId) is enforced by a partial index
-  // in migration 20260219 — only applies when externalId IS NOT NULL.
-  // This allows multiple patients without externalId per practice.
-  @@index([practiceId, externalId])
-}
-
-// ── A single eligibility verification result ─────────────────────────────────
-model VerificationResult {
-  id         String   @id @default(cuid())
-  practiceId String
-  practice   Practice @relation(fields: [practiceId], references: [id])
-  patientId  String?
-  patient    Patient? @relation(fields: [patientId], references: [id])
-
-  memberIdUsed       String?
-  payerIdUsed        String?
-  trigger            String?
-
-  verificationStatus String
-  planStatus         String?
-  payerName          String?
-  source             String
-  rawResponse        Json?
-  normalizedResult   Json
-
-  verifiedAt DateTime @default(now())
-  durationMs Int?
-}
-
-// ── SMS draft queue (approve-before-send outreach) ────────────────────────────
-model SmsQueue {
-  id             String    @id @default(cuid())
-  practiceId     String
-  practice       Practice  @relation(fields: [practiceId], references: [id])
-  patientId      String?
-  patient        Patient?  @relation(fields: [patientId], references: [id])
-
-  recipientPhone String
-  recipientName  String?
-  draftMessage   String
-  triggerType    String              // "reschedule_proposed" | "outreach_queued"
-  status         String    @default("draft")  // draft | approved | sent | failed | dismissed
-  approvedBy     String?             // clerkUserId who approved
-  approvedAt     DateTime?
-  sentAt         DateTime?
-  twilioSid      String?             // Twilio message SID after send
-  errorMessage   String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 // ── Audit log for PHI access and sensitive operations ─────────────────────────
+// ZERO PHI AT REST: Audit logs contain action metadata only — no patient names,
+// DOBs, phone numbers, member IDs, or insurance details.
 model AuditLog {
   id           String   @id @default(cuid())
   practiceId   String?
   practice     Practice? @relation(fields: [practiceId], references: [id])
   userId       String?               // Clerk userId or "webhook"
-  action       String                // e.g. "verify.eligibility", "patient.import"
-  resourceType String?               // e.g. "Patient", "SmsQueue"
+  action       String                // e.g. "verify.eligibility", "pms.sync"
+  resourceType String?               // e.g. "Schedule", "Medicaid"
   resourceId   String?               // ID of the accessed resource
   ipAddress    String?
   metadata     Json?

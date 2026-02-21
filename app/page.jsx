@@ -277,8 +277,15 @@ async function apiFetch(path, options = {}) {
   });
   if (!res.ok) {
     let detail = res.statusText;
-    try { detail = (await res.json()).detail ?? detail; } catch {}
-    throw new Error(detail);
+    let errorType = null;
+    try {
+      const body = await res.json();
+      detail = body.detail ?? body.error ?? detail;
+      errorType = body.error_type ?? null;
+    } catch {}
+    const err = new Error(detail);
+    err.errorType = errorType;
+    throw err;
   }
   return res.json();
 }
@@ -299,6 +306,22 @@ async function apiGetDailySchedule(dateStr) {
 // Returns: Patient[]  (used by DirectorySearchModal)
 async function apiSearchDirectory(query) {
   return apiFetch(`/api/v1/patients/directory?q=${encodeURIComponent(query)}`);
+}
+
+// ── Friendly failure reasons for verification errors ────────────────────────
+// Maps raw API error messages to short, human-readable reasons for the Failed panel.
+function friendlyFailReason(errMsg, patient) {
+  const m = (errMsg || "").toLowerCase();
+  if (m.includes("unauthorized") || m.includes("401")) return "Authentication failed — check your credentials in Settings.";
+  if (m.includes("timeout") || m.includes("timed out") || m.includes("aborted")) return "Verification timed out — the payer portal didn't respond in time.";
+  if (m.includes("rate limit") || m.includes("429") || m.includes("too many")) return "Rate limited — too many requests. Try again in a minute.";
+  if (m.includes("member") && m.includes("not found")) return "Member ID not found by the payer. Double-check the ID.";
+  if (m.includes("payer") && (m.includes("not supported") || m.includes("unknown"))) return `Payer "${patient.insurance || "unknown"}" is not supported yet.`;
+  if (m.includes("credential") || m.includes("login") || m.includes("password")) return "Payer portal credentials are invalid or expired.";
+  if (m.includes("network") || m.includes("fetch") || m.includes("econnrefused")) return "Network error — couldn't reach the verification service.";
+  if (m.includes("500") || m.includes("server")) return "The verification service had an internal error.";
+  if (m.includes("stedi")) return "Clearinghouse error — Stedi returned an unexpected response.";
+  return errMsg ? `Verification error: ${errMsg.slice(0, 80)}` : "Verification failed for an unknown reason.";
 }
 
 // POST /api/v1/verify  { patient_id, member_id, first_name, last_name, date_of_birth, insurance_name, payer_id, trigger }
@@ -379,17 +402,45 @@ function buildVerifyEntry(p, r, t, ph) {
   };
 }
 
-function buildRescheduleDraft(patient, blockReasons) {
-  const reason = (blockReasons[0] || "a coverage issue").toLowerCase();
-  return `Hi ${patient.name.split(" ")[0]}! This is the team at Georgetown Dental. We were getting everything ready for your upcoming visit and noticed a quick hiccup with your insurance (${reason}). Could you give us a quick call at (512) 555-0987 when you have a second? We want to get it sorted out so you don't have any surprises!`;
+function buildRescheduleDraft(patient, blockReasons, practiceName, practicePhone) {
+  const firstName = (patient.name || "").split(" ")[0];
+  const practice = practiceName || "your dental office";
+  const phone = practicePhone ? ` at ${practicePhone}` : "";
+  return `Hi ${firstName}! This is ${practice}. We were getting things ready for your upcoming visit and noticed a small issue with your insurance. Could you give us a quick call${phone} when you get a chance? We want to make sure everything's squared away before your appointment!`;
 }
 
-function buildNotifyDraft(patient, notifyReasons) {
-  const items = notifyReasons.map(r => r.toLowerCase()).join(" and ");
-  return `Hi ${patient.name.split(" ")[0]}, Georgetown Dental here! We are so excited to see you soon. We did a quick check on your benefits and noticed ${items}. No need to worry, we just wanted to give you a heads-up before you come in! Feel free to text or call us if you have any questions.`;
+function buildNotifyDraft(patient, notifyReasons, practiceName, practicePhone) {
+  const firstName = (patient.name || "").split(" ")[0];
+  const practice = practiceName || "your dental office";
+  const phone = practicePhone ? ` at ${practicePhone}` : "";
+  return `Hi ${firstName}, ${practice} here! Quick heads up about your upcoming appointment — we checked your insurance and have a small update for you. Nothing to worry about, but give us a call${phone} if you have any questions. See you soon!`;
 }
 
-function buildRescheduleEntry(p, t, tr) {
+// LLM-powered SMS draft — calls /api/v1/sms/draft for natural-language messages
+async function fetchLLMDraft({ patient, blockReasons, notifyReasons, type, practiceName, practicePhone }) {
+  try {
+    const res = await fetch("/api/v1/sms/draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        patient_name: patient.name,
+        practice_name: practiceName || null,
+        practice_phone: practicePhone || null,
+        procedure: patient.procedure || null,
+        appointment_date: patient.appointmentDate || null,
+        block_reasons: blockReasons || [],
+        notify_reasons: notifyReasons || [],
+        type: type,
+      }),
+    });
+    const data = await res.json();
+    return data.draft || null;
+  } catch {
+    return null; // caller will use the sync fallback
+  }
+}
+
+function buildRescheduleEntry(p, t, tr, practiceName, practicePhone) {
   return {
     id: `rsc_${Date.now()}_${p.id}`,
     time: new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),
@@ -397,11 +448,12 @@ function buildRescheduleEntry(p, t, tr) {
     status: "reschedule_proposed", triage: t.level, reason: t.block[0]||"Coverage issue",
     blockReasons: t.block, appointmentDate: p.appointmentDate, appointmentTime: p.appointmentTime,
     procedure: p.procedure, payer: p.insurance, awaitingApproval: true,
-    draftMessage: buildRescheduleDraft(p, t.block),
+    draftMessage: buildRescheduleDraft(p, t.block, practiceName, practicePhone),
+    _draftLoading: true, // will be replaced by LLM draft
   };
 }
 
-function buildOutreachEntry(p, t) {
+function buildOutreachEntry(p, t, practiceName, practicePhone) {
   return {
     id: `out_${Date.now()}_${p.id}`,
     time: new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),
@@ -409,7 +461,8 @@ function buildOutreachEntry(p, t) {
     status: "outreach_queued", triage: t.level, reason: "Courtesy call",
     notifyReasons: t.notify||[], appointmentDate: p.appointmentDate,
     payer: p.insurance, awaitingApproval: true,
-    draftMessage: buildNotifyDraft(p, t.notify||[]),
+    draftMessage: buildNotifyDraft(p, t.notify||[], practiceName, practicePhone),
+    _draftLoading: true, // will be replaced by LLM draft
   };
 }
 
@@ -1002,9 +1055,11 @@ function OnboardingWizard({ onComplete, showToast }) {
   };
 
   // Step 1 – Practice Identity
-  const [pracName, setPracName] = useState("");
-  const [npi, setNpi]           = useState("");
-  const [taxId, setTaxId]       = useState("");
+  const [pracName, setPracName]       = useState("");
+  const [npi, setNpi]                 = useState("");
+  const [taxId, setTaxId]             = useState("");
+  const [pracAddress, setPracAddress] = useState("");
+  const [pracPhone, setPracPhone]     = useState("");
 
   // Step 2 – PMS Connection
   const [pmsSystem, setPmsSystem]   = useState("");
@@ -1313,6 +1368,10 @@ function OnboardingWizard({ onComplete, showToast }) {
                       }} required validate="taxId" />
                   </div>
                 </div>
+                <OInput label="Office Address" placeholder="e.g. 123 Main St, Suite 200, Salt Lake City, UT 84101"
+                  value={pracAddress} onChange={e => setPracAddress(e.target.value)} required validate="required" />
+                <OInput label="Office Phone" placeholder="e.g. (801) 555-1234" type="tel"
+                  value={pracPhone} onChange={e => setPracPhone(e.target.value)} required validate="phone" />
 
                 {/* Reassurance */}
                 <div style={{ display:"flex", gap:10, alignItems:"center", background:"#f0f9ff",
@@ -1324,7 +1383,7 @@ function OnboardingWizard({ onComplete, showToast }) {
                 </div>
 
                 <NextBtn label="Next: Connect PMS →"
-                  disabled={!pracName || !npi || !taxId}
+                  disabled={!pracName || !npi || !taxId || !pracAddress || !pracPhone}
                   onClick={() => advance("pms")} />
               </div>
             </div>
@@ -1669,6 +1728,8 @@ function OnboardingWizard({ onComplete, showToast }) {
                         name: pracName || undefined,
                         npi: npi || undefined,
                         taxId: taxId || undefined,
+                        address: pracAddress || undefined,
+                        phone: pracPhone || undefined,
                         pmsSystem: pmsSystem || undefined,
                         pmsSyncKey: pmsSyncKey || undefined,
                         accountMode: "live",
@@ -1701,7 +1762,7 @@ function OnboardingWizard({ onComplete, showToast }) {
 // LLM-powered Letter of Medical Necessity generator.
 // Calls /api/v1/preauth/generate → Next.js proxy → Python FastAPI + Anthropic Claude.
 // Falls back to a realistic mock when the Python service is unavailable.
-function PreauthWidget({ patient, result, triage, showToast, prefetched }) {
+function PreauthWidget({ patient, result, triage, showToast, prefetched, practice }) {
   const [status, setStatus]         = useState("idle");    // idle|loading|done|error
   const [loadStage, setLoadStage]   = useState(0);         // 0–3 progressive steps
   const [letter, setLetter]         = useState("");         // editable letter text
@@ -1709,6 +1770,8 @@ function PreauthWidget({ patient, result, triage, showToast, prefetched }) {
   const [summary, setSummary]       = useState(null);
   const [errorMsg, setErrorMsg]     = useState(null);
   const [preauthEmailOpen, setPreauthEmailOpen] = useState(false);
+  const [preauthFaxOpen, setPreauthFaxOpen]     = useState(false);
+  const [savedFaxNumbers, setSavedFaxNumbers]   = useState({});  // payer label → edited fax
   const stageTimer = useRef(null);
 
   useEffect(() => () => clearInterval(stageTimer.current), []);
@@ -1763,6 +1826,11 @@ function PreauthWidget({ patient, result, triage, showToast, prefetched }) {
         body:    JSON.stringify({
           patient_id:     patient.id,
           procedure_code: deriveProcedureCode(),
+          practice_name:    practice?.name || null,
+          practice_address: practice?.address || null,
+          practice_phone:   practice?.phone || null,
+          practice_npi:     practice?.npi || null,
+          practice_tax_id:  practice?.taxId || null,
         }),
       });
 
@@ -1830,8 +1898,8 @@ function PreauthWidget({ patient, result, triage, showToast, prefetched }) {
   <div class="page">
     <div class="practice-header">
       <div>
-        <div class="practice-name">Georgetown Dental Associates</div>
-        <div class="practice-sub">1234 Dental Way, Suite 100 · Georgetown, TX 78626 · (555) 555-0100<br/>NPI: 1234567890 · Tax ID: 74-1234567</div>
+        <div class="practice-name">${practice?.name || "Practice Name"}</div>
+        <div class="practice-sub">${practice?.address || "Address"} · ${practice?.phone || ""}<br/>NPI: ${practice?.npi || "—"} · Tax ID: ${practice?.taxId || "—"}</div>
       </div>
       <div class="badge">Pre-Authorization Request</div>
     </div>
@@ -1902,7 +1970,11 @@ function PreauthWidget({ patient, result, triage, showToast, prefetched }) {
 
   const isMedicaidPA = isMedicaidPatient(patient) || result?._is_medicaid;
   const medicaidStatePA = result?._medicaid_state || detectMedicaidStateClient(patient);
-  const paContact = resolvePreAuthContact(patient, result);
+  const paContactRaw = resolvePreAuthContact(patient, result);
+  // Apply any saved fax number edits from the confirmation modal
+  const paContact = savedFaxNumbers[paContactRaw.label]
+    ? { ...paContactRaw, fax: savedFaxNumbers[paContactRaw.label] }
+    : paContactRaw;
 
   // ── IDLE ──────────────────────────────────────────────────────────────────
   if (status === "idle") return (
@@ -2046,7 +2118,7 @@ function PreauthWidget({ patient, result, triage, showToast, prefetched }) {
         <PDFActionBar
           onDownloadPDF={handleDownloadPDF}
           onEmailPDF={() => setPreauthEmailOpen(true)}
-          onFaxPDF={() => showToast("📠 Fax integration coming soon — use Download PDF + manual fax for now.")}
+          onFaxPDF={() => setPreauthFaxOpen(true)}
           onCopy={() => { navigator.clipboard.writeText(letter); showToast("Letter copied to clipboard!"); }}
         />
       </div>
@@ -2064,6 +2136,23 @@ function PreauthWidget({ patient, result, triage, showToast, prefetched }) {
         }}
         showToast={showToast}
       />
+      <FaxConfirmModal
+        isOpen={preauthFaxOpen}
+        onClose={() => setPreauthFaxOpen(false)}
+        faxNumber={paContact.fax}
+        recipientLabel={paContact.name}
+        documentType={isMedicaidPA ? "Medicaid PA Letter" : "Pre-Auth Letter"}
+        patientName={patient?.name || "Patient"}
+        onConfirm={async ({ fax, edited }) => {
+          // Save the edited fax number for this payer (persists for the session)
+          if (edited) {
+            setSavedFaxNumbers(prev => ({ ...prev, [paContact.label]: fax }));
+          }
+          // Placeholder — in production this would call a fax API (e.g. SRFax, Phaxio, etc.)
+          await new Promise(r => setTimeout(r, 1200));
+        }}
+        showToast={showToast}
+      />
     </div>
   );
 
@@ -2076,6 +2165,8 @@ function PreauthWidget({ patient, result, triage, showToast, prefetched }) {
 function OONEstimatorWidget({ oon, patient, result, practice, showToast }) {
   const [expanded, setExpanded] = useState(false);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [faxModalOpen, setFaxModalOpen]     = useState(false);
+  const [savedFaxOON, setSavedFaxOON]       = useState({});
 
   if (!oon) return null;
 
@@ -2223,13 +2314,13 @@ td{font-size:11px;padding:6px 8px;border:1px solid #e5e7eb;color:#1a1a18}
   };
 
   const handleFaxToCarrier = () => {
-    const contact = resolvePreAuthContact(patient, result);
-    if (contact.fax) {
-      showToast(`📠 Fax superbill to ${contact.label}: ${contact.fax} — fax integration coming soon. Use Download PDF for manual fax.`);
-    } else {
-      showToast("📠 No carrier fax on file. Use Download PDF and fax manually.");
-    }
+    setFaxModalOpen(true);
   };
+
+  const oonContact = (() => {
+    const raw = resolvePreAuthContact(patient, result);
+    return savedFaxOON[raw.label] ? { ...raw, fax: savedFaxOON[raw.label] } : raw;
+  })();
 
   const isOON   = oon.network_status === "out_of_network";
   const officeFee   = oon.office_fee_cents       != null ? fmt(oon.office_fee_cents)        : fmtD(oon.office_fee);
@@ -2385,6 +2476,22 @@ td{font-size:11px;padding:6px 8px;border:1px solid #e5e7eb;color:#1a1a18}
           onSend={async ({ email }) => {
             // Placeholder — in production this would call a server-side email API
             await new Promise(r => setTimeout(r, 800));
+          }}
+          showToast={showToast}
+        />
+        <FaxConfirmModal
+          isOpen={faxModalOpen}
+          onClose={() => setFaxModalOpen(false)}
+          faxNumber={oonContact.fax}
+          recipientLabel={oonContact.name}
+          documentType="Superbill"
+          patientName={patient?.name || "Patient"}
+          onConfirm={async ({ fax, edited }) => {
+            if (edited) {
+              setSavedFaxOON(prev => ({ ...prev, [oonContact.label]: fax }));
+            }
+            // Placeholder — in production this would call a fax API
+            await new Promise(r => setTimeout(r, 1200));
           }}
           showToast={showToast}
         />
@@ -2814,7 +2921,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
                     <div style={{ color:T.red, fontSize:12, fontWeight:900, marginBottom:8, textTransform:"uppercase", letterSpacing:"0.05em" }}>Block Issues Detected</div>
                     {triage.block.map((r,i)=><div key={i} style={{ color:T.red, fontSize:13, fontWeight:600, marginBottom:i<triage.block.length-1?4:0, lineHeight: "1.4" }}>{"- " + r}</div>)}
 
-                    <PreauthWidget patient={patient} result={result} triage={triage} showToast={showToast} />
+                    <PreauthWidget patient={patient} result={result} triage={triage} showToast={showToast} practice={practice} />
                   </div>
                 )}
                 {triage.notify.length > 0 && (
@@ -2826,7 +2933,7 @@ function BenefitsPanel({ patient, result, phaseInfo, onVerify, triage, showToast
                 {/* Show PreauthWidget for Medicaid PA even without block issues */}
                 {triage.block.length === 0 && (isMedicaidPatient(patient) || result?._is_medicaid) &&
                   result?.medicaid_info?.prior_auth_required?.some(c => (patient.procedure || "").match(/D\d{4}/g)?.includes(c)) && (
-                  <PreauthWidget patient={patient} result={result} triage={triage} showToast={showToast} />
+                  <PreauthWidget patient={patient} result={result} triage={triage} showToast={showToast} practice={practice} />
                 )}
               </div>
             )}
@@ -3112,6 +3219,52 @@ function AutoVerifiedPanel({ list, onClose, onSelect }) {
   );
 }
 
+// ── Failed Verifications Panel ─────────────────────────────────────────────────
+function FailedVerificationsPanel({ list, results, onClose, onSelect, onRetry }) {
+  return (
+    <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden" }}>
+      <div style={{ padding:"16px 20px", borderBottom:"1px solid "+T.border, display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
+        <div>
+          <div style={{ fontSize:18, fontWeight:900, color:"#B91C1C" }}>Failed Verifications</div>
+          <div style={{ fontSize:12, color:T.textSoft, marginTop:2 }}>{list.length} patient{list.length !== 1 ? "s" : ""} couldn&apos;t be verified. Review and retry.</div>
+        </div>
+        <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer", fontSize:24, color:T.textSoft }}>&times;</button>
+      </div>
+      <div style={{ flex:1, overflowY:"auto", padding:"16px 20px", display:"flex", flexDirection:"column", gap:10, minHeight:0 }}>
+        {list.length === 0 ? (
+          <div style={{ textAlign:"center", color:T.textSoft, fontSize:13, marginTop:40 }}>No failed verifications right now.</div>
+        ) : list.map(p => {
+          const r = results[p.id];
+          const reason = r?._failReason || "Unknown error";
+          const failedAt = r?._failedAt ? new Date(r._failedAt).toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit" }) : "";
+          return (
+            <div key={p.id}
+              style={{ border:"1px solid #FECACA", background:"#FEF2F2", borderRadius:10, padding:14, cursor:"pointer", transition:"0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.borderColor="#B91C1C"}
+              onMouseLeave={e => e.currentTarget.style.borderColor="#FECACA"}>
+              <div onClick={() => onSelect(p)} style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                <span style={{ fontWeight:800, fontSize:14, color:T.text }}>{p.name}</span>
+                <span style={{ fontSize:10, color:T.textSoft }}>{failedAt}</span>
+              </div>
+              <div onClick={() => onSelect(p)} style={{ fontSize:11, color:T.textMid, marginBottom:6 }}>{p.appointmentTime} · {p.procedure} · {p.insurance}</div>
+              <div style={{ fontSize:12, color:"#B91C1C", fontWeight:600, lineHeight:"1.4", marginBottom:10, padding:"8px 10px", background:"#fff", borderRadius:6, border:"1px solid #FECACA" }}>
+                {reason}
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); onRetry(p); }}
+                style={{ padding:"7px 14px", borderRadius:7, border:"1px solid #FECACA", background:"#fff", color:"#B91C1C", fontWeight:800, cursor:"pointer", fontSize:11, transition:"all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background="#B91C1C"; e.currentTarget.style.color="#fff"; }}
+                onMouseLeave={e => { e.currentTarget.style.background="#fff"; e.currentTarget.style.color="#B91C1C"; }}>
+                Retry Verification
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Schedule Side Panels (Alerts, Outreach) ───────────────────────────────────
 function AlertsPanel({ list, agentLog, onApprove, onDismiss, onClose, onSelect, showToast }) {
   return (
@@ -3139,12 +3292,14 @@ function AlertsPanel({ list, agentLog, onApprove, onDismiss, onClose, onSelect, 
                      {entry && (
                        <div style={{ marginTop: 12, display:"flex", flexDirection:"column" }}>
                          <div style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:8, padding:"10px 12px", marginBottom: 12 }}>
-                           <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>AI SMS Draft</div>
-                           <div style={{ color:T.textMid, fontSize:12, lineHeight:"1.5", fontStyle:"italic" }}>"{entry.draftMessage}"</div>
+                           <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>
+                             AI SMS Draft {entry._draftLoading && <span style={{ color:T.indigo, fontWeight:700, fontSize:9, marginLeft:6 }}>✨ Polishing with AI…</span>}
+                           </div>
+                           <div style={{ color:T.textMid, fontSize:12, lineHeight:"1.5", fontStyle:"italic", opacity: entry._draftLoading ? 0.5 : 1, transition:"opacity 0.3s" }}>&ldquo;{entry.draftMessage}&rdquo;</div>
                          </div>
                          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-                           <button onClick={(e)=>{ e.stopPropagation(); onApprove(entry); showToast("Draft sent successfully!"); }} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"none", background:T.indigoDark, color:"#fff", fontWeight:800, cursor:"pointer", fontSize:11 }}>Approve & Send Draft</button>
-                           <button onClick={(e)=>{ e.stopPropagation(); onDismiss(entry); showToast("Removed from AI Queue."); }} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"1px solid "+T.borderStrong, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:11 }}>I'll Handle It</button>
+                           <button onClick={(e)=>{ e.stopPropagation(); onApprove(entry); showToast("Draft sent successfully!"); }} disabled={entry._draftLoading} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"none", background: entry._draftLoading ? T.border : T.indigoDark, color:"#fff", fontWeight:800, cursor: entry._draftLoading ? "wait" : "pointer", fontSize:11 }}>Approve & Send Draft</button>
+                           <button onClick={(e)=>{ e.stopPropagation(); onDismiss(entry); showToast("Removed from AI Queue."); }} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"1px solid "+T.borderStrong, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:11 }}>I&apos;ll Handle It</button>
                          </div>
                        </div>
                      )}
@@ -3182,12 +3337,14 @@ function OutreachPanel({ list, agentLog, onApprove, onDismiss, onClose, onSelect
                      {entry && (
                        <div style={{ marginTop: 12, display:"flex", flexDirection:"column" }}>
                          <div style={{ background:T.bgCard, border:"1px solid " + T.border, borderRadius:8, padding:"10px 12px", marginBottom: 12 }}>
-                           <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>AI SMS Draft</div>
-                           <div style={{ color:T.textMid, fontSize:12, lineHeight:"1.5", fontStyle:"italic" }}>"{entry.draftMessage}"</div>
+                           <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>
+                             AI SMS Draft {entry._draftLoading && <span style={{ color:T.indigo, fontWeight:700, fontSize:9, marginLeft:6 }}>✨ Polishing with AI…</span>}
+                           </div>
+                           <div style={{ color:T.textMid, fontSize:12, lineHeight:"1.5", fontStyle:"italic", opacity: entry._draftLoading ? 0.5 : 1, transition:"opacity 0.3s" }}>&ldquo;{entry.draftMessage}&rdquo;</div>
                          </div>
                          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-                           <button onClick={(e)=>{ e.stopPropagation(); onApprove(entry); showToast("Message sent to patient!"); }} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"none", background:T.indigoDark, color:"#fff", fontWeight:800, cursor:"pointer", fontSize:11 }}>Send Outreach</button>
-                           <button onClick={(e)=>{ e.stopPropagation(); onDismiss(entry); showToast("Removed from AI Queue."); }} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"1px solid "+T.borderStrong, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:11 }}>I'll Handle It</button>
+                           <button onClick={(e)=>{ e.stopPropagation(); onApprove(entry); showToast("Message sent to patient!"); }} disabled={entry._draftLoading} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"none", background: entry._draftLoading ? T.border : T.indigoDark, color:"#fff", fontWeight:800, cursor: entry._draftLoading ? "wait" : "pointer", fontSize:11 }}>Send Outreach</button>
+                           <button onClick={(e)=>{ e.stopPropagation(); onDismiss(entry); showToast("Removed from AI Queue."); }} style={{ flex: "1 1 120px", padding:"10px 12px", borderRadius:8, border:"1px solid "+T.borderStrong, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:11 }}>I&apos;ll Handle It</button>
                          </div>
                        </div>
                      )}
@@ -3199,7 +3356,7 @@ function OutreachPanel({ list, agentLog, onApprove, onDismiss, onClose, onSelect
   )
 }
 
-function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, onOpenAlerts, onOpenNotify, onOpenAutoVerified }) {
+function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, failedCount, onOpenAlerts, onOpenNotify, onOpenAutoVerified, onOpenFailed }) {
   // The banner is always shown once patients load (botCount box is always present).
   // Only return null if there's truly nothing — no alerts, no outreach, no auto-verified patients.
   return (
@@ -3246,12 +3403,28 @@ function MorningBanner({ blockedCount, notifyCount, botCount, rpaCount, onOpenAl
           </div>
         </div>
       </div>
+      {failedCount > 0 && (
+        <div onClick={onOpenFailed}
+             style={{ flex:"1 1 180px", cursor:"pointer", background:"#FEF2F2", border:"1px solid #FECACA",
+               padding:"14px 18px", borderRadius:12, display:"flex", alignItems:"center", gap:12,
+               transition:"all 0.2s", boxShadow:"0 2px 4px rgba(0,0,0,0.04)" }}
+             onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-4px)"; e.currentTarget.style.boxShadow="0 12px 24px rgba(185,28,28,0.15)"; e.currentTarget.style.borderColor="#B91C1C"; }}
+             onMouseLeave={e=>{ e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 4px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor="#FECACA"; }}>
+          <span style={{fontSize:24}}>❌</span>
+          <div>
+            <div style={{fontSize:15, fontWeight:900, color:"#B91C1C"}}>{failedCount} Failed</div>
+            <div style={{fontSize:12, color:"#B91C1C", opacity:0.8, fontWeight:600, marginTop:2}}>Review &amp; retry →</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, isRPA, onSelect, colColor }) {
   const loading = phaseInfo && phaseInfo.phase !== "complete" && phaseInfo.phase !== "error";
+  const isFailed = result?.verification_status === "error";
+  const isUnverified = !result && !loading; // No result and not loading = needs review
   const isOON = patient.isOON || result?.in_network === false || result?.oon_estimate != null;
   const isMedicaid = isMedicaidPatient(patient) || result?._is_medicaid;
   const medicaidState = result?._medicaid_state || detectMedicaidStateClient(patient);
@@ -3267,6 +3440,8 @@ function PatientCard({ patient, result, phaseInfo, isSelected, triage, isAuto, i
       onMouseLeave={e=>{ if(!isSelected){ e.currentTarget.style.borderColor=T.border; e.currentTarget.style.boxShadow="0 1px 3px "+T.shadow; e.currentTarget.style.transform="translateY(0)"; }}}>
       <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:5, flexWrap:"wrap" }}>
         <span style={{ color:T.text, fontSize:13, fontWeight:800, flex:1 }}>{patient.name}</span>
+        {isFailed && <Badge label="FAILED" color="#B91C1C" bg="#FEF2F2" border="#FECACA" />}
+        {isUnverified && <Badge label="NEEDS REVIEW" color={T.amber} bg={T.amberLight} border={T.amberBorder} />}
         {isMedicaid && <Badge label={medicaidState ? `MEDICAID · ${medicaidState}` : "MEDICAID"} color="#7c3aed" bg="#f5f3ff" border="#ddd6fe" />}
         {isOON  && <Badge label={`OON · ${patient.insurance || result?.payer_name || "OON"}`} color={T.amberDark} bg={T.amberLight} border={T.amberBorder} />}
         {isAuto && <Badge label="AUTO" color={T.indigo} bg={T.indigoLight} border={T.indigoBorder} icon="Bot" />}
@@ -3643,6 +3818,114 @@ function EmailPDFModal({ isOpen, onClose, defaultEmail = "", patientName = "", d
               background:T.indigo, color:"white", fontSize:14, fontWeight:800, cursor:"pointer",
               opacity: sending ? 0.7 : 1 }}>
             {sending ? "Sending…" : `Send to ${recipientLabel || "Recipient"}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Fax Confirmation Modal ──────────────────────────────────────────────────
+// Shows a popup to confirm/edit the fax number before sending.
+// Saves edits to payer contact so the corrected number persists for the session.
+function FaxConfirmModal({ isOpen, onClose, faxNumber = "", recipientLabel = "", documentType = "Document", patientName = "", onConfirm, showToast }) {
+  const [fax, setFax] = useState(faxNumber);
+  const [sending, setSending] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setFax(faxNumber);
+      setSending(false);
+      setSaved(false);
+    }
+  }, [isOpen, faxNumber]);
+
+  if (!isOpen) return null;
+
+  // Basic fax number formatting/validation
+  const cleanFax = fax.replace(/[^\d+\-() ]/g, "").trim();
+  const digitCount = cleanFax.replace(/\D/g, "").length;
+  const isValid = digitCount >= 10;
+
+  const handleConfirm = async () => {
+    if (!isValid) { showToast("Please enter a valid fax number (at least 10 digits)."); return; }
+    setSending(true);
+    try {
+      if (onConfirm) await onConfirm({ fax: cleanFax, edited: cleanFax !== faxNumber });
+      showToast(`📠 ${documentType} queued for fax to ${cleanFax}`);
+      onClose();
+    } catch (err) {
+      showToast(`Fax failed: ${err.message}`);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:9999, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"center", justifyContent:"center" }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ background:T.bgCard, borderRadius:16, padding:32, width:"100%", maxWidth:440,
+          border:"1px solid " + T.border, boxShadow:"0 24px 48px rgba(0,0,0,0.2)" }}>
+
+        {/* Header */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+          <div style={{ fontSize:18, fontWeight:900, color:T.text }}>📠 Confirm Fax Number</div>
+          <button onClick={onClose} style={{ background:"none", border:"none", fontSize:20, color:T.textSoft, cursor:"pointer" }}>✕</button>
+        </div>
+
+        {/* Document info */}
+        <div style={{ background:T.indigoLight, border:"1px solid " + T.indigoBorder, borderRadius:10, padding:"10px 14px", marginBottom:20 }}>
+          <div style={{ fontSize:10, fontWeight:900, color:T.indigoDark, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4 }}>Sending</div>
+          <div style={{ fontSize:13, fontWeight:800, color:T.text }}>{documentType} — {patientName}</div>
+          {recipientLabel && <div style={{ fontSize:11, color:T.textMid, marginTop:2 }}>To: {recipientLabel}</div>}
+        </div>
+
+        {/* Fax number input */}
+        <div style={{ marginBottom:20 }}>
+          <label style={{ fontSize:12, fontWeight:700, color:T.textMid, display:"block", marginBottom:6 }}>
+            Fax Number
+          </label>
+          <input type="tel" value={fax} onChange={e => { setFax(e.target.value); setSaved(false); }}
+            placeholder="1-800-123-4567"
+            style={{ width:"100%", padding:"12px 14px", borderRadius:10, border: isValid || !fax ? "1.5px solid " + T.borderStrong : "1.5px solid " + T.red,
+              background:T.bg, color:T.text, fontSize:16, fontWeight:700, outline:"none",
+              letterSpacing:"0.5px", fontFamily:"monospace", transition:"border-color 0.2s" }}
+            onFocus={e => e.currentTarget.style.borderColor = T.indigo}
+            onBlur={e => e.currentTarget.style.borderColor = isValid || !fax ? T.borderStrong : T.red} />
+          {fax && !isValid && (
+            <div style={{ fontSize:11, color:T.red, marginTop:4, fontWeight:600 }}>Please enter a valid fax number (at least 10 digits)</div>
+          )}
+          {fax && fax !== faxNumber && isValid && (
+            <div style={{ fontSize:11, color:T.indigo, marginTop:4, fontWeight:600 }}>✓ Number updated — will be saved for this payer</div>
+          )}
+          {!fax && (
+            <div style={{ fontSize:11, color:T.amberDark, marginTop:4, fontWeight:600 }}>⚠️ No fax number on file — please enter one</div>
+          )}
+        </div>
+
+        {/* Accuracy warning */}
+        <div style={{ background:T.amberLight, border:"1px solid " + T.amberBorder, borderRadius:8, padding:"10px 12px", marginBottom:20, display:"flex", gap:8, alignItems:"flex-start" }}>
+          <span style={{ fontSize:14, flexShrink:0 }}>⚠️</span>
+          <div style={{ fontSize:11, color:T.amberDark, lineHeight:"1.5", fontWeight:600 }}>
+            Please verify this fax number is correct. Incorrect numbers may result in PHI being sent to the wrong recipient. Double-check with the payer if unsure.
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ display:"flex", gap:10 }}>
+          <button onClick={onClose}
+            style={{ flex:1, padding:"12px", borderRadius:10, border:"1px solid " + T.border,
+              background:T.bgCard, color:T.textMid, fontSize:14, fontWeight:700, cursor:"pointer" }}>
+            Cancel
+          </button>
+          <button onClick={handleConfirm} disabled={sending || !isValid}
+            style={{ flex:1, padding:"12px", borderRadius:10, border:"none",
+              background: sending || !isValid ? T.border : T.indigo, color:"white", fontSize:14, fontWeight:800,
+              cursor: sending || !isValid ? "not-allowed" : "pointer",
+              opacity: sending ? 0.7 : 1, transition:"all 0.15s" }}>
+            {sending ? "Sending…" : "📠 Send Fax"}
           </button>
         </div>
       </div>
@@ -4207,16 +4490,18 @@ function AIWorkflow({ log, onSelectPatient, onApprove, onDismiss, showToast, res
                            ))}
 
                            <div style={{ background:T.bg, border:"1px solid " + T.border, borderRadius:8, padding:"12px", margin:"8px 0" }}>
-                             <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>AI SMS Draft</div>
-                             <div style={{ color:T.textMid, fontSize:13, lineHeight:"1.5", whiteSpace: "normal" }}>"{entry.draftMessage}"</div>
+                             <div style={{ color:T.textSoft, fontSize:10, fontWeight:900, textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:6 }}>
+                               AI SMS Draft {entry._draftLoading && <span style={{ color:T.indigo, fontWeight:700, fontSize:9, marginLeft:6 }}>✨ Polishing with AI…</span>}
+                             </div>
+                             <div style={{ color:T.textMid, fontSize:13, lineHeight:"1.5", whiteSpace: "normal", opacity: entry._draftLoading ? 0.5 : 1, transition:"opacity 0.3s" }}>&ldquo;{entry.draftMessage}&rdquo;</div>
                            </div>
 
                            <div style={{ display:"flex", gap:10, marginTop: 8, flexWrap:"wrap" }}>
-                             <button onClick={()=>{ onApprove(entry); showToast("Message Sent!"); }} style={{ flex: "1 1 140px", padding:"12px 10px", borderRadius:8, border:"none", background:T.indigoDark, color:"#fff", fontWeight:800, cursor:"pointer", fontSize:12 }}>
+                             <button onClick={()=>{ onApprove(entry); showToast("Message Sent!"); }} disabled={entry._draftLoading} style={{ flex: "1 1 140px", padding:"12px 10px", borderRadius:8, border:"none", background: entry._draftLoading ? T.border : T.indigoDark, color:"#fff", fontWeight:800, cursor: entry._draftLoading ? "wait" : "pointer", fontSize:12 }}>
                                {isReschedule ? "Approve & Send" : "Send Outreach"}
                              </button>
                              <button onClick={()=>{ onDismiss(entry); showToast("Removed from queue."); }} style={{ flex: "1 1 140px", padding:"12px 10px", borderRadius:8, border:"1px solid " + T.borderStrong, background:T.bgCard, color:T.textMid, fontWeight:800, cursor:"pointer", fontSize:12 }}>
-                               I'll Handle It
+                               I&apos;ll Handle It
                              </button>
                            </div>
                         </div>
@@ -4842,14 +5127,14 @@ const SInput = ({ label, type = "text", placeholder, value, onChange, validate, 
   );
 };
 
-function Settings({ showToast, sandboxMode, onSyncComplete }) {
+function Settings({ showToast, sandboxMode, practice, onSyncComplete }) {
   const [activeTab, setActiveTab]   = useState("general");
 
-  // General
-  const [pracName, setPracName]     = useState("Georgetown Dental Associates");
-  const [npiVal, setNpiVal]         = useState("1234567890");
-  const [taxIdVal, setTaxIdVal]     = useState("");
-  const [emailVal, setEmailVal]     = useState("hello@georgetowndental.com");
+  // General — load from practice object if available, otherwise empty
+  const [pracName, setPracName]     = useState(practice?.name || "");
+  const [npiVal, setNpiVal]         = useState(practice?.npi || "");
+  const [taxIdVal, setTaxIdVal]     = useState(practice?.taxId || "");
+  const [emailVal, setEmailVal]     = useState(practice?.email || "");
 
   // PMS
   const [pmsSystem]                 = useState("Open Dental");
@@ -5838,13 +6123,17 @@ function Settings({ showToast, sandboxMode, onSyncComplete }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared toast bar — used in both auth and dashboard contexts
 function ToastBar({ msg, fading }) {
+  const isError = /fail|error|denied|❌|🔴|⚠️/i.test(msg);
+  const iconColor = isError ? T.red : T.limeDark;
+  const iconBg    = isError ? T.redLight : T.limeLight;
+  const icon      = isError ? "✗" : "✓";
   return (
     <div style={{ position:"absolute", top:24, right:24, background:T.text, color:T.bgCard,
       padding:"16px 24px", borderRadius:10, fontWeight:800, fontSize:13,
       boxShadow:"0 8px 24px " + T.shadowStrong, zIndex:9999,
       display:"flex", alignItems:"center", gap:12,
       animation: fading ? "toastOut 0.4s ease-out forwards" : "toastIn 0.3s ease-out" }}>
-      <span style={{ color:T.limeDark, background:T.limeLight, borderRadius:"50%", width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>✓</span>
+      <span style={{ color:iconColor, background:iconBg, borderRadius:"50%", width:24, height:24, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>{icon}</span>
       {msg}
     </div>
   );
@@ -6326,6 +6615,9 @@ export default function LevelAI() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [dayPanelLoading, setDayPanelLoading] = useState(false);
 
+  // ── Practice suspension ────────────────────────────────────────────────────
+  const [practiceSuspended, setPracticeSuspended] = useState(false);
+
   // ── Stale credential alerts ────────────────────────────────────────────────
   const [credentialAlerts, setCredentialAlerts] = useState([]);
   // credentialAlerts = [{ type: "pms"|"payer", message: "...", dismissedAt: null }]
@@ -6404,6 +6696,12 @@ export default function LevelAI() {
         return [...otherDays, ...withHours];
       });
     } catch (err) {
+      // Detect practice suspension
+      if (err.errorType === "practice_suspended") {
+        setPracticeSuspended(true);
+        setDailyLoading(false);
+        return;
+      }
       setDailyError(err.message);
       // Detect PMS credential issues (Open Dental returns 401/403 which surfaces as 502 from our route)
       const msg = (err.message || "").toLowerCase();
@@ -6544,7 +6842,17 @@ export default function LevelAI() {
       apiResult = await apiPostVerify(patient.id, trigger, patient);
     } catch (e) {
       setPhase(patient.id, { phase: "error", error: e.message });
-      showToast(`Verification failed: ${e.message}`);
+      // Store a failure result so the patient shows in the "Failed" column (not stuck in Pending)
+      const failReason = friendlyFailReason(e.message, patient);
+      setResults(prev => ({ ...prev, [patient.id]: {
+        verification_status: STATUS.ERROR,
+        plan_status: "unknown",
+        _failReason: failReason,
+        _failedAt: new Date().toISOString(),
+      }}));
+      if (trigger === "manual") {
+        showToast(`❌ ${patient.name} — ${failReason}`);
+      }
       // Detect payer credential issues
       const msg = (e.message || "").toLowerCase();
       if (msg.includes("credential") || msg.includes("login") || msg.includes("authentication") || msg.includes("unauthorized") || msg.includes("invalid password") || msg.includes("session expired")) {
@@ -6595,9 +6903,11 @@ export default function LevelAI() {
     const isFuture = patient.hoursUntil > 24;
     // "batch" (Verify All) is logged as "manual" so it doesn't appear in auto-verified panel
     const logTrigger = trigger === "batch" ? "manual" : trigger;
+    const practiceName = practice?.name || null;
+    const practicePhone = practice?.phone || null;
     const newEntries = [buildVerifyEntry(patient, finalResult, logTrigger, runPhases)];
-    if (triage.block.length > 0 && isFuture) newEntries.push(buildRescheduleEntry(patient, triage, trigger));
-    else if (triage.notify.length > 0) newEntries.push(buildOutreachEntry(patient, triage));
+    if (triage.block.length > 0 && isFuture) newEntries.push(buildRescheduleEntry(patient, triage, trigger, practiceName, practicePhone));
+    else if (triage.notify.length > 0) newEntries.push(buildOutreachEntry(patient, triage, practiceName, practicePhone));
     setAgentLog(log => [...newEntries.reverse(), ...log]);
 
     // ── Module 5: Pre-auth letter (manual trigger only) ─────────────────────
@@ -6605,32 +6915,50 @@ export default function LevelAI() {
     // button in PreauthWidget to initiate the letter drafting flow.
 
     // ── Module 3: Create SMS draft for block/notify patients ────────────────
+    // Uses LLM to generate natural-language patient-facing messages (no raw triage data)
     if ((triage.block.length > 0 || triage.notify.length > 0) && patient.phone && !sandboxMode) {
-      const smsMessage = triage.block.length > 0
-        ? `Hi ${(patient.name || "").split(" ")[0]}, this is your dental office. We noticed an issue with your insurance coverage for your upcoming visit. Please call us at your earliest convenience so we can help resolve this before your appointment. Thank you!`
-        : `Hi ${(patient.name || "").split(" ")[0]}, this is your dental office. We have an update regarding your insurance coverage for your upcoming appointment. Please give us a call when you get a chance. Thank you!`;
-      fetch("/api/v1/sms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          patientId: patient.id?.startsWith?.("p") ? null : patient.id, // skip fixture IDs
-          recipientPhone: patient.phone,
-          recipientName: patient.name,
-          draftMessage: smsMessage,
-          triggerType: triage.block.length > 0 ? "reschedule_proposed" : "outreach_queued",
-        }),
-      }).then(r => r.json()).then(data => {
-        // Attach smsQueueId to the agent log entry so Approve/Dismiss can target it
-        if (data?.draft?.id) {
+      const isBlock = triage.block.length > 0;
+      const draftType = isBlock ? "reschedule" : "outreach";
+
+      // Fire LLM draft + SMS queue creation in parallel
+      // The agent log entry already has a template fallback; LLM draft replaces it when ready
+      (async () => {
+        try {
+          // Get LLM-quality draft
+          const llmDraft = await fetchLLMDraft({
+            patient,
+            blockReasons: triage.block,
+            notifyReasons: triage.notify,
+            type: draftType,
+            practiceName,
+            practicePhone,
+          });
+
+          // Use LLM draft or fall back to the template already in the entry
+          const finalDraft = llmDraft || (isBlock
+            ? buildRescheduleDraft(patient, triage.block, practiceName, practicePhone)
+            : buildNotifyDraft(patient, triage.notify, practiceName, practicePhone));
+
+          // Update agent log entry with LLM-quality draft
           setAgentLog(log => log.map(e =>
-            e.patientId === patient.id && e.awaitingApproval && !e.smsQueueId
-              ? { ...e, smsQueueId: data.draft.id }
+            e.patientId === patient.id && e.awaitingApproval && e._draftLoading
+              ? { ...e, draftMessage: finalDraft, _draftLoading: false }
+              : e
+          ));
+
+          // ZERO PHI AT REST: Draft stays in agentLog React state only.
+          // No DB persistence — handleApprove sends directly via /api/v1/sms/send.
+        } catch {
+          // Non-blocking — template fallback already in agent log
+          setAgentLog(log => log.map(e =>
+            e.patientId === patient.id && e._draftLoading
+              ? { ...e, _draftLoading: false }
               : e
           ));
         }
-      }).catch(() => {}); // non-blocking
+      })();
     }
-  }, [isLoading, setPhase, showToast, sandboxMode, preauthCache, addCredentialAlert]);
+  }, [isLoading, setPhase, showToast, sandboxMode, preauthCache, addCredentialAlert, practice]);
 
   // ── Auto-verify: fires on schedule load for today, 24h, and 7d windows ───────
   // Skipped for admin users and sandbox mode (no auth session → API returns 401).
@@ -6702,12 +7030,10 @@ export default function LevelAI() {
       status: "reschedule_approved",
       resolvedAt: new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),
     }));
-    // Wire SMS: approve the draft then trigger send (non-blocking)
-    if (entry.smsQueueId) {
-      fetch("/api/v1/sms", { method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: entry.smsQueueId, status: "approved" }) })
-        .then(() => fetch("/api/v1/sms/send", { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ smsQueueId: entry.smsQueueId }) }))
+    // Stateless SMS send — no DB queue, send directly with message body
+    if (entry.recipientPhone && entry.draftMessage) {
+      fetch("/api/v1/sms/send", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipientPhone: entry.recipientPhone, message: entry.draftMessage }) })
         .catch(() => {}); // non-blocking
     }
   }, []);
@@ -6718,12 +7044,7 @@ export default function LevelAI() {
       status: "reschedule_dismissed",
       resolvedAt: new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),
     }));
-    // Wire SMS: dismiss the draft (non-blocking)
-    if (entry.smsQueueId) {
-      fetch("/api/v1/sms", { method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: entry.smsQueueId, status: "dismissed" }) })
-        .catch(() => {});
-    }
+    // Stateless — draft only lived in agentLog state, nothing to clean up
   }, []);
 
   // ── Derived state (same logic as before — different source array) ────────────
@@ -6736,7 +7057,10 @@ export default function LevelAI() {
   const verifiedCount = todayOnly.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.VERIFIED).length;
   const actionCount   = todayOnly.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.ACTION_REQUIRED).length;
   const inactiveCount = todayOnly.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.INACTIVE).length;
+  const failedCount   = todayOnly.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.ERROR).length;
   const pendingCount  = todayOnly.filter(p => !results[p.id] || isLoading(p.id)).length;
+  // Full list of failed patients (all days, for the FailedVerificationsPanel)
+  const failedPatients = patients.filter(p => !isLoading(p.id) && results[p.id]?.verification_status === STATUS.ERROR);
   const todayIds      = new Set(todayOnly.map(p => p.id));
   const autoCount     = agentLog.filter(e => e.trigger !== "manual" && e.action === ACTION.VERIFIED && todayIds.has(e.patientId)).length;
   const rpaCount      = agentLog.filter(e => e.rpaEscalated && todayIds.has(e.patientId)).length;
@@ -6748,7 +7072,8 @@ export default function LevelAI() {
     { key:"action_required", label:"Action Required", color:T.amber,   bg:T.amberLight, border:T.amberBorder, filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.ACTION_REQUIRED },
     { key:"verified",        label:"Verified",        color:T.limeDark,bg:T.limeLight,  border:T.limeBorder,  filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.VERIFIED        },
     { key:"inactive",        label:"Inactive",        color:T.red,     bg:T.redLight,   border:T.redBorder,   filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.INACTIVE        },
-    { key:"pending",         label:"Pending",         color:T.slate,   bg:T.slateLight, border:T.border,      filter:p=>!results[p.id]||isLoading(p.id)                                              },
+    { key:"failed",          label:"Failed",          color:"#B91C1C", bg:"#FEF2F2",    border:"#FECACA",     filter:p=>!isLoading(p.id)&&results[p.id]?.verification_status===STATUS.ERROR            },
+    { key:"pending",         label:"Needs Review",    color:T.slate,   bg:T.slateLight, border:T.border,      filter:p=>!results[p.id]||isLoading(p.id)                                              },
   ];
 
   const todayStrLocal = isMounted ? new Date().toISOString().split("T")[0] : "";
@@ -6842,6 +7167,49 @@ export default function LevelAI() {
         />
         {toastMsg && <ToastBar msg={toastMsg} fading={toastFading} />}
       </>
+    );
+  }
+
+  // ── Practice Suspension Overlay ──────────────────────────────────────────────
+  if (practiceSuspended && !sandboxMode) {
+    return (
+      <div style={{
+        height: "100vh", background: T.bg, fontFamily: "'Nunito',sans-serif",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        flexDirection: "column", gap: 20, padding: 40,
+      }}>
+        <div style={{
+          background: T.bgCard, border: "1px solid " + T.border,
+          borderRadius: 16, padding: "48px 40", maxWidth: 480, width: "100%",
+          textAlign: "center", boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+        }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>&#9888;&#65039;</div>
+          <h1 style={{ color: T.text, fontSize: 24, fontWeight: 800, marginBottom: 12 }}>
+            Service Paused
+          </h1>
+          <p style={{ color: T.textSoft, fontSize: 15, lineHeight: 1.6, marginBottom: 24 }}>
+            Your LvlAI subscription is currently paused.
+            Please contact our team to resume service.
+          </p>
+          <div style={{
+            background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+            borderRadius: 10, padding: "16px 20", marginBottom: 20,
+          }}>
+            <div style={{ color: "#a5b4fc", fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Contact Support</div>
+            <div style={{ color: T.textSoft, fontSize: 14 }}>billing@levelai.com</div>
+          </div>
+          <button
+            onClick={handleLogout}
+            style={{
+              background: "rgba(255,255,255,0.06)", border: "1px solid " + T.border,
+              borderRadius: 8, padding: "10px 24px", color: T.textSoft,
+              fontSize: 13, fontWeight: 700, cursor: "pointer",
+            }}
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -7030,13 +7398,18 @@ export default function LevelAI() {
           {dailyLoading ? <NavCountSkeleton /> : (
             <>
               {[
-                { label:"Verified",  count:verifiedCount, color:T.limeDark, bg:T.limeLight,  border:T.limeBorder  },
-                { label:"Action",    count:actionCount,   color:T.amber,    bg:T.amberLight, border:T.amberBorder },
-                { label:"Inactive",  count:inactiveCount, color:T.red,      bg:T.redLight,   border:T.redBorder   },
-                { label:"Pending",   count:pendingCount,  color:T.slate,    bg:T.slateLight, border:T.border      },
-              ].map(({label,count,color,bg,border}) => (
-                <div key={label} style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px",
-                  borderRadius:20, background:bg, border:"1px solid " + border, color, fontSize:11, fontWeight:800 }}>
+                { label:"Verified",     count:verifiedCount, color:T.limeDark, bg:T.limeLight,  border:T.limeBorder  },
+                { label:"Action",       count:actionCount,   color:T.amber,    bg:T.amberLight, border:T.amberBorder },
+                { label:"Inactive",     count:inactiveCount, color:T.red,      bg:T.redLight,   border:T.redBorder   },
+                { label:"Failed",       count:failedCount,   color:"#B91C1C",  bg:"#FEF2F2",    border:"#FECACA", onClick: failedCount > 0 ? () => { setSchedulePanel("failed"); setPrevPanel(null); } : undefined },
+                { label:"Needs Review", count:pendingCount,  color:T.slate,    bg:T.slateLight, border:T.border      },
+              ].map(({label,count,color,bg,border,onClick}) => (
+                <div key={label} onClick={onClick}
+                  style={{ display:"flex", alignItems:"center", gap:4, padding:"4px 10px",
+                  borderRadius:20, background:bg, border:"1px solid " + border, color, fontSize:11, fontWeight:800,
+                  cursor: onClick ? "pointer" : "default", transition:"all 0.15s" }}
+                  onMouseEnter={e => { if(onClick) e.currentTarget.style.transform="scale(1.05)"; }}
+                  onMouseLeave={e => { if(onClick) e.currentTarget.style.transform="scale(1)"; }}>
                   <span style={{ fontSize:13, fontWeight:900, lineHeight:1 }}>{count}</span>
                   <span>{label}</span>
                 </div>
@@ -7076,7 +7449,7 @@ export default function LevelAI() {
 
         {tab === "settings" && (
           <div key="settings" style={{ animation:"fadeIn 0.3s ease-out", height:"100%", display:"flex", flexDirection:"column" }}>
-          <Settings showToast={showToast} sandboxMode={sandboxMode} onSyncComplete={() => loadWeekSchedule(new Date().toISOString().split("T")[0])} />
+          <Settings showToast={showToast} sandboxMode={sandboxMode} practice={practice} onSyncComplete={() => loadWeekSchedule(new Date().toISOString().split("T")[0])} />
           </div>
         )}
 
@@ -7129,11 +7502,25 @@ export default function LevelAI() {
                       if (toVerify.length === 0) return;
                       showToast(`🔄 Verifying ${toVerify.length} patients…`);
                       // Stagger verification calls but suppress individual toasts via "batch" trigger
+                      let batchFailed = 0;
                       const promises = toVerify.map((p, i) =>
-                        new Promise(resolve => setTimeout(async () => { await verify(p, "batch").catch(() => {}); resolve(); }, i * 300))
+                        new Promise(resolve => setTimeout(async () => {
+                          try { await verify(p, "batch"); } catch { batchFailed++; }
+                          resolve();
+                        }, i * 300))
                       );
                       await Promise.all(promises);
-                      showToast(`✅ All ${toVerify.length} patients verified.`);
+                      // Count failures from results (verify() stores STATUS.ERROR on failure)
+                      const actualFailed = toVerify.filter(p => results[p.id]?.verification_status === STATUS.ERROR).length;
+                      const totalFailed = Math.max(batchFailed, actualFailed);
+                      const totalSuccess = toVerify.length - totalFailed;
+                      if (totalFailed === 0) {
+                        showToast(`✅ All ${toVerify.length} patients verified.`);
+                      } else if (totalSuccess === 0) {
+                        showToast(`❌ All ${toVerify.length} verifications failed. Click "Failed" to review.`);
+                      } else {
+                        showToast(`✅ ${totalSuccess} verified, ❌ ${totalFailed} failed. Click "Failed" to review.`);
+                      }
                     }}
                     style={{ background: dailyLoading ? T.borderStrong : T.lime, color:"#fff", border:"none", padding:"8px 18px", borderRadius:8, fontWeight:800, cursor: dailyLoading ? "not-allowed" : "pointer", fontSize:12, transition:"all 0.2s" }}
                     onMouseEnter={e => { if(!dailyLoading) e.currentTarget.style.transform = "scale(1.03)"; }}
@@ -7194,9 +7581,11 @@ export default function LevelAI() {
                   notifyCount={notifyList.length}
                   botCount={autoCount}
                   rpaCount={rpaCount}
+                  failedCount={failedCount}
                   onOpenAlerts={() => { setSchedulePanel("alerts"); setPrevPanel(null); }}
                   onOpenNotify={() => { setSchedulePanel("outreach"); setPrevPanel(null); }}
                   onOpenAutoVerified={() => { setSchedulePanel("autoverified"); setPrevPanel(null); }}
+                  onOpenFailed={() => { setSchedulePanel("failed"); setPrevPanel(null); }}
                 />
               )}
 
@@ -7269,6 +7658,15 @@ export default function LevelAI() {
                   list={autoVerifiedList}
                   onClose={() => setSchedulePanel("benefits")}
                   onSelect={(p) => { setSelected(p); setPrevPanel("autoverified"); setSchedulePanel("benefits"); }}
+                />
+              )}
+              {schedulePanel === "failed" && (
+                <FailedVerificationsPanel
+                  list={failedPatients}
+                  results={results}
+                  onClose={() => setSchedulePanel("benefits")}
+                  onSelect={(p) => { setSelected(p); setPrevPanel("failed"); setSchedulePanel("benefits"); }}
+                  onRetry={(p) => { verify(p, "manual"); }}
                 />
               )}
             </div>
