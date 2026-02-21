@@ -67,5 +67,5 @@ ENV PORT=8080
 ENV HOSTNAME="0.0.0.0"
 EXPOSE 8080
 
-# Run migrations then start server
-CMD ["sh", "-c", "prisma migrate deploy --schema=./prisma/schema.prisma && node server.js"]
+# Run migrations (if DB configured) then start server
+CMD ["sh", "-c", "if [ -n \"$DATABASE_URL\" ]; then prisma migrate deploy --schema=./prisma/schema.prisma; fi && node server.js"]
